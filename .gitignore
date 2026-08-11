@@ -1,0 +1,21 @@
+# Python bytecode/cache
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Virtual environments, in case one ever ends up inside this folder
+.venv/
+venv/
+
+# Test/device .fit artifacts, in case any reappear here during future testing
+*.fit
+
+# Superseded draft -- merged into README.md's License/Disclaimer section
+README_DISCLAIMER_DRAFT.md
+
+# Raw memory reconstruction, superseded by PROJECT_NOTES.md as the
+# curated, GitHub-ready version of the same material -- kept locally
+# for personal reference only
+MEMORY_LOG.md
