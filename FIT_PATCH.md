@@ -1,6 +1,48 @@
 ```
 FIT_PATCH(1)              Garmin Edge FIT Toolkit             FIT_PATCH(1)
 
+Doc rev 16 -- refreshed 2026-08-11. Field 320 corrected: "Conditioning"
+-> "Perf. Conditioning" -- full concept name is "Performance
+Conditioning," but Doug confirmed the actual on-device DATA FIELD
+display reads "Perf. Conditioning" (abbreviated), matching this
+toolkit's naming convention (see NOTE on 320 below). fit_dump.py now
+v2.4.9, still 117 entries (rename only). Prior rev (15, 2026-08-11)
+follows.
+
+Doc rev 15 -- refreshed 2026-08-11. Field 49 corrected: "Avg Speed
+(Alt)" -> "Avg Speed" -- Doug deployed it into a full-width screen
+slot and visually confirmed on-device it's plain text, no graph/bars.
+No record exists of the original "(Alt)" naming's provenance; flagged
+as a methodological caution for the Graph/Bars marker theory (see
+NOTE on 49 below) rather than a falsification, since there's no
+evidence this field's old label was ever a literal on-device marker
+transcription like 23/348/349 were. fit_dump.py now v2.4.8, still 117
+entries (rename only). Prior rev (14, 2026-08-11) follows.
+
+Doc rev 14 -- refreshed 2026-08-11. Field ID reference now 117
+confirmed entries (12 new this pass: 2, 15, 18, 32, 165, 347, 350,
+433, 452, 478, 495, 497 -- see FIELD ID REFERENCE note below),
+fit_dump.py v2.4.7. Also corrects 3 placeholder names built around the
+"*"/"(Alt)" marker before its meaning was confirmed: 23 "Heart Rate
+(Alt)" -> "HR Zone Graph", 348 "Speed *" -> "Speed Bars", 349
+"Cadence *" -> "Cadence Bars". Prior rev (13, 2026-08-11) follows.
+
+Doc rev 13 -- refreshed 2026-08-11. The long-open "*" marker mystery
+(fields 348/349) is likely resolved -- Doug reported confirming it
+marks a Graph/Bars-style rendering requiring a full-width screen slot,
+falling back to plain text otherwise; same for the "(Alt)" suffix on
+fields 23/49. Not yet independently re-verified by this project, noted
+as the working explanation rather than certain. fit_dump.py now
+v2.4.6, doc-only. See PROJECT_NOTES.md for a scoped (not yet built)
+GUI feature this unlocks. Prior rev (12, 2026-08-11) follows.
+
+Doc rev 12 -- refreshed 2026-08-11. Two field names corrected: 58 and
+87 were transcribed as "Lap Timer"/"Last Lap Timer" (assumed by
+analogy to the separate, correctly-named field 56 "Timer"), but a
+closer on-device relabeling check found the real display text is "Lap
+Time"/"Last Lap Time," no "r." No field IDs added or removed, still
+105 confirmed entries. Prior rev (11, 2026-08-10) follows.
+
 Doc rev 11 -- refreshed 2026-08-10. Field ID reference now 105
 confirmed entries (18 new this pass -- see FIELD ID REFERENCE note
 below), fit_dump.py v2.4.4. No fit_patch.py functional changes this
@@ -351,62 +393,68 @@ FIELD 10 / SCREEN TYPES (CONFIRMED, side-thread Test 4, 2026-08-04)
        it (or NAMED_SCREEN_TYPES directly) rather than re-deriving this
        table elsewhere.
 
-FIELD ID REFERENCE (105 confirmed)
-       ID     Name                          ID     Name
-       ---    ----------------------        ---    ----------------------
-        0    Calories                         91    Max Speed
-        3    Cadence                          93    ETA at Destination
-        4    Avg Cadence                      94    ETA to Next
-        5    Lap Cadence                      95    Odometer
-        6    Distance                         96    Battery Level
-        7    Lap Dist.                        97    GPS Signal Strength
-        9    Elevation (ft)                   99    Aerobic Training Effect
-       11    Percent Grade                   146    10s Power
-       12    Heading                         178    Gears
-       13    Heart Rate                      179    Front Gear
-       14    Avg Heart Rate                  180    Rear Gear
-       16    %Max Heart Rate                 181    Gear Battery
-       17    Avg %Max Heart Rate             182    Gear Ratio
-       19    %Heart Rate Reserve             199    HR Zone 1 (time)
-       20    Avg %HRR                        200    HR Zone 2 (time)
-       22    Heart Rate Zone                 201    HR Zone 3 (time)
-       23    Heart Rate (Alt)                202    HR Zone 4 (time)
-       27    Distance to Destination         203    HR Zone 5 (time)
-       28    Time to Destination             216    WindField Widget
-       29    Distance to Next                257    Time Standing
-       30    Time to Next                    259    Time Seated
-       31    Dest. Location                  263    Platform Center Offset
-       36    Power                           266    Power Phase Right
-       37    Avg Power                       270    Avg R. Peak Pwr Phase
-       38    Kilojoules                      272    Power Phase Left
-       39    Lap Power                       276    Avg L. Peak Pwr Phase
-       48    Speed                           295    Target Power
-       49    Avg Speed (Alt)                 316    Lights Connected
-       50    Lap Speed                       317    Light Battery
-       53    Sunrise                         318    Beam Angle Status
-       54    Sunset                          319    Light Mode
-       55    Elapsed Time                    320    Conditioning
-       56    Timer                           343    Heart Rate Graph
-       57    Avg Lap Time                    344    Speed Graph
-       58    Lap Timer                       345    Cadence Graph
-       59    Time of Day (TOD)               346    Power Graph
-       60    Total Ascent                    348    Speed * (see note)
-       61    Total Descent                   349    Cadence * (see note)
-       62    Dest. Ahead                     368    Elevation Graph
-       63    Time Ahead                      409    Gear Combo
-       64    Calories to Go                  442    Lap VAM
-       65    Distance to Go                  443    Avg VAM
-       66    Heart Rate to Go                444    Ascent Remaining
-       67    Reps to Go                      445    Asc to Next Crs Pt
-       68    Time to Go                      486    Grit
-       77    VAM                             487    Lap Grit
-       78    Temperature                     488    Flow
-       79    3s Power                        489    Lap Flow
-       81    Normalized Power                491    Assist Mode
-       84    Last Lap Dist                   492    Shifting Advice
-       86    Last Lap Speed                  493    eBike Battery
-       87    Last Lap Timer                  494    Travel Range
-       88    30s VAM
+FIELD ID REFERENCE (117 confirmed)
+       ID     Name                       ID     Name
+       ---    -----------------------    ---    -----------------------
+         0    Calories                    94    ETA to Next
+         2    Course Pt Dist.             95    Odometer
+         3    Cadence                     96    Battery Level
+         4    Avg Cadence                 97    GPS Signal Strength
+         5    Lap Cadence                 99    Aerobic Training Effect
+         6    Distance                   146    10s Power
+         7    Lap Dist.                  165    Last Lap HR
+         9    Elevation (ft)             178    Gears
+        11    Percent Grade              179    Front Gear
+        12    Heading                    180    Rear Gear
+        13    Heart Rate                 181    Gear Battery
+        14    Avg Heart Rate             182    Gear Ratio
+        15    Lap HR                     199    HR Zone 1 (time)
+        16    %Max Heart Rate            200    HR Zone 2 (time)
+        17    Avg %Max Heart Rate        201    HR Zone 3 (time)
+        18    Lap %Max HR                202    HR Zone 4 (time)
+        19    %Heart Rate Reserve        203    HR Zone 5 (time)
+        20    Avg %HRR                   216    WindField Widget
+        22    Heart Rate Zone            257    Time Standing
+        23    HR Zone Graph              259    Time Seated
+        27    Distance to Destination    263    Platform Center Offset
+        28    Time to Destination        266    Power Phase Right
+        29    Distance to Next           270    Avg R. Peak Pwr Phase
+        30    Time to Next               272    Power Phase Left
+        31    Dest. Location             276    Avg L. Peak Pwr Phase
+        32    Next Pt Location           295    Target Power
+        36    Power                      316    Lights Connected
+        37    Avg Power                  317    Light Battery
+        38    Kilojoules                 318    Beam Angle Status
+        39    Lap Power                  319    Light Mode
+        48    Speed                      320    Perf. Conditioning
+        49    Avg Speed                  343    Heart Rate Graph
+        50    Lap Speed                  344    Speed Graph
+        53    Sunrise                    345    Cadence Graph
+        54    Sunset                     346    Power Graph
+        55    Elapsed Time               347    HR Bars
+        56    Timer                      348    Speed Bars (see note)
+        57    Avg Lap Time               349    Cadence Bars (see note)
+        58    Lap Time                   350    Power Bars
+        59    Time of Day (TOD)          368    Elevation Graph
+        60    Total Ascent               409    Gear Combo
+        61    Total Descent              433    Anaerobic TE
+        62    Dest. Ahead                442    Lap VAM
+        63    Time Ahead                 443    Avg VAM
+        64    Calories to Go             444    Ascent Remaining
+        65    Distance to Go             445    Asc to Next Crs Pt
+        66    Heart Rate to Go           452    Respiration
+        67    Reps to Go                 478    EPOC
+        68    Time to Go                 486    Grit
+        77    VAM                        487    Lap Grit
+        78    Temperature                488    Flow
+        79    3s Power                   489    Lap Flow
+        81    Normalized Power           491    Assist Mode
+        84    Last Lap Dist              492    Shifting Advice
+        86    Last Lap Speed             493    eBike Battery
+        87    Last Lap Time              494    Travel Range
+        88    30s VAM                    495    60s Grit
+        91    Max Speed                  497    60s Flow
+        93    ETA at Destination
 
        NOTE: 2026-08-10 batch (18 new: 7, 30, 31, 39, 50, 57, 61, 62,
        63, 67, 86, 88, 94, 95, 295, 442, 443, 445) -- confirmed by
@@ -422,19 +470,66 @@ FIELD ID REFERENCE (105 confirmed)
        on a sandbox profile -- same verification standard as every
        other entry in this table.
 
-       NOTE: 84/87 (Last Lap Dist / Last Lap Timer) confirmed 2026-08-04
+       NOTE: 84/87 (Last Lap Dist / Last Lap Time) confirmed 2026-08-04
        via the same exploration thread -- a forced-field test screen
        deployed successfully through NewFiles. Previously assumed
        GroupTrack-specific purely by association (both IDs happened to
        appear on the f10=32 Conditional record) -- they aren't
        GroupTrack-related at all, just two ordinary lap-stat fields.
        This closes the toolkit's last open field-ID mystery;
-       KNOWN_UNRESOLVED_IDS is now empty.
+       KNOWN_UNRESOLVED_IDS is now empty. CORRECTED 2026-08-11: field
+       87 was originally transcribed as "Last Lap Timer" -- a closer
+       on-device relabeling check found the real display text is
+       "Last Lap Time," no "r" (same mixup as field 58 below).
 
-       NOTE on 348/349 ("Speed *"/"Cadence *"): confirmed genuinely
-       distinct from 48/3 via an on-device UI marker (a "*" shown
-       only in the field picker, never while actually riding) --
-       exact meaning of the marker still unknown.
+       NOTE on 348/349 (now "Speed Bars"/"Cadence Bars", formerly
+       "Speed *"/"Cadence *"): confirmed genuinely distinct from 48/3
+       via an on-device UI marker (a "*" shown only in the field
+       picker, never while actually riding). MEANING RESOLVED
+       2026-08-11 (Doug verified directly): the "*" marks a Bars-type
+       rendering; real on-device names confirmed and corrected above.
+       Same marker family as field 23 (Graph-type, also corrected --
+       see below) and the standalone Bars entries 347/350. All need a
+       full-width screen slot to actually draw as a bar/graph --
+       placed in a shared/split row instead, silently falls back to
+       plain text. Not yet independently re-verified across multiple
+       placements by this project. See PROJECT_NOTES.md "Graph/Bars
+       full-width warning" for a scoped (not yet built) GUI feature to
+       surface this.
+
+       NOTE: 2026-08-11 batch (12 new: 2, 15, 18, 32, 165, 347, 350,
+       433, 452, 478, 495, 497) -- Doug's continued field census in a
+       separate session, same direct on-device verification standard
+       as every other entry. Also corrects 3 placeholder names built
+       around the "*"/"(Alt)" marker before its meaning was confirmed:
+       23 "Heart Rate (Alt)" -> "HR Zone Graph" (a distinct Graph-type
+       field, not an alternate view of plain Heart Rate), 348/349 (see
+       note above). No collisions with any prior entry.
+
+       NOTE on 49 (now "Avg Speed", formerly "Avg Speed (Alt)"),
+       corrected same day (2026-08-11): no record exists of how/why
+       this field was originally named "(Alt)" -- predates this
+       project's later discipline of noting confirmation method per
+       field, the same blind spot that produced field 58's earlier
+       wrong "Lap Timer" guess. Doug deployed it into a full-width
+       screen slot via the GUI and visually confirmed on-device: it's
+       a plain text "Avg Speed" value, no graph or bars. CAUTION for
+       the Graph/Bars marker theory (348/349's note above): unlike
+       23/348/349, there's no record this field's old "(Alt)" label
+       was ever a literal transcription of a real on-device UI marker
+       -- treat this as a caution, not a falsification of the theory.
+       An OLD placeholder name merely containing the word "(Alt)"
+       isn't itself evidence of a real on-device marker unless that
+       was actually recorded at confirmation time.
+
+       NOTE on 320 (now "Perf. Conditioning", formerly
+       "Conditioning"), corrected 2026-08-11: the full concept name is
+       "Performance Conditioning," but Doug confirmed the actual
+       on-device DATA FIELD display reads "Perf. Conditioning"
+       (abbreviated). Renamed to match this toolkit's established
+       convention of naming fields as they display on-device rather
+       than by their full/conceptual name -- same convention behind
+       "Lap Dist." and "Dest. Location."
 
        NOTE on the 343-346/368 graph cluster: confirmed via two
        independent screens plus on-ride photo verification. First-
@@ -443,11 +538,15 @@ FIELD ID REFERENCE (105 confirmed)
        corrected. Don't assume array order = display order for
        future census entries, especially on B-variant layouts.
 
-       NOTE on 58 (Lap Timer): confirmed 2026-08-06, surfaced
+       NOTE on 58 (Lap Time): confirmed 2026-08-06, surfaced
        incidentally by real GUI testing rather than an active field-ID
        hunt -- a restored 8/3/2026 CyclingRoadSandbox backup contained
        a field the GUI's picker didn't recognize; confirmed via direct
-       visual comparison against the live device display.
+       visual comparison against the live device display. CORRECTED
+       2026-08-11: originally transcribed as "Lap Timer" (assumed by
+       analogy to the separate, correctly-named field 56 "Timer"), but
+       a closer on-device relabeling check found the real display text
+       is "Lap Time," no "r." Field 56 "Timer" is unaffected.
 
 LAYOUT VARIANTS
        Field 8 selects the grid arrangement for a given field count.

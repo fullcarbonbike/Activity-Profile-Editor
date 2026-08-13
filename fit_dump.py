@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "2.4.4"  # add 18 confirmed field IDs, 2026-08-10 batch: 7 Lap Dist., 30 Time to Next, 31 Dest. Location, 39 Lap Power, 50 Lap Speed, 57 Avg Lap Time, 61 Total Descent, 62 Dest. Ahead, 63 Time Ahead, 67 Reps to Go, 86 Last Lap Speed, 88 30s VAM, 94 ETA to Next, 95 Odometer, 295 Target Power, 442 Lap VAM, 443 Avg VAM, 445 Asc to Next Crs Pt -- developer arranged two screens to 10 fields each on a real profile specifically for this census, entered/selected each field by its on-device name, then cross-referenced every field's raw ID against its known on-screen position using the GUI (v0.16.4's readability/resize fixes were what made that cross-referencing practical -- see gui_app.py). No collisions with any existing FIELD_ID_NAMES entry (confirmed via grep before insertion). FIELD_ID_NAMES now 105 confirmed entries; KNOWN_UNRESOLVED_IDS still empty. Prior entry (2.4.3): add 1 confirmed field ID (58, Lap Timer) -- surfaced incidentally by real GUI Restore-from-Backup testing (an old 8/3/2026 backup had a field the GUI's picker didn't recognize), confirmed via direct visual comparison against the live device display. FIELD_ID_NAMES now 87 confirmed entries. Prior entry (2.4.2): add 2 confirmed field IDs closing the last open field-ID mystery (84 Last Lap Dist, 87 Last Lap Timer -- note: unrelated numeric coincidence to this entry's field 58, "Last Lap Timer" vs. "Lap Timer" are genuinely distinct fields, not a naming collision), confirmed via a forced-field test deployed successfully through NewFiles -- FIELD_ID_NAMES was 86 confirmed entries; KNOWN_UNRESOLVED_IDS still empty
+__version__ = "2.4.9"  # bug fix, real user report (2026-08-11): field 320 was "Conditioning" -- incomplete. The full concept name is "Performance Conditioning," but Doug confirmed the actual on-device DATA FIELD display reads "Perf. Conditioning" (abbreviated). Corrected to match this toolkit's established convention of naming fields as they display on-device rather than by their full/conceptual name (same convention behind "Lap Dist.", "Dest. Location", etc.). FIELD_ID_NAMES still 117 entries (rename only). Prior entry (2.4.8): bug fix, real user report (2026-08-11): field 49 was "Avg Speed (Alt)" with no record of how/why -- predates this project's discipline of noting confirmation method per field, same blind spot as field 58's earlier wrong "Lap Timer" guess. Doug deployed it into a full-width screen slot via the GUI and visually confirmed on-device: plain text "Avg Speed," no graph or bars. Corrected to "Avg Speed." IMPORTANT METHODOLOGICAL NOTE, not just a rename: this is a caution for the Graph/Bars "*"/"(Alt)" marker theory (v2.4.6/2.4.7) -- unlike 23/348/349, there's no record 49's old "(Alt)" label was ever a literal transcription of a real on-device marker, so this doesn't necessarily falsify the theory, but does mean an OLD placeholder name merely containing the word "(Alt)" isn't itself evidence of a real on-device marker unless that was actually recorded at the time. FIELD_ID_NAMES still 117 entries (rename only, no count change). See PROJECT_NOTES.md "Graph/Bars full-width warning" for the updated caution. Prior entry (2.4.7): add 12 confirmed field IDs, 2026-08-11 batch: 2 Course Pt Dist., 15 Lap HR, 18 Lap %Max HR, 32 Next Pt Location, 165 Last Lap HR, 347 HR Bars, 350 Power Bars, 433 Anaerobic TE, 452 Respiration, 478 EPOC, 495 60s Grit, 497 60s Flow -- from Doug's continued field census in a separate session, same direct on-device verification standard as every prior batch. Also corrects 3 placeholder names that were built around the "*"/"(Alt)" marker before its meaning was confirmed: 23 "Heart Rate (Alt)" -> "HR Zone Graph" (a distinct Graph-type field, not an alternate view of plain Heart Rate), 348 "Speed *" -> "Speed Bars", 349 "Cadence *" -> "Cadence Bars" (marker confirmed as Bars-type, not Graph -- see the field 23/343-350 comments). No collisions with any existing entry (confirmed via AST parse before insertion). FIELD_ID_NAMES now 117 confirmed entries; KNOWN_UNRESOLVED_IDS still empty. Prior entry (2.4.6): doc-only, no functional change (2026-08-11): the long-open "*" marker mystery on fields 348/349 (Speed */Cadence *) is LIKELY RESOLVED -- Doug reported confirming that "*" (and separately "(Alt)", seen on fields 23/49) marks a Graph- or Bars-style rendering that needs a full-width screen slot to actually draw as a graph/bar, falling back to plain text otherwise. Not yet independently re-verified by this project across multiple placements, so treated as the working explanation rather than stated as certain -- comments updated accordingly (348/349's block above, this entry). No FIELD_ID_NAMES entries changed. See PROJECT_NOTES.md "Graph/Bars full-width warning" (Open Items) for a scoped GUI feature this unlocks. Prior entry (2.4.5): bug fix, real user report (2026-08-11): fields 58 and 87 were transcribed as "Lap Timer" and "Last Lap Timer" -- Doug's own earlier assumption by analogy to the separate, correctly-named field 56 "Timer" -- but a closer on-device relabeling check found the real display text is "Lap Time" and "Last Lap Time," no "r." Corrected in FIELD_ID_NAMES (58, 87) and their surrounding comments (including the KNOWN_UNRESOLVED_IDS resolution note for 84/87). Field 56 "Timer" is unaffected and still correct. No new/removed field IDs, still 105 confirmed entries. FIT_PATCH.md's FIELD ID REFERENCE table and NOTE sections corrected to match (now doc rev 12). Prior entry (2.4.4): add 18 confirmed field IDs, 2026-08-10 batch: 7 Lap Dist., 30 Time to Next, 31 Dest. Location, 39 Lap Power, 50 Lap Speed, 57 Avg Lap Time, 61 Total Descent, 62 Dest. Ahead, 63 Time Ahead, 67 Reps to Go, 86 Last Lap Speed, 88 30s VAM, 94 ETA to Next, 95 Odometer, 295 Target Power, 442 Lap VAM, 443 Avg VAM, 445 Asc to Next Crs Pt -- developer arranged two screens to 10 fields each on a real profile specifically for this census, entered/selected each field by its on-device name, then cross-referenced every field's raw ID against its known on-screen position using the GUI (v0.16.4's readability/resize fixes were what made that cross-referencing practical -- see gui_app.py). No collisions with any existing FIELD_ID_NAMES entry (confirmed via grep before insertion). FIELD_ID_NAMES now 105 confirmed entries; KNOWN_UNRESOLVED_IDS still empty. Prior entry (2.4.3): add 1 confirmed field ID (58, Lap Timer) -- surfaced incidentally by real GUI Restore-from-Backup testing (an old 8/3/2026 backup had a field the GUI's picker didn't recognize), confirmed via direct visual comparison against the live device display. FIELD_ID_NAMES now 87 confirmed entries. Prior entry (2.4.2): add 2 confirmed field IDs closing the last open field-ID mystery (84 Last Lap Dist, 87 Last Lap Timer -- note: unrelated numeric coincidence to this entry's field 58, "Last Lap Timer" vs. "Lap Timer" are genuinely distinct fields, not a naming collision), confirmed via a forced-field test deployed successfully through NewFiles -- FIELD_ID_NAMES was 86 confirmed entries; KNOWN_UNRESOLVED_IDS still empty
 """
 fit_dump.py - Dump (and diff) Garmin .FIT files for reverse-engineering
 undocumented messages/fields, e.g. Edge Sports/<Profile>.fit data-screen
@@ -97,6 +97,14 @@ DATA_SCREEN_MESG_KEY = "14"
 # verification for several graph-type fields (see note on 344/346 below).
 FIELD_ID_NAMES = {
     0:   "Calories",
+    # 2026-08-11 batch (12 new + 3 corrections): Doug's continued field
+    # census work in a separate session. Same direct on-device
+    # verification standard as every other entry in this dict. Also
+    # resolved: 23, 348, 349 were placeholder names built around the
+    # "*"/"(Alt)" on-device marker before its meaning was confirmed --
+    # renamed now that Doug verified their real on-device text directly
+    # (see each entry below and the "*" marker note further down).
+    2:   "Course Pt Dist.",
     3:   "Cadence",
     4:   "Avg Cadence",
     5:   "Lap Cadence",
@@ -117,19 +125,36 @@ FIELD_ID_NAMES = {
     12:  "Heading",
     13:  "Heart Rate",
     14:  "Avg Heart Rate",
+    15:  "Lap HR",
     16:  "%Max Heart Rate",
     17:  "Avg %Max Heart Rate",
+    18:  "Lap %Max HR",
     19:  "%Heart Rate Reserve",
     20:  "Avg %HRR",
     22:  "Heart Rate Zone",
-    23:  "Heart Rate (Alt)",
+    23:  "HR Zone Graph",  # CORRECTED 2026-08-11 -- was "Heart Rate (Alt)"; Doug verified the real on-device name directly, and it's a distinct Graph-type field, not literally an alternate view of plain Heart Rate
     27:  "Distance to Destination",
     28:  "Time to Destination",
     29:  "Distance to Next",
     30:  "Time to Next",
     31:  "Dest. Location",
+    32:  "Next Pt Location",
     48:  "Speed",
-    49:  "Avg Speed (Alt)",
+    # 49: CORRECTED 2026-08-11 -- no record exists of how/why this was
+    # originally named "Avg Speed (Alt)" (predates this project's
+    # later discipline of noting confirmation method per field, same
+    # blind spot that produced field 58's wrong "Lap Timer" guess).
+    # Doug deployed it via the GUI into a full-width screen slot and
+    # visually confirmed on-device: it's a plain text "Avg Speed"
+    # value, no graph or bars. CAUTION for the Graph/Bars marker theory
+    # (see 348/349's note): unlike 23/348/349, there's no record this
+    # field's old "(Alt)" label was ever a literal transcription of an
+    # on-device UI marker -- it may just have been an old, undocumented
+    # guess that happened to reuse that word. Treat as a caution, not a
+    # falsification: don't assume every OLD placeholder name containing
+    # "(Alt)" reflects a real on-device marker unless that was actually
+    # recorded at the time.
+    49:  "Avg Speed",
     50:  "Lap Speed",
     53:  "Sunrise",
     54:  "Sunset",
@@ -140,8 +165,12 @@ FIELD_ID_NAMES = {
     # (surfaced by real GUI testing of Restore-from-Backup, v0.15.x --
     # not an active field-ID hunt), unrecognized by the GUI's field
     # picker at the time -- confirmed via direct visual comparison
-    # against the live device display, which reads "Lap Timer".
-    58:  "Lap Timer",
+    # against the live device display. CORRECTED 2026-08-11: originally
+    # transcribed as "Lap Timer" (assumed by analogy to the separate,
+    # correctly-named field 56 "Timer"), but a closer on-device
+    # relabeling check found the real display text is "Lap Time" --
+    # no "r". Field 56 "Timer" itself is unaffected and still correct.
+    58:  "Lap Time",
     59:  "Time of Day (TOD)",
     60:  "Total Ascent",
     61:  "Total Descent",
@@ -158,7 +187,7 @@ FIELD_ID_NAMES = {
     81:  "Normalized Power",
     84:  "Last Lap Dist",
     86:  "Last Lap Speed",
-    87:  "Last Lap Timer",
+    87:  "Last Lap Time",  # CORRECTED 2026-08-11 -- was "Last Lap Timer" (same "r" mixup as field 58, see its comment above)
     88:  "30s VAM",
     91:  "Max Speed",
     93:  "ETA at Destination",
@@ -168,6 +197,7 @@ FIELD_ID_NAMES = {
     97:  "GPS Signal Strength",
     99:  "Aerobic Training Effect",
     146: "10s Power",
+    165: "Last Lap HR",
     178: "Gears",
     179: "Front Gear",
     180: "Rear Gear",
@@ -195,7 +225,7 @@ FIELD_ID_NAMES = {
     319: "Light Mode",
     317: "Light Battery",
     318: "Beam Angle Status",
-    320: "Conditioning",
+    320: "Perf. Conditioning",  # CORRECTED 2026-08-11 -- was "Conditioning"; full concept name is "Performance Conditioning" but the actual on-device data field display reads "Perf. Conditioning" (abbreviated, matching this toolkit's convention of naming fields as they display on-device, e.g. "Lap Dist.", "Dest. Location")
     # 343/344/345/346/368: a Graph-type cluster, confirmed via TWO
     # independent screens (Tourtst Slot 0 [6-B layout] and Slot 16
     # [4-A layout]) plus on-ride photo verification. IMPORTANT: the
@@ -208,21 +238,32 @@ FIELD_ID_NAMES = {
     344: "Speed Graph",
     345: "Cadence Graph",
     346: "Power Graph",
+    347: "HR Bars",
     # 348/349: on Tourtst Slot 6 (nav-themed screen), visually read as
     # "Speed"/"Cadence" but marked with a "*" prefix in the on-device
     # editor -- NOT present on 48/3's normal Speed/Cadence fields (e.g.
     # Roadtest's Dashboard screen). Confirmed genuinely distinct from
-    # 48/3 by this UI marker, not a duplicate or census row-slip. Exact
-    # meaning of the "*" unknown (course/route-derived? estimated?) --
-    # named literally after the visible marker rather than guessing.
-    348: "Speed *",
-    349: "Cadence *",
+    # 48/3 by this UI marker, not a duplicate or census row-slip.
+    # MEANING RESOLVED 2026-08-11 (Doug verified directly): the "*"
+    # marker denotes a Bars-type rendering -- Doug confirmed the real
+    # on-device names are "Speed Bars"/"Cadence Bars", corrected below.
+    # Same marker family as field 23 above (Graph-type) and the
+    # standalone Bars entries 347/350 -- all need a full-width screen
+    # slot to actually draw as a bar/graph, falling back to plain text
+    # otherwise. See PROJECT_NOTES.md "Graph/Bars full-width warning"
+    # (Open Items) for a scoped GUI feature to surface this to users.
+    348: "Speed Bars",  # CORRECTED 2026-08-11 -- was "Speed *"
+    349: "Cadence Bars",  # CORRECTED 2026-08-11 -- was "Cadence *"
+    350: "Power Bars",
     368: "Elevation Graph",
     409: "Gear Combo",
+    433: "Anaerobic TE",
     442: "Lap VAM",
     443: "Avg VAM",
     444: "Ascent Remaining",
     445: "Asc to Next Crs Pt",
+    452: "Respiration",
+    478: "EPOC",
     486: "Grit",
     487: "Lap Grit",
     488: "Flow",
@@ -231,6 +272,8 @@ FIELD_ID_NAMES = {
     492: "Shifting Advice",
     493: "eBike Battery",
     494: "Travel Range",
+    495: "60s Grit",
+    497: "60s Flow",
 }
 
 # REMOVED (superseded below): previously had SYSTEM_SLOT_HINTS keyed by
@@ -304,7 +347,8 @@ def screen_type_name(f10):
 
 # IDs seen in the wild but not yet identified with confidence.
 # (84/87 RESOLVED 2026-08-04 -- see FIELD_ID_NAMES: Last Lap Dist/Last
-# Lap Timer, confirmed via a forced-field test deployed successfully
+# Lap Time (87 corrected 2026-08-11, was mistranscribed "Last Lap
+# Timer"), confirmed via a forced-field test deployed successfully
 # through NewFiles. Previously assumed GroupTrack-related purely by
 # association with the f10=32 Conditional record they happened to be
 # seen on -- they aren't GroupTrack-specific at all, just two ordinary

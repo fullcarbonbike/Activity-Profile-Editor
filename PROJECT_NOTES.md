@@ -1,5 +1,224 @@
 # Garmin Edge 530 Activity Profile Screen Editor
 
+*Doc rev 33 — refreshed 2026-08-13. **Second real bug, same test
+session: `install.sh` v1.0.1 died with `PIP_EXTRA[@]: unbound
+variable`** the moment it tried to install `garmin-fit-sdk`, right
+after cleanly passing the v1.0.1 CLT fix (Doug had run `xcode-select
+--install`, Homebrew python3 3.14 detected fine). Root cause: bash
+3.2 -- confirmed for real via Doug's `bash-3.2$` prompt, macOS's
+actual stock `/bin/bash` -- has a genuine, long-documented bug where
+`set -u` throws unbound-variable on an EMPTY array's `[@]` expansion
+instead of expanding to nothing (fixed upstream in bash 4.4, 2016;
+macOS still ships 3.2 for GPLv3-avoidance reasons). `PIP_EXTRA=()`
+plus `"${PIP_EXTRA[@]}"` when `--upgrade` wasn't passed (the normal
+case) hit this exactly. Invisible in the dev sandbox because that
+sandbox runs bash 5.1.16, which doesn't have the bug -- a real,
+now-identified gap between sandbox and real-hardware test coverage.
+Fixed in v1.0.2: `PIP_EXTRA` array removed entirely, replaced with a
+`pip_install()` function branching on `$UPGRADE` directly -- zero
+arrays left in the script (`grep '\[@\]'` confirms), so the bug class
+is eliminated structurally, not patched around. Tried to get a real
+bash 3.2 into the sandbox to close the coverage gap properly (compile
+from source) -- blocked by the sandbox's network allowlist (GNU
+mirrors all returned `blocked-by-allowlist`); fell back to structural
+elimination plus this being a well-known, well-documented historical
+bash bug. Re-verified both the plain-install and `--upgrade` paths in
+the dev sandbox. Not yet re-confirmed end-to-end on Doug's Mac past
+this fix. See the toolkit table entry below for the full writeup.
+Prior rev (32, 2026-08-13) summary follows.*
+
+*Doc rev 32 — refreshed 2026-08-13. **Real bug found via real Mac
+hardware test: `install.sh` v1.0.0 crashed silently on a fresh
+machine with no Xcode Command Line Tools installed.** Doug's report:
+`bash-3.2$ ./install.sh` got through the platform check and "Found
+python3" cleanly, then died right there -- only output was macOS's own
+`xcode-select: note: No developer tools were found, requesting
+install` message, no error from the script itself, prompt just
+returned. Root cause: invoking python3 for its version check was the
+first real python3 execution, and a CLT-less `/usr/bin/python3` can't
+actually run -- it exited non-zero, `set -e` turned that into a silent
+stop. The script's only CLT check existed, but was buried inside the
+"Python < 3.10" warning branch, reachable only AFTER a version check
+that could never succeed without CLT in the first place -- backwards
+ordering. Fixed in v1.0.1: Command Line Tools check moved to its own
+step immediately after the platform check, before python3 is touched
+at all, with a clear message (install dialog may have just opened --
+let it finish, or run `xcode-select --install` yourself, then
+re-run). Also added defense-in-depth error handling around the
+version-check python3 invocation itself, and a `--version` flag.
+Verified the fix in the dev sandbox (both the no-CLT-stops-cleanly
+path and the CLT-present-proceeds-normally path); not yet re-tested
+end to end on Doug's Mac. Bonus confirmation: Doug's `bash-3.2$`
+prompt confirms the script really is running under real macOS stock
+bash 3.2 as designed, not just assumed compatible. See the toolkit
+table entry below for the full writeup. Prior rev (31, 2026-08-13)
+summary follows.*
+
+*Doc rev 31 — refreshed 2026-08-13. **Pre-release consistency check,
+one cosmetic fix.** Doug asked directly whether `fit_dump.py` and
+`gui_app.py` reflect all field IDs gathered so far, ahead of testing
+`install.sh` on real Mac hardware and a possible v1.0.1 tag. Confirmed
+yes -- `fit_dump.py` v2.4.9 (117 entries, field 320 "Perf. Conditioning"
+the latest); `gui_app.py` has no separate field ID list, it imports
+`FIELD_ID_NAMES` live, so it can never go stale on data. Did catch one
+purely cosmetic drift while checking: `FieldPickerDialog`'s docstring
+still said "105 confirmed entries" (last updated at v0.16.5, before
+the 2026-08-11 batches). Fixed, `gui_app.py` now v0.16.12. Prior rev
+(30, 2026-08-13) summary follows.*
+
+*Doc rev 30 — refreshed 2026-08-13. **New `install.sh` setup script**
+(real user request: "make it easier to plug and play"). macOS-only
+per Doug's decision (matches the toolkit's current real platform
+support -- Windows/Linux device detection still isn't implemented).
+Checks python3 presence/version (hard floor 3.9, warns plus checks for
+Xcode Command Line Tools below 3.10, since `wxPython` only ships
+pre-built PyPI wheels from 3.10 up -- verified directly against PyPI's
+JSON API), creates/reuses a dedicated `.venv` (user-confirmed choice
+over the README's existing bare system-Python `pip install
+--break-system-packages` pattern, which this also sidesteps entirely
+since a venv's pip is never PEP-668 externally-managed), installs
+`garmin-fit-sdk`/`wxPython` into it, then imports both back to confirm
+the install actually works, not just that pip exited 0. Idempotent,
+`--upgrade`/`--help` flags. Verified in the dev sandbox (Linux) with
+the platform gate patched out: version-check arithmetic, venv
+creation, pip upgrade, and `garmin-fit-sdk` install/import all
+confirmed working; `wxPython`'s install predictably fails there
+(no macOS wheel, no GTK headers to build from source in this sandbox)
+-- expected, not a real bug, since real macOS would fetch the prebuilt
+wheel instead. Not yet run on Doug's actual Mac. README.md Setup/GUI
+sections now lead with it, manual `pip install` steps kept as an
+explicit fallback. See the toolkit table entry below for the full
+writeup. Prior rev (29, 2026-08-11) summary follows.*
+
+*Doc rev 29 — refreshed 2026-08-11. **Field 320 corrected.** Doug
+reported the "Conditioning" field's full concept name is "Performance
+Conditioning," but the actual on-device DATA FIELD display reads
+"Perf. Conditioning" (abbreviated). Renamed to match this toolkit's
+established convention of naming fields as they display on-device
+rather than by their full/conceptual name -- same convention behind
+"Lap Dist." and "Dest. Location" (`fit_dump.py` now v2.4.9, still 117
+entries, rename only; `FIT_PATCH.md` now doc rev 16). Prior rev (28,
+2026-08-11) summary follows.*
+
+*Doc rev 28 — refreshed 2026-08-11. **Field 49 corrected; important
+methodological caution for the Graph/Bars marker theory.** Doug
+followed up by deploying field 49 (old placeholder "Avg Speed (Alt)")
+into a full-width screen slot and visually confirming on-device: it's
+plain text, no graph or bars. Renamed to "Avg Speed"
+(`fit_dump.py` now v2.4.8, `FIT_PATCH.md` now doc rev 15). Flagged as
+a caution, not a falsification -- unlike 23/348/349, there's no record
+this field's old "(Alt)" label was ever a literal on-device marker
+transcription, so it may simply have been an old, undocumented naming
+guess. Practical takeaway for the eventual GUI feature: the confirmed
+Graph/Bars set should only grow from fields where a real on-device
+marker was directly observed and recorded, not from any old name that
+happens to contain "(Alt)". Prior rev (27, 2026-08-11) summary
+follows.*
+
+*Doc rev 27 — refreshed 2026-08-11. **12 new field IDs, plus 3
+placeholder names corrected now that the "*"/"(Alt)" marker is
+understood.** Doug's continued census (separate session): 2 Course Pt
+Dist., 15 Lap HR, 18 Lap %Max HR, 32 Next Pt Location, 165 Last Lap
+HR, 347 HR Bars, 350 Power Bars, 433 Anaerobic TE, 452 Respiration,
+478 EPOC, 495 60s Grit, 497 60s Flow. Corrected: 23 "Heart Rate (Alt)"
+→ "HR Zone Graph", 348 "Speed *" → "Speed Bars", 349 "Cadence *" →
+"Cadence Bars" — confirming the marker denotes Graph/Bars-type
+rendering. `fit_dump.py` now v2.4.7 (117 confirmed entries, no
+collisions), `FIT_PATCH.md` now doc rev 14 with a regenerated
+reference table. Graph/Bars full-width warning Open Item updated with
+the now-10-field confirmed set. Prior rev (26, 2026-08-11) summary
+follows.*
+
+*Doc rev 26 — refreshed 2026-08-11. **"*" marker mystery likely
+resolved; Graph/Bars full-width warning scoped.** Doug confirmed the
+long-open "*"/"(Alt)" field-name marker (fields 348/349, 23, 49, and
+the self-evidently-named Graph cluster) denotes a Graph- or Bars-style
+rendering that needs a full-width screen slot, falling back to plain
+text otherwise — corrected throughout (`fit_dump.py` now v2.4.6,
+`FIT_PATCH.md` now doc rev 13, doc-only, not independently re-verified
+by this project yet). New Open Item: a GUI warning surfacing this,
+fully computable from `LAYOUT_GRIDS`'s existing row-width data with no
+new geometry model needed — see "Graph/Bars full-width warning" below.
+Prior rev (25, 2026-08-11) summary follows.*
+
+*Doc rev 25 — refreshed 2026-08-11. **Redundant-backup reduction
+scoped and batched as low priority.** A tester's complaint (repeated
+"Backed up X profile(s)..." messages just from reselecting a different
+profile, no edits involved) traced to `ProfileListPanel` re-backing-up
+everything on every visit rather than once per meaningful device-state
+change. Scoped correctly (the naive "once ever" version would silently
+skip the backup taken right after a real deploy — the most important
+one). Doug's call: worth doing, but low priority — his own real usage
+numbers (~1MB backup folder even after heavy testing, ~4-5GB across
+1098 files over this project's whole prior history) confirm disk
+footprint was never really the issue. He also flagged a possibly
+better-value alternative: a real backup retention/pruning routine,
+already an existing (until now unscoped) Open Item — updated with his
+numbers and his own suggestion that it may be worth doing first. Prior
+rev (24, 2026-08-11) summary follows.*
+
+*Doc rev 24 — refreshed 2026-08-11. **Two field names corrected,
+real user report.** Fields 58 and 87 were transcribed as "Lap
+Timer"/"Last Lap Timer" — a mistaken analogy to the separate,
+correctly-named field 56 "Timer" — but a closer on-device relabeling
+check found the real display text is "Lap Time"/"Last Lap Time," no
+"r." Corrected in `fit_dump.py` (now v2.4.5, `FIELD_ID_NAMES` still
+105 entries, none added/removed) and `FIT_PATCH.md` (now doc rev 12).
+Field 56 "Timer" is unaffected. Prior rev (23, 2026-08-11) summary
+follows.*
+
+*Doc rev 23 — refreshed 2026-08-11. **Design chosen for "restore a
+deleted profile"; both it and `startup.txt` deferred to a future
+batched release.** `ProfileListPanel` gets a second list section below
+the existing on-device one ("Deleted, but available to restore"),
+implemented as a separate widget rather than an inline divider row
+(deliberately avoiding a repeat of this session's wx.ListCtrl/ListBox
+issues) — the existing Restore button/`RestorePanel` need no changes
+at all, since neither has ever cared whether a filename is currently
+live. Doug's decision: hold off building this and `startup.txt` for
+now (a confirmed-working CLI workaround exists via `garmin_device.py
+deploy`), watch for anything else that surfaces over the next few
+days, and fold whatever accumulates into one future release. Prior rev
+(22, 2026-08-11) summary follows.*
+
+*Doc rev 22 — refreshed 2026-08-11. **"Restore a deleted profile"
+fully de-risked.** Doug directly tested the exact scenario that
+enhancement is about — `garmin_device.py deploy` with a backup of a
+profile deliberately deleted from the device, targeting that
+now-absent filename — and confirmed via on-device verification that
+NewFiles correctly recreates it. This is a stronger, more direct
+confirmation than rev 21's Clone Profile finding (same underlying
+mechanism, but this is the literal restore-a-deleted-profile path, not
+an analogous one). The backend/CLI side of this feature is now fully
+proven; only the GUI entry-point gap remains. `gui_app.py` reached
+v0.16.11 (doc-only). Prior rev (21, 2026-08-11) summary follows.*
+
+*Doc rev 21 — refreshed 2026-08-11. **Clone Profile's real-hardware
+status corrected.** Doug reported (after the fact) that Clone Profile
+has actually been confirmed working on real hardware for some time —
+two clones deployed via NewFiles under brand-new filenames, `Clonebox`
+and `CloneRoad` — which had never been logged here; this document (and
+README.md) had been carrying a stale "not yet tested through the
+actual GUI" note against it. Corrected throughout. This also resolves
+what had just been flagged (rev 20, below) as the single biggest open
+risk for the newly-scoped "restore a deleted profile" enhancement,
+since both features write a NewFiles filename not currently present in
+`Sports/` — that mechanism is now confirmed working. `gui_app.py`
+reached v0.16.10 (doc-only, logging this confirmation). Prior rev (20,
+2026-08-11) summary follows.*
+
+*Doc rev 20 — refreshed 2026-08-11. **Repo is live on GitHub; first
+external user-reported gap scoped.** A user working from
+`garmin_device.py` (GUI restore path not yet used) found that a
+profile deleted from the device has no way to be selected for Restore
+in the GUI — correctly diagnosed as a real gap (`ProfileListPanel`'s
+list is sourced entirely from the live device), not user error.
+Scoped, not yet built — see "Restore a profile that's no longer on the
+device" under Open Items below; flags a shared unconfirmed-on-real-
+hardware risk with Clone Profile (both write a NewFiles filename not
+currently present in `Sports/`). Prior rev (19, 2026-08-11) summary
+follows.*
+
 *Doc rev 19 — refreshed 2026-08-11. **Pre-publish/GitHub-release
 housekeeping pass.** Landed: `LICENSE` (MIT, copyright `Doug
 (fullcarbonbike)`), a License/Disclaimer section merged into
@@ -157,14 +376,15 @@ path consistently for both backup and stage.
 
 | File | Version | Purpose |
 |---|---|---|
+| `install.sh` | 1.0.2 | macOS-only setup script, real user request ("make it easier to plug and play"). Bash, `set -euo pipefail`, written to also run correctly under macOS's stock bash 3.2 (no associative arrays, no `[[ ]]` regex-only features from bash 4+) even though it was authored/tested against bash 5 in the dev sandbox -- **CONFIRMED running under real bash 3.2 on Doug's actual Mac** (`bash-3.2$` prompt visible in his terminal output), so that compatibility goal is now verified, not just theoretical. **REAL BUG FOUND AND FIXED (v1.0.1, 2026-08-13):** Doug's first real-hardware test was on a genuinely fresh Mac laptop that had never had Xcode Command Line Tools installed. v1.0.0 got through the platform check and "Found python3" cleanly, then died silently: invoking `python3 -c '...'` for the version check triggered macOS's own `xcode-select` "note: No developer tools were found, requesting install" message on stderr, python3 itself exited non-zero (CLT-less `/usr/bin/python3` can't actually run), and `set -e` turned that into an immediate, unexplained script exit -- no `die()` message, nothing actionable, just the raw OS message and a dead prompt. Root cause: the script's only CLT check (`xcode-select -p`) was buried inside the "Python < 3.10" warning branch, reachable only AFTER a successful version check -- exactly backwards, since CLT has to exist before python3 can run AT ALL on a fresh install, not just before building wxPython from source. Fix: moved the Command Line Tools check to its own step, immediately after the platform check and before python3 is touched in any way -- on failure it now explains plainly that macOS may have just opened an install dialog (let it finish) or to run `xcode-select --install` directly, then re-run. Also hardened the version-check python3 invocation itself with explicit `if ! ... ; then die ...` error handling (previously bare `set -e`-reliant) as defense-in-depth against any other python3-fails-to-run scenario, not just this one. Added `SCRIPT_VERSION`/`--version` (this class of tool had no version string at all before -- every other file in this toolkit tracks one). **Verified the fix in the dev sandbox** by reproducing both branches: no-`xcode-select`-on-PATH now stops cleanly at the new step with the intended message (confirmed NOT reaching python3 at all); a stubbed `xcode-select -p` that reports success now proceeds correctly through python3 detection, version check, venv creation, and `garmin-fit-sdk` install/import exactly as before. **SECOND real bug found and fixed, same test session (v1.0.2, 2026-08-13):** Doug ran `xcode-select --install`, got past the v1.0.1 fix cleanly (CLT found, python3 found -- Homebrew's, freshly installed, reporting 3.14 -- version check passed), then hit a new failure the instant the script tried "Installing garmin-fit-sdk...": `./install.sh: line 174: PIP_EXTRA[@]: unbound variable`. Root cause: `PIP_EXTRA=()` followed later by `"${PIP_EXTRA[@]}"` when `--upgrade` wasn't passed (the common case) means expanding a genuinely EMPTY array -- and bash 3.2 has a real, long-documented bug where `set -u` treats an empty array's `[@]` expansion as an unbound variable and errors, instead of correctly expanding to zero words the way POSIX/modern bash does. Fixed in bash 4.4 (2016), but macOS still ships 3.2 as `/bin/bash` for licensing reasons (GPLv3 avoidance) and has for over a decade -- exactly the environment `install.sh` was written to target, confirmed for real this session via Doug's own `bash-3.2$` shell prompt in his pasted output. This bug was INVISIBLE in the dev/test sandbox specifically because that sandbox runs bash 5.1.16 (`bash --version` confirmed), which doesn't have it -- every earlier "verified in the dev sandbox" claim for this script was genuinely accurate for what it tested, it just couldn't have caught this one, a real gap in the sandbox-vs-real-hardware coverage that's now closed. Fix: removed `PIP_EXTRA` entirely, replaced with a `pip_install()` shell function that takes a package name and internally branches `if (( UPGRADE )); then ... --upgrade ...; else ...; fi` -- no array anywhere in the script now, so this isn't a patch around one instance, the whole bug class is structurally gone. Re-verified in the dev sandbox: both the plain-install path and `--upgrade` path exercised end to end (confirmed `garmin-fit-sdk` installs/imports correctly either way; `wxPython`'s build-from-source failure at that point remains the expected, sandbox-is-Linux-not-macOS limitation, unrelated to this fix). Attempted to get real bash 3.2 into the dev sandbox for a true repro (compile from source) specifically to close this coverage gap properly -- blocked by the sandbox's network allowlist (ftp.gnu.org and mirrors all returned `blocked-by-allowlist`); relying instead on eliminating the array construct structurally (confirmed via `grep '\[@\]'` returning zero matches in the whole file) plus the well-documented nature of this specific historical bash bug. Not yet re-confirmed end-to-end on Doug's Mac past this fix. Prior entry (v1.0.0, 2026-08-13, initial version): macOS-only setup script. Sequence: (1) `uname -s == Darwin` gate, dies with a clear message otherwise -- explicitly scoped to macOS only per Doug's decision, since `garmin_device.py`'s Windows path is still a `NotImplementedError` stub and Linux isn't even stubbed; cross-platform version deferred until Doug has Windows hardware to test against; (2) `python3` presence check; (3) version check -- hard floor 3.9 (dies below that), warns below 3.10 specifically because PyPI's `wxPython` wheels are only pre-built for cp310 and up (verified directly against the live PyPI JSON API before picking this cutoff -- 3.9 and older would silently fall through to a from-source build, 10-20 min, requiring the Command Line Tools); (4) creates/reuses a dedicated `.venv` in the toolkit's own directory via `python3 -m venv` -- deliberate choice over installing to system/Homebrew Python (Doug's explicit choice over the alternative), which also sidesteps PEP 668's "externally managed environment" block entirely, since a venv's own pip is never marked externally-managed -- no `--break-system-packages` needed anywhere in this script, unlike the manual README instructions it supplements; (5) upgrades pip inside the venv; (6) installs `garmin-fit-sdk` and `wxPython` into it (`--upgrade` CLI flag threads through to both if passed); (7) imports both back inside the venv's own Python and reports version strings, so a "successful" pip install that's actually broken doesn't get reported as done. Idempotent by construction. User-confirmed design decisions (2026-08-13): macOS-only for now (cross-platform revisited once Windows access exists); dedicated venv rather than the README's existing bare `pip install ... --break-system-packages` pattern, specifically to avoid touching system/Homebrew Python at all. README.md's Setup and GUI sections lead with `./install.sh`, keeping the original manual `pip install` commands as an explicit fallback. |
 | `fit_raw_walk.py` | 1.0.0 | Generic FIT definition/data message byte-offset walker. No SDK dependency — needed because the SDK doesn't recognize `data_screen` at all. |
 | `fit_crc.py` | 1.0.0 | FIT file CRC-16 (Garmin's nibble-table algorithm). Self-verifies against known-good files before being trusted for writes. |
-| `fit_dump.py` | 2.4.4 | SDK-based (`garmin_fit_sdk`) read/inspect tool. Subcommands: `dump`, `unknown`, `diff`, `screens` (sorted by true display order, shows all three screen states plus real f10-derived screen-type names). `classify_screens()`/`active_field_ids()`/`screen_type_name()` are print-free functions, importable directly by the GUI. `NAMED_SCREEN_TYPES` holds the 10 confirmed f10 codes. `FIELD_ID_NAMES` has 105 confirmed entries (NEW, 2026-08-10 batch: 18 IDs -- 7, 30, 31, 39, 50, 57, 61, 62, 63, 67, 86, 88, 94, 95, 295, 442, 443, 445 -- confirmed by arranging two screens to 10 fields each on a real profile for this census, entering each field by its on-device name, then cross-referencing raw ID against known on-screen position via the GUI) -- `KNOWN_UNRESOLVED_IDS` is still empty. |
+| `fit_dump.py` | 2.4.9 | SDK-based (`garmin_fit_sdk`) read/inspect tool. Subcommands: `dump`, `unknown`, `diff`, `screens` (sorted by true display order, shows all three screen states plus real f10-derived screen-type names). `classify_screens()`/`active_field_ids()`/`screen_type_name()` are print-free functions, importable directly by the GUI. `NAMED_SCREEN_TYPES` holds the 10 confirmed f10 codes. `FIELD_ID_NAMES` has 117 confirmed entries (v2.4.9, real user report: field 320 corrected "Conditioning" -> "Perf. Conditioning" -- full concept name is "Performance Conditioning," but the actual on-device DATA FIELD display reads "Perf. Conditioning" (abbreviated), matching this toolkit's on-device-display naming convention (same as "Lap Dist.", "Dest. Location"); v2.4.8, real user report: field 49 corrected "Avg Speed (Alt)" -> "Avg Speed" -- deployed into a full-width slot and visually confirmed on-device as plain text, no graph/bars; a METHODOLOGICAL CAUTION for the Graph/Bars marker theory, not a falsification -- no record exists that this field's old "(Alt)" label was ever a real on-device marker transcription the way 23/348/349 were; v2.4.7, 2026-08-11 batch: 12 new IDs -- 2, 15, 18, 32, 165, 347, 350, 433, 452, 478, 495, 497 -- plus 3 corrected placeholder names (23 "Heart Rate (Alt)" -> "HR Zone Graph", 348 "Speed *" -> "Speed Bars", 349 "Cadence *" -> "Cadence Bars"), confirming the "*"/"(Alt)" marker denotes a Graph/Bars-style field needing a full-width screen slot, else falls back to plain text; v2.4.6, doc-only: the long-open "*" marker mystery on fields 348/349 is likely resolved -- Graph/Bars-style rendering needing a full-width screen slot, else falls back to plain text, per Doug's report; v2.4.5, real user report: fields 58/87 corrected from "Lap Timer"/"Last Lap Timer" to "Lap Time"/"Last Lap Time" -- a mistaken analogy to the separate, correctly-named field 56 "Timer," caught via a closer on-device relabeling check; 2026-08-10 batch: 18 IDs -- 7, 30, 31, 39, 50, 57, 61, 62, 63, 67, 86, 88, 94, 95, 295, 442, 443, 445 -- confirmed by arranging two screens to 10 fields each on a real profile for this census, entering each field by its on-device name, then cross-referencing raw ID against known on-screen position via the GUI) -- `KNOWN_UNRESOLVED_IDS` is still empty. |
 | `fit_patch.py` | 1.12.0 | Surgical byte-level patcher/writer. `next_available_field10()` (NEW) auto-assigns a collision-free screen identity for `--new-slot`/`--un-remove`, replacing the old hardcoded f10=0 default -- root-caused and RESOLVED the long-standing "Add New Screen always fails" limitation; CONFIRMED working via live on-device round-trip (2026-08-05). `check_system_screen_guard()` (`--force` to override) is f10-based and CERTAIN for any Active screen, not a guess -- old content-pattern/low-field-count heuristics kept only as a fallback for Removed-state slots with no real f10. `would_hide_last_visible_screen()` is a HARD, non-heuristic guard (no `--force`) blocking `--hide`/`--disable` on a profile's last remaining REAL USER screen, correctly counted via f10. `hide_unsupported_screen_type()` is a SECOND hard guard (no `--force`) blocking `--hide` on Map or ClimbPro entirely -- CONFIRMED via direct on-device inspection that neither has a Show Screen toggle at all, on any profile type. |
 | `fit_chain.py` | 1.0.0 | Chains multiple `fit_patch.py` operations into one file before a single device write, avoiding a restart per change. CRC-verified after every step. |
 | `fit_clone_profile.py` | 1.0.0 | Clones a profile under a new display name by patching `sport_mesgs[0].name` — a standard, SDK-known message, unlike `data_screen`. |
 | `garmin_device.py` | 0.11.0 | Device connection layer: detect (+ `get_device_info()` device identification), list, backup (lineage-tracked), stage, write to `NewFiles` with read-back verification, eject/remount-wait. `screens` subcommand shells out to `fit_dump.py screens` directly -- no separate classification logic to fix. NEW (v0.11.0): `list_backup_history(working_dir, profile_filename)` lists every backup of one profile under `working_dir/backups/<timestamp>/`, newest first, de-duplicating consecutive byte-identical entries (a real characteristic of this app: every visit to the GUI's profile list re-backs-up all profiles, not just on real changes, so an untouched profile accumulates many identical timestamped backups per session -- collapsing those keeps the history meaningful, one entry per REAL change). Backs the GUI's `RestorePanel`; also a new `backup-history` CLI subcommand for parity. |
-| `gui_app.py` | 0.16.9 | wxPython GUI. NEW (v0.16.9, pre-Windows-support housekeeping): `DEFAULT_WORKING_DIR` was hardcoded to Doug's own actual Mac path (`/Volumes/UserDCbu/dougcurtis/GarminBackups`) -- harmless for Doug alone, but wrong for any other user and outright broken on Windows, where `/Volumes/...` doesn't exist. Now `os.path.join(os.path.expanduser("~"), "GarminBackups")`, resolving sanely on any OS/user. Also, `working_dir` was never persisted across restarts even after being changed via "Change..." -- every launch reset to the default. New `load_saved_working_dir()`/`save_working_dir()` persist the choice to a small JSON sidecar (`~/.garmin_screen_editor_config.json`); `MainFrame.__init__` seeds `working_dir` from the saved value if present (falling back to `DEFAULT_WORKING_DIR` only on a genuine first-ever launch), and `on_change_working_dir()` saves immediately on every pick. Both best-effort/never-raise -- a missing/corrupt config file or read-only home directory just falls back to in-memory-only behavior for that session, never blocks the app. User-confirmed design (2026-08-11) over two simpler alternatives (plain default with no persistence; first-use-only prompt) -- both would have needed the same persistence layer anyway, so this solves it for good. Prior entry (v0.16.8): "About" button on `DetectPanel` opens `AboutDialog` -- a short modal summary (name/version, "not affiliated with Garmin" trademark disclaimer, a one-paragraph note that `data_screen` was reverse-engineered via black-box observation rather than reverse-engineering Garmin's own software, MIT license mention pointing to `LICENSE`/`README.md` for the full text). Deliberately short, not an attempt to embed the full legal text verbatim -- keeps this dialog from ever needing to track the README disclaimer word-for-word. Read-only word-wrapped `wx.TextCtrl` body; as a modal dialog with its own fixed size (not embedded in `MainFrame`'s resizable sizer tree) it can't reproduce the v0.16.2/v0.16.3/v0.16.6 best-size bug class regardless, wrapping is just the right call for a paragraph this long either way. Headless-verified the template string's line-continuation formatting collapses correctly (real string-literal evaluation, not regex extraction). Prior entry (v0.16.7): cosmetic rename ahead of a possible public GitHub release -- window title changed from "Garmin Edge Screen Editor" to "Activity Profile Screen Editor for Garmin Edge" (this is an independent, unofficial project, not a Garmin product; "for Garmin Edge" is the standard nominative-fair-use naming pattern, user-confirmed over two other candidates). No functional change -- part of the same pre-publish pass as the new `LICENSE` (MIT) and the disclaimer draft, see Open Items below ("Publishing to GitHub"). Prior entry (v0.16.6): real reported bug fix that also corrects a WRONG previous fix -- v0.16.3's 460px ceiling on the Fields column stopped the frame from growing but silently broke something else: `wx.ListCtrl` clips a cell's text to its column's pixel width with no wrap/ellipsis, and the control's own horizontal scrollbar only engages when the SUM of all column widths exceeds the control's rendered area, which a single capped column mostly never triggers -- confirmed on a real 10-field screen with several of the new longer field names, only 6-7 visible, no way to see the rest, no error. New `ScreensListCtrl(wx.ListCtrl)` subclass overrides `DoGetBestSize()` to cap only the WIDTH the sizer system sees (height still comes from the normal calculation, preserving v0.11.0's grow-taller-for-more-rows intent) -- decoupling the FRAME's size from the COLUMN's width entirely, rather than trying to control one by capping the other. `ViewScreensPanel.screens_list` and `RestorePanel.history_list` (same exposure, proactively fixed too -- it had never even gotten the v0.16.3 ceiling) both switched to it. The Fields column reverted to floor-only auto-size (280px minimum, no ceiling) -- safe again now that content width can't reach the frame; genuine overflow now correctly triggers the `ListCtrl`'s real native horizontal scroll, since assigned-area-smaller-than-content is finally the true state of affairs. See PROJECT_NOTES.md "Corrections and lessons learned" for the full three-strikes story on this widget. Prior entry (v0.16.5): cosmetic doc-only fix -- `FieldPickerDialog`'s docstring said "87 confirmed entries," stale after `fit_dump.py` v2.4.4's 2026-08-10 batch of 18 new field IDs brought `FIELD_ID_NAMES` to 105; no functional change. Prior entry (v0.16.4): readability fix -- real reported feedback (with a side-by-side screenshot) that `LayoutDiagramPanel`'s cell-label text (9pt) was noticeably smaller than the rest of the window's controls. Bumped to 13pt (10pt for the italic note/placeholder text) and `SetMinSize()` from (280,220) to (340,280) for more breathing room at the bigger font in dense 8-10 field layouts. Confirmed via code review this carries NONE of the v0.16.2/v0.16.3 width-blowup risk -- `LayoutDiagramPanel` is custom-painted with an explicit per-cell clipping region, its reported size is only ever the fixed `SetMinSize()` value, never derived from font/content the way `wx.ListBox`/`wx.ListCtrl` are. One flagged trade-off to watch during testing: a longer known field name in a busy layout is now somewhat more likely to get silently clipped (no ellipsis) at the bigger font. Prior entry (v0.16.3): same-day follow-up to v0.16.2 -- the identical root cause also hit `ViewScreensPanel`'s "Fields" `ListCtrl` column, not just `EditScreenPanel`/`AddScreenPanel`'s `wx.ListBox`: a real profile with 9 of 10 fields unresolved on two screens still widened the window from "View Screens." The v0.11.1 fix's assumption -- that a report-mode `ListCtrl`'s column content never grows the frame, since its own native horizontal scrollbar takes over -- didn't hold for large enough overflow, confirmed via real testing. Fixed both the trigger and the mechanism together: the Fields column and the Conditional/Removed summary lines (`self.other_text`, a plain `wx.StaticText` with no scrollbar at all -- actually more exposed to this than the `ListCtrl` was) now use `field_name(fid, terse=True)`; `SetColumnWidth(6, wx.LIST_AUTOSIZE)`'s result is now capped on both ends -- the existing 280px floor plus a new 460px ceiling -- with overflow relying on the `ListCtrl`'s own horizontal scroll rather than a frame resize. `wx.ListCtrl` report mode has no built-in per-cell wrap (that's a `wx.grid.Grid` feature, not applied here), so cap-plus-shorten is the practical equivalent without a heavier widget swap. Prior entry (v0.16.2): real reported bug fix -- editing a screen with an unresolved/unknown field ID pushed the whole window off the left edge of the screen, with a large gap between the field list and the diagram, and the diagram column stretched wider than needed too; the oversized window then persisted across every subsequent panel. Root cause: `wx.ListBox` sizes itself to its longest item string, and `field_name()`'s default non-terse form returns a long descriptive sentence for unknown IDs (~40 chars) vs. a normal field name (~10-20 chars) -- that inflated best-size propagated through the shared-proportion `body_row` sizer (explaining why the diagram column grew too, not just the field list) into `MainFrame._relayout()`'s v0.11.0 grow-only behavior, which has no ceiling once triggered. Fixed at the source (`field_name(fid, terse=True)` in both `EditScreenPanel` and `AddScreenPanel`'s field list AND diagram labels -- "id58?" instead of the full sentence) and hardened `_relayout()` itself as defense-in-depth: growth is now clamped to the current display's usable work area, so this whole *category* of bug (any future content-driven best-size spike, not just this one) degrades to tight/scrolled content instead of an off-screen, restart-required lockout. Headless-verified (`field_name(9999, terse=True)` -> `"id9999?"`, 7 chars vs. 40 for the old form); compiled clean. Prior entry (v0.16.1): two minor UX fixes, no behavioral change -- the "no device connected" message now says "Connect your Garmin Edge device via USB" instead of naming the 530 specifically (detection has always been structure-based, not model-specific -- see "Model portability" note below); the window title now shows the running version (`f"Garmin Edge Screen Editor v{__version__}"`) so it's visible in-app, not just in the file. **Covers steps 1-10**, plus Restore-from-Backup and Clone Profile as sibling actions to editing: detect, list+backup, select+stage, view screens (Type column showing real f10-derived screen names, plus screen-level Move Up/Down reordering), add a brand-new screen, edit one screen's fields (reorder/add/remove/change type), A/B layout (live visual diagram), and Show/Hide, review accumulated changes, deploy to the device, post-write verification, restore any profile from its backup history, and clone a profile under a new name. **This closes out the GUI's full feature backlog -- nothing left unscoped.** NEW (v0.16.0): `ClonePanel` -- "Clone..." on `ProfileListPanel` patches `sport_mesgs[0].name` via `fit_clone_profile.py`'s `patch_profile_name()` (a completely different message than `data_screen` -- already CONFIRMED full-fidelity on real hardware at the CLI level, see MVP_SCOPE.md "Clone-and-retarget"). Live filename-collision validation against `frame.known_profiles` (kept fresh by `ProfileListPanel.on_refresh()` every visit) blocks "Create Clone" until the chosen filename is guaranteed not to match anything currently on the device -- deploying under an existing filename would silently OVERWRITE that profile instead of creating a new one. Auto-suggests a filename from the display name (alnum-only) but never overwrites one the user has typed directly. Sources from the selected profile's just-taken backup, never the live device file, same discipline as Stage/Restore. Hands off straight to `DeployPanel` (steps 9-10) exactly like Restore does -- no staged-vs-editing diff applies to a clone either. `frame.deploy_return_panel` gains a third value ("clone"), handled by the same context-aware Back button and belt-and-suspenders `editing_path` cleanup pattern `RestorePanel` already uses. Headless-verified against a real backup file: filename validation (missing extension, path separators, case-insensitive collision) all behave correctly; `patch_profile_name()` produces a byte-for-byte-structurally-identical clone (same screens/fields/order, only the name field bytes differ, source untouched); `describe_screen_changes()` confirms zero screen differences between source and clone, matching the confirmed real-hardware CLI result. Prior entry (v0.15.2): cosmetic doc-only fix -- `FieldPickerDialog`'s docstring said "86 confirmed entries," stale after `fit_dump.py` v2.4.3 added field 58 (Lap Timer); no functional change. v0.15.1: fixed a REAL bug found via testing (2026-08-06) -- `frame.editing_path` was only ever cleared by `DeployPanel.on_done()`, so backing out of a Restore attempt without completing it left `editing_path` pointed at the abandoned restore's backup file; since `get_working_path()` prefers `editing_path` over `staged_path`, a subsequent normal Stage then silently showed that stale leftover instead of what was just staged (reported symptom: "View Screens shows the backup I was about to restore, not what I just staged" -- it happened to produce a plausible-looking Preflight diff purely by coincidence, not because anything was actually correct). Fixed in two places: `ProfileListPanel.on_stage()` now unconditionally discards any prior session's `editing_path` before staging (the real fix -- a fresh Stage should always start clean; this also covers the same latent risk when switching to a different profile mid-session, which existed even before Restore was added); `RestorePanel.on_back()` also proactively discards when `frame.deploy_return_panel == "restore"` (cleans up immediately rather than waiting for the next Stage). v0.15.0: `RestorePanel` -- "Restore from Backup..." on `ProfileListPanel` lists the selected profile's backup history (`list_backup_history()`, newest first) with a per-candidate screen-type summary (e.g. "8 screen(s): Screen 1, Lap Summary, Map, ..."), then hands off straight to `DeployPanel` (steps 9-10), deliberately skipping `PreflightPanel` (steps 7-8) -- there's no staged-vs-editing diff to review when the user already picked a specific, known backup from a summarized list. `frame.editing_path` points at the chosen backup file directly (never copied -- `DeployPanel`/`describe_screen_changes()` only ever read it). `DeployPanel`'s "Back" button is now context-aware (`frame.deploy_return_panel`) so it returns to wherever Deploy was actually reached from. Headless-verified against real backup files (row summaries build correctly, including reflecting a screen-order swap between two backups). v0.14.0: `DeployPanel.on_check()` now re-pulls the LIVE profile from the device's `Sports/` folder the instant reconnect is confirmed, and compares it against `editing_path` (what was actually sent) via a new module-level `describe_screen_changes()` -- factored out of `PreflightPanel`'s former `_describe_changes()` so both panels share one implementation. Runs automatically on reconnect, not a separate manual step. User-confirmed design decision (2026-08-06): compares visible/active screens only, no Removed-list bookkeeping -- Garmin's own editor has no un-remove option and neither does this GUI, so the device's known Removed-list wipe on NewFiles import isn't reported; `describe_screen_changes()` already does this for free (only reports slots ACTIVE on at least one side, so Removed/Unconfigured-only transitions are invisible to it by construction) -- headless-verified by simulating the exact Removed→Unconfigured flip and confirming zero diff lines while a real field/position change on the same file pair still reports correctly. v0.13.0: `DeployPanel` (step 9) writes `editing_path` to the device's `NewFiles/` via `write_to_newfiles()` (byte-for-byte write-back verification), then walks the user through eject (confirm-then-`diskutil eject`, reusing `_volume_mount_point()` for the real ejectable target, plus an "I Ejected It Myself" fallback) and reconnect. User-confirmed design decision (2026-08-06): reconnect detection is a manual "Check for Reconnected Device" button rather than background-thread polling of `wait_for_remount()` -- this app has never used a background thread, and the manual-click tradeoff avoids introducing a new class of failure mode (thread lifetime vs. panel teardown) for the sake of a few saved clicks. `eject_device(auto_eject=True)`'s own `input()`-based confirmation isn't reused since it would hang a GUI handler -- the eject confirmation is a `wx.MessageBox` instead. "Done" clears `editing_path` (`discard_edits()`) and returns to the profile list. **CONFIRMED live on real hardware** (2026-08-06): full deploy of a new 10-field screen, plus the change summary and Fields-column fixes below, all verified end to end. v0.12.0: `PreflightPanel`'s change summary is now a plain-English, per-screen description (`_describe_changes()`) instead of a raw `fit_dump.py diff`-style unified diff -- real user feedback: the byte-level diff was too technical for the GUI's actual audience (a rider, not a developer); anyone who wants that level of detail still has the CLI tools directly. Compares the staged file against the working copy by slot (message_index) and reports plain lines like "Screen 4: added Cadence, removed Grade" or "Screen 2: moved from position 3 to position 2" -- new/removed screens, field set changes, field-order-only changes, layout A/B changes, show/hide changes, and position changes are all covered; a generic fallback line covers any future edit type not yet described in plain English, so real byte-level changes are never silently under-reported. Whether there's anything to deploy at all is still decided from the raw bytes directly, independent of the summary's coverage. v0.11.1: fixed `ViewScreensPanel`'s "Fields" column being a fixed 280px width, which silently CLIPPED (not wrapped) any screen's field list wider than ~3-4 short names -- real reported bug: a 10-field screen only showed 3 fields plus part of the 4th. `on_refresh()` now auto-sizes that column to its actual widest content on every refresh (never below the original 280px floor); overflow beyond the window's own width falls to the ListCtrl's native horizontal scrollbar instead of clipping. v0.11.0: fixed `MainFrame._relayout()` to only GROW the window when content needs more room, never shrink it -- real reported bug: manually enlarging the window (e.g. to see more of the screens list) snapped back to a smaller size on the next button click, since nearly every handler ends with `self.frame._relayout()`, which called `self.Fit()` unconditionally (Fit() resizes to the sizer's ideal size in both directions). The original v0.1.1 anti-overlap intent (grow when content needs more room) is preserved via `GetBestSize()`; only the unwanted shrink is gone. No call sites needed to change. v0.9.0: "Change Type..." on both `EditScreenPanel` and `AddScreenPanel` -- swaps one field's ID in place via the existing `FieldPickerDialog`, without the Remove+Add+reposition workaround ("Replace Field" from the original design notes, now built) -- **CONFIRMED live on real hardware** (2026-08-05), including a guard-overridden field change on ClimbPro that survived a full deploy/restart/reconnect cycle. v0.8.0: `AddScreenPanel` (step 5) replicates `--new-slot`'s exact defaulting logic via direct function calls -- picks the lowest unconfigured slot (never shown to the user), sets f1/f12 like every real device-created screen, auto-assigns collision-free f9/f10 via `next_available_field9()`/`next_available_field10()`, and enforces the confirmed 10-user-screen cap with a friendly message rather than a raw failure -- **CONFIRMED live on real hardware** (2026-08-05). v0.7.0: `ViewScreensPanel` Move Up/Down buttons swap two screens' on-device display order via `swap_display_order()` (the `--swap-order` backend) -- select-plus-buttons, same UX pattern as field reordering, enabled/disabled based on the selected row's position (top/bottom can't move further that direction). `_confirm_guard()`/`_confirm_hide_guard()` no longer show a false-positive "possibly a system screen" dialog for confirmed user screens. `on_show_toggle()` HARD-blocks (no override) hiding Map or ClimbPro at all, ahead of the last-visible-user-screen check. Deploy and restore-from-backup's picker not yet built. |
+| `gui_app.py` | 0.16.12 | wxPython GUI. NEW (v0.16.12, cosmetic doc-only fix, 2026-08-13): `FieldPickerDialog`'s docstring said "105 confirmed entries" -- stale after `fit_dump.py` grew to 117 across the 2026-08-11 batch (v2.4.7) and the field 49/320 rename-only corrections (v2.4.8/2.4.9); same class of drift already fixed once before at v0.16.5 (87->105). No functional change -- `FIELD_ID_NAMES` is imported live from `fit_dump.py`, so the actual field picker was never wrong, only this comment. Caught while confirming pre-release state ahead of a possible v1.0.1 tag (Doug asked directly whether `fit_dump.py`/`gui_app.py` reflect all field IDs gathered so far -- yes, both do; `FIELD_ID_NAMES` has no separate copy in `gui_app.py` to go stale). Prior entry (v0.16.11, doc-only, no code change): the "restore a profile no longer on the device" enhancement's one real open risk -- whether NewFiles can RECREATE a deleted profile, not just replace an existing one or accept a never-before-seen filename -- is now RESOLVED. Doug tested the exact scenario via `garmin_device.py deploy` with a backup of a deliberately-deleted profile, targeting that now-absent filename; CONFIRMED via on-device verification. Only the GUI entry-point itself remains unbuilt (see Open Items). Prior entry (v0.16.10, doc-only, no code change): Clone Profile CONFIRMED via real hardware, reported after the fact by Doug -- two working clones deployed via NewFiles under brand-new filenames (`Clonebox`, `CloneRoad`), correcting a stale "not yet tested through the actual GUI" note that had been sitting in both this table and the "DONE" section below, and resolving a previously-open question shared with the newly-scoped "restore a deleted profile" enhancement: NewFiles does correctly accept a genuinely new filename, not just a replacement of an existing one. Prior entry (v0.16.9, pre-Windows-support housekeeping): `DEFAULT_WORKING_DIR` was hardcoded to Doug's own actual Mac path (`/Volumes/UserDCbu/dougcurtis/GarminBackups`) -- harmless for Doug alone, but wrong for any other user and outright broken on Windows, where `/Volumes/...` doesn't exist. Now `os.path.join(os.path.expanduser("~"), "GarminBackups")`, resolving sanely on any OS/user. Also, `working_dir` was never persisted across restarts even after being changed via "Change..." -- every launch reset to the default. New `load_saved_working_dir()`/`save_working_dir()` persist the choice to a small JSON sidecar (`~/.garmin_screen_editor_config.json`); `MainFrame.__init__` seeds `working_dir` from the saved value if present (falling back to `DEFAULT_WORKING_DIR` only on a genuine first-ever launch), and `on_change_working_dir()` saves immediately on every pick. Both best-effort/never-raise -- a missing/corrupt config file or read-only home directory just falls back to in-memory-only behavior for that session, never blocks the app. User-confirmed design (2026-08-11) over two simpler alternatives (plain default with no persistence; first-use-only prompt) -- both would have needed the same persistence layer anyway, so this solves it for good. Prior entry (v0.16.8): "About" button on `DetectPanel` opens `AboutDialog` -- a short modal summary (name/version, "not affiliated with Garmin" trademark disclaimer, a one-paragraph note that `data_screen` was reverse-engineered via black-box observation rather than reverse-engineering Garmin's own software, MIT license mention pointing to `LICENSE`/`README.md` for the full text). Deliberately short, not an attempt to embed the full legal text verbatim -- keeps this dialog from ever needing to track the README disclaimer word-for-word. Read-only word-wrapped `wx.TextCtrl` body; as a modal dialog with its own fixed size (not embedded in `MainFrame`'s resizable sizer tree) it can't reproduce the v0.16.2/v0.16.3/v0.16.6 best-size bug class regardless, wrapping is just the right call for a paragraph this long either way. Headless-verified the template string's line-continuation formatting collapses correctly (real string-literal evaluation, not regex extraction). Prior entry (v0.16.7): cosmetic rename ahead of a possible public GitHub release -- window title changed from "Garmin Edge Screen Editor" to "Activity Profile Screen Editor for Garmin Edge" (this is an independent, unofficial project, not a Garmin product; "for Garmin Edge" is the standard nominative-fair-use naming pattern, user-confirmed over two other candidates). No functional change -- part of the same pre-publish pass as the new `LICENSE` (MIT) and the disclaimer draft, see Open Items below ("Publishing to GitHub"). Prior entry (v0.16.6): real reported bug fix that also corrects a WRONG previous fix -- v0.16.3's 460px ceiling on the Fields column stopped the frame from growing but silently broke something else: `wx.ListCtrl` clips a cell's text to its column's pixel width with no wrap/ellipsis, and the control's own horizontal scrollbar only engages when the SUM of all column widths exceeds the control's rendered area, which a single capped column mostly never triggers -- confirmed on a real 10-field screen with several of the new longer field names, only 6-7 visible, no way to see the rest, no error. New `ScreensListCtrl(wx.ListCtrl)` subclass overrides `DoGetBestSize()` to cap only the WIDTH the sizer system sees (height still comes from the normal calculation, preserving v0.11.0's grow-taller-for-more-rows intent) -- decoupling the FRAME's size from the COLUMN's width entirely, rather than trying to control one by capping the other. `ViewScreensPanel.screens_list` and `RestorePanel.history_list` (same exposure, proactively fixed too -- it had never even gotten the v0.16.3 ceiling) both switched to it. The Fields column reverted to floor-only auto-size (280px minimum, no ceiling) -- safe again now that content width can't reach the frame; genuine overflow now correctly triggers the `ListCtrl`'s real native horizontal scroll, since assigned-area-smaller-than-content is finally the true state of affairs. See PROJECT_NOTES.md "Corrections and lessons learned" for the full three-strikes story on this widget. Prior entry (v0.16.5): cosmetic doc-only fix -- `FieldPickerDialog`'s docstring said "87 confirmed entries," stale after `fit_dump.py` v2.4.4's 2026-08-10 batch of 18 new field IDs brought `FIELD_ID_NAMES` to 105; no functional change. Prior entry (v0.16.4): readability fix -- real reported feedback (with a side-by-side screenshot) that `LayoutDiagramPanel`'s cell-label text (9pt) was noticeably smaller than the rest of the window's controls. Bumped to 13pt (10pt for the italic note/placeholder text) and `SetMinSize()` from (280,220) to (340,280) for more breathing room at the bigger font in dense 8-10 field layouts. Confirmed via code review this carries NONE of the v0.16.2/v0.16.3 width-blowup risk -- `LayoutDiagramPanel` is custom-painted with an explicit per-cell clipping region, its reported size is only ever the fixed `SetMinSize()` value, never derived from font/content the way `wx.ListBox`/`wx.ListCtrl` are. One flagged trade-off to watch during testing: a longer known field name in a busy layout is now somewhat more likely to get silently clipped (no ellipsis) at the bigger font. Prior entry (v0.16.3): same-day follow-up to v0.16.2 -- the identical root cause also hit `ViewScreensPanel`'s "Fields" `ListCtrl` column, not just `EditScreenPanel`/`AddScreenPanel`'s `wx.ListBox`: a real profile with 9 of 10 fields unresolved on two screens still widened the window from "View Screens." The v0.11.1 fix's assumption -- that a report-mode `ListCtrl`'s column content never grows the frame, since its own native horizontal scrollbar takes over -- didn't hold for large enough overflow, confirmed via real testing. Fixed both the trigger and the mechanism together: the Fields column and the Conditional/Removed summary lines (`self.other_text`, a plain `wx.StaticText` with no scrollbar at all -- actually more exposed to this than the `ListCtrl` was) now use `field_name(fid, terse=True)`; `SetColumnWidth(6, wx.LIST_AUTOSIZE)`'s result is now capped on both ends -- the existing 280px floor plus a new 460px ceiling -- with overflow relying on the `ListCtrl`'s own horizontal scroll rather than a frame resize. `wx.ListCtrl` report mode has no built-in per-cell wrap (that's a `wx.grid.Grid` feature, not applied here), so cap-plus-shorten is the practical equivalent without a heavier widget swap. Prior entry (v0.16.2): real reported bug fix -- editing a screen with an unresolved/unknown field ID pushed the whole window off the left edge of the screen, with a large gap between the field list and the diagram, and the diagram column stretched wider than needed too; the oversized window then persisted across every subsequent panel. Root cause: `wx.ListBox` sizes itself to its longest item string, and `field_name()`'s default non-terse form returns a long descriptive sentence for unknown IDs (~40 chars) vs. a normal field name (~10-20 chars) -- that inflated best-size propagated through the shared-proportion `body_row` sizer (explaining why the diagram column grew too, not just the field list) into `MainFrame._relayout()`'s v0.11.0 grow-only behavior, which has no ceiling once triggered. Fixed at the source (`field_name(fid, terse=True)` in both `EditScreenPanel` and `AddScreenPanel`'s field list AND diagram labels -- "id58?" instead of the full sentence) and hardened `_relayout()` itself as defense-in-depth: growth is now clamped to the current display's usable work area, so this whole *category* of bug (any future content-driven best-size spike, not just this one) degrades to tight/scrolled content instead of an off-screen, restart-required lockout. Headless-verified (`field_name(9999, terse=True)` -> `"id9999?"`, 7 chars vs. 40 for the old form); compiled clean. Prior entry (v0.16.1): two minor UX fixes, no behavioral change -- the "no device connected" message now says "Connect your Garmin Edge device via USB" instead of naming the 530 specifically (detection has always been structure-based, not model-specific -- see "Model portability" note below); the window title now shows the running version (`f"Garmin Edge Screen Editor v{__version__}"`) so it's visible in-app, not just in the file. **Covers steps 1-10**, plus Restore-from-Backup and Clone Profile as sibling actions to editing: detect, list+backup, select+stage, view screens (Type column showing real f10-derived screen names, plus screen-level Move Up/Down reordering), add a brand-new screen, edit one screen's fields (reorder/add/remove/change type), A/B layout (live visual diagram), and Show/Hide, review accumulated changes, deploy to the device, post-write verification, restore any profile from its backup history, and clone a profile under a new name. **This closes out the GUI's full feature backlog -- nothing left unscoped.** NEW (v0.16.0): `ClonePanel` -- "Clone..." on `ProfileListPanel` patches `sport_mesgs[0].name` via `fit_clone_profile.py`'s `patch_profile_name()` (a completely different message than `data_screen` -- already CONFIRMED full-fidelity on real hardware at the CLI level, see MVP_SCOPE.md "Clone-and-retarget"). Live filename-collision validation against `frame.known_profiles` (kept fresh by `ProfileListPanel.on_refresh()` every visit) blocks "Create Clone" until the chosen filename is guaranteed not to match anything currently on the device -- deploying under an existing filename would silently OVERWRITE that profile instead of creating a new one. Auto-suggests a filename from the display name (alnum-only) but never overwrites one the user has typed directly. Sources from the selected profile's just-taken backup, never the live device file, same discipline as Stage/Restore. Hands off straight to `DeployPanel` (steps 9-10) exactly like Restore does -- no staged-vs-editing diff applies to a clone either. `frame.deploy_return_panel` gains a third value ("clone"), handled by the same context-aware Back button and belt-and-suspenders `editing_path` cleanup pattern `RestorePanel` already uses. Headless-verified against a real backup file: filename validation (missing extension, path separators, case-insensitive collision) all behave correctly; `patch_profile_name()` produces a byte-for-byte-structurally-identical clone (same screens/fields/order, only the name field bytes differ, source untouched); `describe_screen_changes()` confirms zero screen differences between source and clone, matching the confirmed real-hardware CLI result. Prior entry (v0.15.2): cosmetic doc-only fix -- `FieldPickerDialog`'s docstring said "86 confirmed entries," stale after `fit_dump.py` v2.4.3 added field 58 (Lap Timer); no functional change. v0.15.1: fixed a REAL bug found via testing (2026-08-06) -- `frame.editing_path` was only ever cleared by `DeployPanel.on_done()`, so backing out of a Restore attempt without completing it left `editing_path` pointed at the abandoned restore's backup file; since `get_working_path()` prefers `editing_path` over `staged_path`, a subsequent normal Stage then silently showed that stale leftover instead of what was just staged (reported symptom: "View Screens shows the backup I was about to restore, not what I just staged" -- it happened to produce a plausible-looking Preflight diff purely by coincidence, not because anything was actually correct). Fixed in two places: `ProfileListPanel.on_stage()` now unconditionally discards any prior session's `editing_path` before staging (the real fix -- a fresh Stage should always start clean; this also covers the same latent risk when switching to a different profile mid-session, which existed even before Restore was added); `RestorePanel.on_back()` also proactively discards when `frame.deploy_return_panel == "restore"` (cleans up immediately rather than waiting for the next Stage). v0.15.0: `RestorePanel` -- "Restore from Backup..." on `ProfileListPanel` lists the selected profile's backup history (`list_backup_history()`, newest first) with a per-candidate screen-type summary (e.g. "8 screen(s): Screen 1, Lap Summary, Map, ..."), then hands off straight to `DeployPanel` (steps 9-10), deliberately skipping `PreflightPanel` (steps 7-8) -- there's no staged-vs-editing diff to review when the user already picked a specific, known backup from a summarized list. `frame.editing_path` points at the chosen backup file directly (never copied -- `DeployPanel`/`describe_screen_changes()` only ever read it). `DeployPanel`'s "Back" button is now context-aware (`frame.deploy_return_panel`) so it returns to wherever Deploy was actually reached from. Headless-verified against real backup files (row summaries build correctly, including reflecting a screen-order swap between two backups). v0.14.0: `DeployPanel.on_check()` now re-pulls the LIVE profile from the device's `Sports/` folder the instant reconnect is confirmed, and compares it against `editing_path` (what was actually sent) via a new module-level `describe_screen_changes()` -- factored out of `PreflightPanel`'s former `_describe_changes()` so both panels share one implementation. Runs automatically on reconnect, not a separate manual step. User-confirmed design decision (2026-08-06): compares visible/active screens only, no Removed-list bookkeeping -- Garmin's own editor has no un-remove option and neither does this GUI, so the device's known Removed-list wipe on NewFiles import isn't reported; `describe_screen_changes()` already does this for free (only reports slots ACTIVE on at least one side, so Removed/Unconfigured-only transitions are invisible to it by construction) -- headless-verified by simulating the exact Removed→Unconfigured flip and confirming zero diff lines while a real field/position change on the same file pair still reports correctly. v0.13.0: `DeployPanel` (step 9) writes `editing_path` to the device's `NewFiles/` via `write_to_newfiles()` (byte-for-byte write-back verification), then walks the user through eject (confirm-then-`diskutil eject`, reusing `_volume_mount_point()` for the real ejectable target, plus an "I Ejected It Myself" fallback) and reconnect. User-confirmed design decision (2026-08-06): reconnect detection is a manual "Check for Reconnected Device" button rather than background-thread polling of `wait_for_remount()` -- this app has never used a background thread, and the manual-click tradeoff avoids introducing a new class of failure mode (thread lifetime vs. panel teardown) for the sake of a few saved clicks. `eject_device(auto_eject=True)`'s own `input()`-based confirmation isn't reused since it would hang a GUI handler -- the eject confirmation is a `wx.MessageBox` instead. "Done" clears `editing_path` (`discard_edits()`) and returns to the profile list. **CONFIRMED live on real hardware** (2026-08-06): full deploy of a new 10-field screen, plus the change summary and Fields-column fixes below, all verified end to end. v0.12.0: `PreflightPanel`'s change summary is now a plain-English, per-screen description (`_describe_changes()`) instead of a raw `fit_dump.py diff`-style unified diff -- real user feedback: the byte-level diff was too technical for the GUI's actual audience (a rider, not a developer); anyone who wants that level of detail still has the CLI tools directly. Compares the staged file against the working copy by slot (message_index) and reports plain lines like "Screen 4: added Cadence, removed Grade" or "Screen 2: moved from position 3 to position 2" -- new/removed screens, field set changes, field-order-only changes, layout A/B changes, show/hide changes, and position changes are all covered; a generic fallback line covers any future edit type not yet described in plain English, so real byte-level changes are never silently under-reported. Whether there's anything to deploy at all is still decided from the raw bytes directly, independent of the summary's coverage. v0.11.1: fixed `ViewScreensPanel`'s "Fields" column being a fixed 280px width, which silently CLIPPED (not wrapped) any screen's field list wider than ~3-4 short names -- real reported bug: a 10-field screen only showed 3 fields plus part of the 4th. `on_refresh()` now auto-sizes that column to its actual widest content on every refresh (never below the original 280px floor); overflow beyond the window's own width falls to the ListCtrl's native horizontal scrollbar instead of clipping. v0.11.0: fixed `MainFrame._relayout()` to only GROW the window when content needs more room, never shrink it -- real reported bug: manually enlarging the window (e.g. to see more of the screens list) snapped back to a smaller size on the next button click, since nearly every handler ends with `self.frame._relayout()`, which called `self.Fit()` unconditionally (Fit() resizes to the sizer's ideal size in both directions). The original v0.1.1 anti-overlap intent (grow when content needs more room) is preserved via `GetBestSize()`; only the unwanted shrink is gone. No call sites needed to change. v0.9.0: "Change Type..." on both `EditScreenPanel` and `AddScreenPanel` -- swaps one field's ID in place via the existing `FieldPickerDialog`, without the Remove+Add+reposition workaround ("Replace Field" from the original design notes, now built) -- **CONFIRMED live on real hardware** (2026-08-05), including a guard-overridden field change on ClimbPro that survived a full deploy/restart/reconnect cycle. v0.8.0: `AddScreenPanel` (step 5) replicates `--new-slot`'s exact defaulting logic via direct function calls -- picks the lowest unconfigured slot (never shown to the user), sets f1/f12 like every real device-created screen, auto-assigns collision-free f9/f10 via `next_available_field9()`/`next_available_field10()`, and enforces the confirmed 10-user-screen cap with a friendly message rather than a raw failure -- **CONFIRMED live on real hardware** (2026-08-05). v0.7.0: `ViewScreensPanel` Move Up/Down buttons swap two screens' on-device display order via `swap_display_order()` (the `--swap-order` backend) -- select-plus-buttons, same UX pattern as field reordering, enabled/disabled based on the selected row's position (top/bottom can't move further that direction). `_confirm_guard()`/`_confirm_hide_guard()` no longer show a false-positive "possibly a system screen" dialog for confirmed user screens. `on_show_toggle()` HARD-blocks (no override) hiding Map or ClimbPro at all, ahead of the last-visible-user-screen check. Deploy and restore-from-backup's picker not yet built. |
 
 Design principle throughout: **patch bytes in place, never re-encode
 the whole file.** Every edit observed on real devices — ours and the
@@ -889,7 +1109,71 @@ Kept deliberately, for pattern-recognition on future work:
   during the build: the exact on-device path, and whether a write
   needs the eject/remount cycle to take effect. Estimated small — no
   FIT parsing, CRC, or NewFiles pathway involved at all, unlike
-  everything else in this toolkit.
+  everything else in this toolkit. BATCHING PLAN (2026-08-11, Doug's
+  decision): this is the first item slated for the next release batch,
+  alongside "Restore a profile that's no longer on the device" below
+  (fully scoped and de-risked, also deferred) — waiting a few days to
+  see if anything else external turns up before building either.
+- **Graph/Bars full-width warning (raised by Doug, 2026-08-11,
+  discussed not yet built).** Doug confirmed (see the corrected "*"
+  mystery note under field 348/349 above) that fields marked with a
+  "*" or "(Alt)" suffix are Graph- or Bars-style fields that need a
+  FULL-WIDTH screen slot to actually render as a graph/bar; placed in
+  a shared/split row instead, they silently fall back to plain text
+  with no on-device indication anything's wrong. UPDATE (2026-08-11,
+  same day): confirmed set now stands at 10 fields following Doug's
+  continued census -- 343 Heart Rate Graph, 344 Speed Graph, 345
+  Cadence Graph, 346 Power Graph, 347 HR Bars, 348 Speed Bars, 349
+  Cadence Bars, 350 Power Bars, 368 Elevation Graph, and 23 HR Zone
+  Graph (renamed from the placeholder "Heart Rate (Alt)" now that its
+  real on-device name and Graph-type nature are both confirmed).
+  UPDATE (2026-08-11, same day): field 49 was checked next and turned
+  out NOT to be Graph/Bars -- Doug deployed it into a full-width
+  screen slot via the GUI and visually confirmed on-device it's a
+  plain text "Avg Speed" value. Renamed from the old placeholder "Avg
+  Speed (Alt)" accordingly. IMPORTANT METHODOLOGICAL CAUTION, not a
+  falsification of the marker theory: unlike 23/348/349, there's no
+  record that 49's old "(Alt)" label was ever a literal transcription
+  of a real on-device UI marker -- it may simply have been an old,
+  undocumented naming guess (predating this project's later discipline
+  of noting confirmation method per field) that happened to reuse the
+  same word. Practical implication for the eventual GUI feature: the
+  confirmed Graph/Bars set (the 10 fields above) should only ever grow
+  from fields where an actual on-device marker was directly observed
+  and recorded at confirmation time -- an OLD placeholder name merely
+  containing "(Alt)" is not itself sufficient evidence on its own.
+  Question: should the GUI flag this so a user doesn't unknowingly end
+  up with a "graph" field that's actually just showing a number?
+  Good news on feasibility: this is fully computable from data the GUI
+  already has, no new geometry model needed. `LAYOUT_GRIDS` (in
+  `gui_app.py`) already represents each row as a list of field
+  positions -- a row with exactly one position (e.g. `[0]`) is
+  full-width; a row with more than one (e.g. `[2, 3]`) means those
+  fields split the row, each less than full width. So "is position P
+  full-width for this field count + A/B layout" is a small, pure,
+  already-derivable lookup -- no new geometry data to maintain. What's
+  actually needed: (1) a small NEW curated set (e.g.
+  `GRAPH_OR_BARS_FIELD_IDS`, kept separate from `FIELD_ID_NAMES` in
+  `fit_dump.py` rather than folding a category flag into it, to avoid
+  touching every existing consumer of that dict) -- listing only the
+  fields individually confirmed as Graph/Bars type, same discipline as
+  every other confirmed entry in this toolkit's field data; (2) a
+  helper function checking row membership/width for a given
+  count+layout+position; (3) UI surfacing in two natural, complementary
+  places -- a static note in `FieldPickerDialog` when a Graph/Bars
+  field is being picked at all (independent of placement), and a
+  CONTEXT-AWARE warning in `EditScreenPanel`/`AddScreenPanel` once a
+  field is actually placed, reflecting whether ITS CURRENT position is
+  full-width or not (recomputed whenever fields are reordered, since a
+  position's row membership can change as neighbors are added/
+  removed). `LayoutDiagramPanel` could optionally reinforce this
+  visually later, but isn't essential to the core value. Real
+  limitation to flag: the Graph/Bars membership set can only ever be as
+  complete as what's been individually confirmed -- there could be
+  other Graph/Bars-type fields not yet caught by the "*"/"(Alt)"
+  marker pattern that simply haven't been identified yet, so this
+  would have false negatives (unflagged fields that actually need full
+  width) but should have no false positives (nothing flagged incorrectly).
 - **"Favorite screen" -- save a screen, reuse it across profiles
   (requested by a tester, 2026-08-11, discussed not yet built).** A
   tester wants to save his favorite "dashboard" screen (a specific
@@ -925,11 +1209,129 @@ Kept deliberately, for pattern-recognition on future work:
   tested cross-sport-type (e.g. a Cycling-specific field applied to a
   Running profile). Needs a real-device check before trusting this
   works generally, not just within same-sport-type profiles.
+- **Restore a profile that's no longer on the device (first external
+  GitHub user report, 2026-08-11, discussed not yet built).** A user
+  (currently on `garmin_device.py` directly, not the GUI yet) deleted a
+  profile from the device and found no way in the GUI to restore it --
+  correctly identified as a real gap, not user error. Root cause:
+  `ProfileListPanel`'s profile list -- the ONLY entry point into
+  `RestorePanel` (via its "Restore from Backup..." button, which
+  requires a selection from that list) -- is sourced entirely from
+  `garmin_device.backup_profiles()`'s read of the LIVE device's
+  `Sports/` folder. A deleted profile vanishes from that list
+  immediately, so it can never be selected again, even though its
+  backup history is still sitting untouched under
+  `working_dir/backups/<timestamp>/` -- `list_backup_history()` only
+  needs a profile filename + working_dir, no device dependency at all.
+  So this is purely a missing GUI entry point, not a missing backend
+  capability -- good news for scope. `RestorePanel` itself needs ZERO
+  changes; it already only depends on `frame.profile_filename` +
+  `frame.working_dir`, never on whether that profile currently exists
+  on the device. What's actually needed: (1) a new
+  `garmin_device.py` helper (e.g. `list_all_backed_up_profiles
+  (working_dir)`) that scans every `backups/<timestamp>/` folder and
+  returns the UNION of every filename ever backed up, not just what's
+  live now -- small, mirrors `list_backup_history()`'s existing
+  directory-walk logic closely; (2) a new GUI entry point surfacing
+  profile names that are in that backup-history set but NOT in the
+  current live list (i.e. "deleted" from the device's point of view),
+  then setting `frame.profile_filename` to the chosen one and routing
+  straight to the existing `RestorePanel`/`DeployPanel` flow unchanged.
+  DESIGN CHOSEN (2026-08-11, Doug): `ProfileListPanel` gets a second,
+  visually separated section below the existing "On Device" list --
+  something like "Deleted, but available to restore" -- populated from
+  the new backup-history-union helper minus whatever's currently live.
+  Implemented as a SECOND, separate list widget with its own header
+  label rather than one list with an inline divider row, deliberately
+  avoiding the kind of custom-selectable-divider hackery that would
+  reopen the exact class of wx.ListCtrl/ListBox trouble this project
+  has already hit three times this session. The existing "Restore from
+  Backup..." button and `RestorePanel` need NO changes at all -- a
+  selection from either section just sets `frame.profile_filename` and
+  routes to the same already-built date-history picker, which has
+  never cared whether that filename currently exists on the device.
+  Stage/Clone/View Screens stay gated to the top (live) section only,
+  since those genuinely require the profile to currently exist.
+  Net effect: no new button, no new panel -- just one new list, one
+  new backend helper, and the copy fix below. Also needs a small copy
+  fix either way: `RestorePanel.on_restore()`'s confirmation dialog currently says
+  "REPLACING what's currently on it," which is only true for the
+  existing live-profile case -- restoring a deleted profile would be
+  closer to *recreating* it, not replacing anything. UPDATE
+  (2026-08-11, same day): the one real open technical risk flagged
+  here — whether NewFiles correctly handles a filename that isn't
+  currently present in `Sports/` at all, as opposed to replacing an
+  existing file — is now RESOLVED. Doug reported Clone Profile (which
+  shares this exact mechanism) has in fact already been confirmed live
+  on real hardware: at least two working clones, `Clonebox` and
+  `CloneRoad`, both deployed under brand-new filenames via NewFiles.
+  See the corrected Clone Profile entry above (which had incorrectly
+  been carrying a stale "not yet tested" note) for the full
+  confirmation. SECOND, MORE DIRECT CONFIRMATION (2026-08-11, same
+  day): Doug tested the exact scenario this feature is about, via
+  `garmin_device.py deploy <backup_of_a_deleted_profile.fit>
+  <target_profile_filename>` — a backup of a profile he'd deleted from
+  the device, targeting that now-absent filename. Confirmed via
+  on-device verification: NewFiles correctly RECREATED the deleted
+  profile, not just accepted a never-before-seen name (Clone's case).
+  This is the stronger of the two confirmations, since it's the actual
+  restore-a-deleted-profile path, not just an analogous one — the
+  backend/CLI mechanics this feature would wrap are now fully proven
+  end to end. This removes what was the single biggest open risk for
+  this feature — the remaining work is genuinely just the GUI
+  entry-point gap described above. Also worth a documentation caveat rather than a
+  code fix: `list_backup_history()` (and any new helper built on it)
+  identifies a profile purely by filename, so if a filename is ever
+  reused for an unrelated profile after the original was deleted, its
+  backup history would silently mix both profiles' snapshots together
+  -- an existing characteristic of the backup system, not new to this
+  feature, but more likely to surface once "browse backups of
+  something not currently live" becomes a normal, supported action
+  instead of an edge case. IMPLEMENTATION DEFERRED (2026-08-11, Doug's
+  decision): fully scoped and de-risked, design chosen, but not
+  urgent -- `garmin_device.py deploy` is a confirmed-working manual
+  workaround in the meantime. Holding off building this alone; plan is
+  to watch for anything else that turns up over the next few days and
+  fold multiple changes into one future release, alongside the
+  `startup.txt` feature below.
+- **Reduce redundant profile backups -- LOW PRIORITY (requested by a
+  tester, scoped 2026-08-11).** `ProfileListPanel` currently re-backs-
+  up all profiles on every visit to the profile list, not just when
+  something actually changed -- a tester reported the confusing
+  side-effect directly (going back and re-selecting a different
+  profile printed another "Backed up X profile(s)..." message, with no
+  edits in between). Scoped fix: track a frame-level `needs_backup`
+  flag, reset to `True` on either of the two real "device state may
+  have changed" events -- a fresh `DetectPanel.on_detect()`, or
+  `DeployPanel.on_check()` confirming reconnect after a deploy (the
+  naive "just back up once ever this session" version would miss that
+  second case, silently skipping the backup that captures state right
+  after a real edit -- the one that matters most). "Refresh (re-backup
+  + re-list)" would still always force a real backup regardless of the
+  flag, honoring its own label. Contained entirely to `gui_app.py`, no
+  changes needed to `garmin_device.py` or any CLI tool. Doug's call
+  (2026-08-11): worth doing, but LOW priority -- his own
+  `~/GarminBackups` folder is only ~1MB (plus ~160KB staging) even
+  after heavy recent testing, and even the much larger prior dev
+  folder (~4-5GB across 1098 `.fit` files accumulated over this whole
+  project) isn't a real problem at these file sizes. The redundant
+  copies are annoying (terminal noise, wasted I/O) but not a resource
+  concern. Batched with the other low-priority/deferred items.
 - **Backup retention/pruning.** Backups accumulate indefinitely right
-  now — nothing deletes old ones. Not a problem at Garmin-profile file
-  sizes for a long time, so deliberately left out of MVP, but a future
-  age-based cutoff (e.g. auto-delete backups older than 30 days) is
-  worth building once real usage patterns are clear.
+  now — nothing deletes old ones. Deliberately left out of MVP.
+  UPDATE (2026-08-11): Doug's real usage numbers (see above) confirm
+  this genuinely isn't urgent at Garmin-profile file sizes -- even
+  ~1098 backed-up `.fit` files over the life of this project only came
+  to ~4-5GB. His own suggestion, worth weighing against the
+  once-per-session change above: a cleanup/pruning routine (e.g.
+  auto-delete backups older than N days, or cap total count/size) may
+  be the more useful thing to build here than reducing HOW OFTEN
+  backups happen -- it addresses the same "backups accumulate" root
+  concern but as a real, permanent feature (worth having regardless of
+  file-count growth over a long project lifetime) rather than a minor
+  redundant-work optimization. Not yet scoped in detail; worth doing
+  before the once-per-session change if only one gets built, since it
+  solves a longer-term problem the other doesn't touch at all.
 - **Model portability (discussed 2026-08-06, not yet built).** The
   `data_screen` layout mechanism is count-driven, not geometry-stored —
   a screen's grid shape comes from field 3 (count) + field 8 (A/B flag)
@@ -1273,9 +1675,18 @@ so `PreflightPanel` is skipped.
   (`classify_screens()` reports the same screens/fields/order) with
   only the name field bytes different, and `describe_screen_changes()`
   reports zero differences — matching the already-confirmed real-
-  hardware CLI result for `fit_clone_profile.py` itself. **Not yet
-  tested through the actual GUI on real hardware** — next thing to
-  verify.
+  hardware CLI result for `fit_clone_profile.py` itself. **CONFIRMED
+  via real hardware (2026-08-11, reported after the fact by Doug,
+  hadn't been logged here yet):** at least two clones deployed and
+  working correctly through NewFiles under brand-new filenames not
+  previously present on the device — `Clonebox` (from `Sandbox`) and
+  `CloneRoad` (from `Road`). This also settles a previously-open
+  question relevant beyond Clone itself: NewFiles correctly accepts a
+  genuinely NEW filename, not just a replacement of an existing one —
+  see "Restore a profile that's no longer on the device" under Open
+  Items, which shares this exact mechanism and was flagged as carrying
+  the identical unconfirmed risk as of the last revision of this
+  document.
 
 See [`MVP_SCOPE.md`](MVP_SCOPE.md) for the feature-level scope this
 flow is built around, and [`MEMORY_LOG.md`](MEMORY_LOG.md) for the
