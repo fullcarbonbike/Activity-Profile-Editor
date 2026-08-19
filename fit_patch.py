@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "1.12.0"  # add next_available_field10() and wire it into --new-slot/--un-remove's auto-default, replacing the old hardcoded f10=0 -- ROOT-CAUSES the long-standing "Add New Screen via NewFiles always fails" limitation as an f10 IDENTITY COLLISION (0 = "Screen 1", already in use on almost every real profile), not a hard device restriction. CONFIRMED via live on-device round-trip (2026-08-05, CyclingRoadSandbox): --new-slot with a collision-free f10 survives the NewFiles restart cycle intact, verified independently by both fit_dump.py and garmin_device.py reading the live mounted device. Also fixed next_available_field9()'s f3-presence gate to match the f1-based gate used elsewhere (same Virtual-Partner-style blind spot fixed in classify_screens()/read_current_state() earlier)
+__version__ = "1.14.2"  # Doc-only, no functional change, Doug's decision (2026-08-15): comments referencing the f10=32 Conditional runtime record as "GroupTrack"/"the GroupTrack Conditional record" updated to describe it as "Reserved" (display name change lives in fit_dump.py v2.4.12's NAMED_SCREEN_TYPES -- this file has no code path of its own that special-cases f10=32, only prose describing it) -- read_current_state()'s docstring and NO_SHOW_TOGGLE_TYPES' comment block updated to match, both now note the record's real purpose was never actually confirmed rather than asserting a GroupTrack identity. count_shown_active_screens()'s docstring updated the same way. f10=57 "GroupTrack List" is untouched by this pass -- that one remains correctly, confirmedly GroupTrack-specific. No behavior change anywhere in this file. Prior entry (1.14.1): Doc-only, no functional change (2026-08-14): --remove is now CONFIRMED via a real on-device round-trip test (Doug) -- the target screen was correctly removed from the on-device Data Screens order, matching a real Remove button press, and (as expected, matching the retired --un-remove's own history and Doug's stated reasoning for retiring it) the removed screen does NOT survive as a recoverable Removed-state slot after the deploy -- NewFiles wipes it, same as every other Removed-state slot on any NewFiles deploy. Updated remove_screen()'s docstring and --remove's argparse help text from "NOT YET VERIFIED ON REAL HARDWARE" to CONFIRMED. This closes step 2 of the two-phase build plan (backend + headless verification, then a real device test) -- the GUI wrapper (ViewScreensPanel, per Doug's placement decision) is now the one remaining, unblocked step; still not built until Doug asks for it, per this project's established discipline of not building ahead of an explicit go-ahead. Prior entry (1.14.0): New feature, first half of "Delete Screen" (2026-08-14): added --remove and its backend primitive remove_screen() -- transitions an Active screen slot to the Removed state (f1=0, f9/f10 cleared to sentinel, f3/f7 content left untouched, matching the confirmed on-device Removed-state model). Mirrors --new-slot's activation in reverse, same spirit as the now-retired --un-remove but going the other direction. Reuses hide_unsupported_screen_type() and would_hide_last_visible_screen() directly as --remove's two hard guards (no --force override for either) -- CONFIRMED (2026-08-13, Doug, directly on-device) that NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) bounds Remove availability identically to Show/Hide, and the last-visible-user-screen floor rule is documented as already covering Remove too, so no new guard logic was needed, only reuse. ONE-WAY by design -- no --un-remove exists anymore (retired v1.13.0); Restore-from-Backup is the only real undo path, matching Garmin's own editor (Hide is reversible, Remove is permanent, same as Add New). Headless-verified only so far, against a real profile copy (CyclingRoadSandbox): remove_screen() correctly transitions the target slot to 'removed' (read_current_state()), leaves f3/f7 byte-identical to before, and leaves read_current_state() unchanged on every OTHER slot in the file; the CLI end-to-end path (--slot 3 --remove) wrote a file with a valid trailing CRC (fit_crc() recomputation matched the stored value exactly); both guards were exercised directly and blocked exactly as designed -- --slot 2 (Map) errored via hide_unsupported_screen_type(), and removing a profile's second-to-last then last visible user screen correctly errored via would_hide_last_visible_screen() on the second attempt. But this is NOT YET VERIFIED ON REAL HARDWARE (no on-device round-trip test yet, unlike --new-slot/--hide/--swap-order, all of which are proven live). Per the two-phase build plan recorded when "Delete Screen" was scoped (see PROJECT_NOTES.md Open Items, 2026-08-13): this backend flag is step one: a real on-device round-trip test is needed next, and ONLY THEN (not before) does a GUI wrapper (ViewScreensPanel, per Doug's placement decision) get built. Prior entry (1.13.2): doc-only, no functional change (2026-08-13): corrected a self-inflicted gap from the previous entry -- Doug clarified that "GroupTrack" in his confirmed-active-Remove list meant the on-device editor's actual label "GroupTrack List" (f10=57), which was already covered, not a separate untested type. The genuinely separate f10=32 GroupTrack Conditional runtime record never appears as a row in the on-device Data Screens editor at all (no real f9), so it has no Remove-button status to check and is already structurally out of reach of the future --remove flag regardless. Also recorded, for pattern-recognition: an early, already-removed SYSTEM_SLOT_HINTS hardcode once claimed "slot 10 = GroupTrack" by message_index -- confirmed wrong on the Indoor profile (slot 10 there is a genuine Cadence screen); slot numbers were never reliable for identifying GroupTrack or anything else, only f10 is. NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) is now documented as the COMPLETE confirmed Remove-block set for common named types, no remaining gap. No code/behavior change -- comment only. Prior entry (1.13.1): doc-only, no functional change (2026-08-13): Doug confirmed directly on-device that NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) also bounds Remove availability, not just the Show/Hide toggle it already guards -- every other common named type (Elevation, GroupTrack, Cycling Dynamics, Lap Summary, Virtual Partner, Compass, Segment) has an active Remove option. Added a comment documenting this at the constant's definition, directly relevant to the still-scoped, not-yet-built --remove flag (its future type-check guard can reuse this exact set). No code/behavior change -- comment only. Prior entry (1.13.0): RETIRED --un-remove entirely, Doug's decision (2026-08-13): Restore-from-Backup already covers the real recovery use case (a whole-profile undo, already CONFIRMED on real hardware), and --un-remove itself was never a clean win -- it had a CONFIRMED real device-side data-loss hazard pre-v1.12.0 (root-caused to the same f10=0 collision --new-slot had, see BUGS in FIT_PATCH.md), was never re-tested live after that fix (still "unverified-but-plausibly-fixed" as of v1.12.0), and Garmin's own on-device editor doesn't expose an un-remove workflow at all -- Hide (temporary) and Remove + Add New (permanent) are the only two lifecycle actions it offers, matching this project's own "Product note on --un-remove" which had left the final call deferred. Removed the --un-remove argparse flag, its --new-slot mutual-exclusion check, its Removed-state validation block, and simplified every `args.new_slot or args.un_remove` conditional down to just `args.new_slot` (the f1 configured-flag set, and the f9/f10 auto-fill safety net) -- confirmed via grep that zero `un_remove` references remain in this file outside this changelog line and the retirement note left in its place. No behavior change to --new-slot itself. This also removes a layer of unverified risk that would otherwise sit underneath any future --remove (Delete Screen) flag -- see PROJECT_NOTES.md Open Items. Prior entry (1.12.0): add next_available_field10() and wire it into --new-slot/--un-remove's auto-default, replacing the old hardcoded f10=0 -- ROOT-CAUSES the long-standing "Add New Screen via NewFiles always fails" limitation as an f10 IDENTITY COLLISION (0 = "Screen 1", already in use on almost every real profile), not a hard device restriction. CONFIRMED via live on-device round-trip (2026-08-05, CyclingRoadSandbox): --new-slot with a collision-free f10 survives the NewFiles restart cycle intact, verified independently by both fit_dump.py and garmin_device.py reading the live mounted device. Also fixed next_available_field9()'s f3-presence gate to match the f1-based gate used elsewhere (same Virtual-Partner-style blind spot fixed in classify_screens()/read_current_state() earlier)
 """
 fit_patch.py - Surgical patcher for Garmin Edge data_screen (mesg_num=14) messages.
 
@@ -22,8 +22,8 @@ our ignorance of those bytes is harmless -- they're never touched.
 GUI reuse
 ---------
 patch_screen(), read_current_field_array(), read_current_count_and_layout(),
-read_current_state(), swap_display_order(), the pack_*() helpers,
-check_system_screen_guard(), count_shown_active_screens(),
+read_current_state(), swap_display_order(), remove_screen(), the pack_*()
+helpers, check_system_screen_guard(), count_shown_active_screens(),
 would_hide_last_visible_screen(), hide_unsupported_screen_type(),
 next_available_field9(), next_available_field10(),
 KNOWN_SYSTEM_CONTENT_PATTERNS, and COUNTS_WITH_B_VARIANT are all plain,
@@ -134,6 +134,12 @@ def pack_enabled(enabled=True):
     return bytes([0 if enabled else 1])
 
 
+def pack_removed_flag():
+    """field 1 -- goes 01 -> 00 when a slot transitions from Active/
+    Configured to Removed (see remove_screen())."""
+    return bytes([0])
+
+
 def read_current_count_and_layout(input_path, message_index):
     """
     Peek at a slot's CURRENT field_count (f3) and layout (f8) without
@@ -204,8 +210,8 @@ def next_available_field10(input_path):
     """
     f10 is a per-profile, zero-indexed counter for plain, user-created
     screens (shown on-device as "Screen N" = f10+1); named Garmin screen
-    types (Map, ClimbPro, GroupTrack, etc.) use a fixed global code and
-    are excluded from this count entirely.
+    types (Map, ClimbPro, GroupTrack List, etc.) use a fixed global code
+    and are excluded from this count entirely.
 
     CONFIRMED via live on-device round-trip (2026-08-05,
     CyclingRoadSandbox): writing a --new-slot screen with an f10 value
@@ -323,8 +329,10 @@ def read_current_state(input_path, message_index):
     """
     Read the raw f1/f9/f10 bytes for a slot to determine its screen
     state (see SCREEN STATE MODEL in project notes): Active (f1=1, f9
-    real), Conditional (f1=1, f9 absent, f10 real -- GroupTrack-style),
-    Removed (f1=0, f9/f10 both absent, content preserved), or
+    real), Conditional (f1=1, f9 absent, f10 real -- always seen as
+    f10=32, display name "Reserved," see fit_dump.py's
+    NAMED_SCREEN_TYPES), Removed (f1=0, f9/f10 both absent, content
+    preserved), or
     Unconfigured (no f1==1 signal at all -- never created). Returns one
     of those four strings, or None if the slot doesn't exist in the
     file at all.
@@ -386,10 +394,10 @@ def count_shown_active_screens(input_path):
     makes possible to check correctly from the file alone.
 
     Directly countable fact, not a guess -- unlike
-    check_system_screen_guard()'s content heuristics. Conditional (e.g.
-    GroupTrack) and Removed screens are excluded -- they have no real
-    f9, so they were never part of the on-device "Data Screens"
-    reorderable list this constraint applies to.
+    check_system_screen_guard()'s content heuristics. Conditional (the
+    f10=32 "Reserved" record) and Removed screens are excluded -- they
+    have no real f9, so they were never part of the on-device "Data
+    Screens" reorderable list this constraint applies to.
     """
     messages, hdr_size, end_of_data, total_len = parse_fit(input_path)
     with open(input_path, 'rb') as f:
@@ -500,6 +508,22 @@ def would_hide_last_visible_screen(input_path, message_index):
 # universally, regardless of profile type: forcing f12=1 on a Map or
 # ClimbPro screen via a raw file write has no on-device equivalent
 # action to compare it against, on ANY profile.
+#
+# CONFIRMED (2026-08-13, Doug, directly on-device) that this exact set
+# also bounds Remove availability, not just Show/Hide: of the common
+# Garmin Edge named screen types, Map and ClimbPro are the ONLY two
+# with the on-device Remove option disabled -- Elevation, "GroupTrack
+# List" (f10=57, the on-device editor's actual label -- not to be
+# confused with f10=32, the separate always-present Conditional-only
+# runtime record, display name "Reserved" (renamed 2026-08-15 from
+# "GroupTrack" -- its real purpose was never actually confirmed), which
+# never appears as a row in the editor at all and so has no
+# Remove-button status to check), Cycling Dynamics, Lap Summary,
+# Virtual Partner, Compass, and Segment all show an active Remove
+# option. That's the complete set of common named types -- no gap
+# remains. Directly relevant to the scoped-but-not-yet-built --remove
+# flag (see PROJECT_NOTES.md Open Items, "Delete Screen") -- its own
+# type-check guard can reuse this same set (Map, ClimbPro) as-is.
 NO_SHOW_TOGGLE_TYPES = {25, 104}  # Map, ClimbPro
 
 
@@ -525,6 +549,67 @@ def hide_unsupported_screen_type(input_path, message_index):
     if f10_val is None or f10_val not in NO_SHOW_TOGGLE_TYPES:
         return None
     return NAMED_SCREEN_TYPES[f10_val]
+
+
+def remove_screen(input_path, output_path, message_index):
+    """
+    Transition an Active, configured screen slot to the Removed state:
+    f1 -> 0, f9/f10 cleared to the 0xFF sentinel. Mirrors --new-slot's
+    activation in reverse. Field count/array (f3/f7) are deliberately
+    left UNTOUCHED -- confirmed on-device behavior (see SCREEN STATE
+    MODEL, PROJECT_NOTES.md) is that a Removed screen's CONTENT is
+    preserved, only its f1/f9/f10 identity/order signals go away.
+
+    This is a ONE-WAY operation by design, matching Garmin's own
+    editor (Hide is the only reversible per-screen action; Remove is
+    permanent, same as Add New). --un-remove, this project's own
+    former attempt at a per-screen undo, was retired entirely
+    (v1.13.0) -- Restore-from-Backup (a whole-profile undo, confirmed
+    on real hardware) is the only real recovery path after a Remove.
+    There is no --force override for anything this function's callers
+    guard against, for the same reason --hide's guards have none: both
+    hard guards below are directly observed facts, not heuristics.
+
+    Caller is responsible for running the SAME two guards --hide
+    already enforces, BEFORE calling this -- this function is a pure
+    byte-patch primitive and does not re-check either one itself, same
+    division of responsibility patch_screen() itself follows:
+      - hide_unsupported_screen_type(input_path, message_index): CONFIRMED
+        (2026-08-13, Doug, directly on-device) that NO_SHOW_TOGGLE_TYPES
+        (Map, ClimbPro) bounds Remove availability too, not just Show/
+        Hide -- these two named types have no Remove option either.
+      - would_hide_last_visible_screen(input_path, message_index):
+        documented as already covering Remove's identical on-device
+        floor-of-one rule (a profile must always have at least one
+        visible plain user screen) -- no separate function needed,
+        since Remove and Hide both result in the screen no longer
+        being shown.
+
+    CONFIRMED via a real on-device round-trip test (2026-08-14, Doug):
+    the target screen was correctly removed from the on-device Data
+    Screens order, matching a real Remove button press. Also confirmed
+    the expected corollary from the retired --un-remove's own history:
+    the removed screen does NOT survive as a recoverable Removed-state
+    slot after the deploy that removes it -- NewFiles wipes it, same as
+    every other Removed-state slot on any NewFiles deploy (see BUGS).
+    This directly matches Doug's own reasoning for retiring --un-remove
+    in the first place ("if the user mistakenly deletes a screen, they
+    can always recover the previous state using restore from backup")
+    -- there was never going to be a toolkit-side undo path for this,
+    by design, and this test confirms there isn't one on the device
+    side either. See PROJECT_NOTES.md Open Items ("Delete Screen") for
+    the full two-phase build history this function completed: backend
+    primitive, headless verification, then this real device test --
+    the GUI wrapper (ViewScreensPanel, per Doug's placement decision)
+    is the one remaining, now-unblocked step.
+    """
+    changes = {
+        1: pack_removed_flag(),
+        9: bytes([0xFF]),
+        10: bytes([0xFF]),
+    }
+    patch_screen(input_path, output_path, message_index, changes)
+    return changes
 
 
 # Content patterns that have recurred, on MULTIPLE different profiles,
@@ -719,6 +804,20 @@ def _cli():
                               "Takes priority over --seed-from-slot and the --new-slot "
                               "auto-default (next_available_field10()). Only needed to "
                               "override the auto-computed value for deliberate testing.")
+    parser.add_argument("--remove", action="store_true",
+                         help="PERMANENTLY remove this screen (matches the on-device "
+                              "\"Remove\" option, NOT \"Hide\"): sets field 1 to 0 and "
+                              "clears fields 9/10 to the sentinel, but leaves the "
+                              "screen's field count/content (fields 3/7) untouched -- "
+                              "confirmed Removed-state behavior is that content is "
+                              "preserved, only identity/order signals go away. "
+                              "ONE-WAY: there is no --un-remove (retired, see "
+                              "FIT_PATCH.md) -- Restore-from-Backup is the only real "
+                              "undo path. Ignores --fields/--layout/--enable/--disable/ "
+                              "etc. when used -- this is a separate operation from "
+                              "those, same as --swap-order. CONFIRMED via a real "
+                              "on-device round-trip test (2026-08-14) -- see "
+                              "remove_screen()'s docstring.")
     parser.add_argument("--swap-order", metavar="SLOT,SLOT",
                          help="swap the DISPLAY ORDER of two already-configured screens by "
                               "swapping their field 9 (creation-order stamp) values. f9 "
@@ -728,26 +827,9 @@ def _cli():
                               "screen count never changes. Both slots must already have a "
                               "real (non-sentinel) f9. This is a separate operation from "
                               "--slot/--fields etc. -- ignores --slot when used.")
-    parser.add_argument("--un-remove", action="store_true",
-                         help="restore a screen from the Removed state (see SCREEN STATE "
-                              "MODEL) back to Active. Requires --slot pointing at a slot "
-                              "CONFIRMED to be in the Removed state (f1=0, f9/f10 absent, "
-                              "content preserved) -- refuses otherwise. Sets f1=1 and "
-                              "assigns a fresh, unique f9 (auto-computed unless --field9 "
-                              "given) and a fresh, collision-free f10 (auto-computed via "
-                              "next_available_field10() unless --field10/--seed-from-slot "
-                              "given -- see BUGS below re: why the old hardcoded-0 default "
-                              "was unsafe). Does NOT touch f3/f7 -- the screen's original "
-                              "field content is left exactly as it was. "
-                              "*** WARNING: an EARLIER version of this tool (pre-v1.12.0, "
-                              "before f10's meaning was understood) was CONFIRMED via live "
-                              "device round-trip to cause silent data loss on an UNRELATED "
-                              "screen -- root-caused to the old default writing f10=0, which "
-                              "collided with the profile's existing 'Screen 1' identity. The "
-                              "auto-default now avoids that collision, but --un-remove has "
-                              "NOT itself been re-tested live since the fix (only --new-slot "
-                              "has). Back up first regardless -- not just recommended, "
-                              "required. ***")
+    # --un-remove RETIRED (v1.13.0, 2026-08-13) -- see BUGS below and
+    # PROJECT_NOTES.md "Product note on --un-remove" for the full
+    # history. It's no longer a flag this parser accepts.
 
     args = parser.parse_args()
 
@@ -765,22 +847,37 @@ def _cli():
     if args.slot is None:
         parser.error("--slot is required (except when using --swap-order)")
 
-    if args.un_remove and args.new_slot:
-        parser.error("--un-remove and --new-slot are mutually exclusive -- they assume "
-                     "opposite starting states (already-has-content vs. truly empty)")
-
-    if args.un_remove:
-        state = read_current_state(args.input_file, args.slot)
-        if state is None:
-            parser.error(f"--un-remove: slot {args.slot} not found in {args.input_file}")
-        if state != 'removed':
+    if args.remove:
+        # Same two hard guards --hide already enforces, no --force
+        # override for either -- see remove_screen()'s docstring for
+        # why both are directly-observed facts, not heuristic guesses,
+        # and why Remove reuses --hide's exact guard functions rather
+        # than needing its own.
+        unsupported_type = hide_unsupported_screen_type(args.input_file, args.slot)
+        if unsupported_type is not None:
             parser.error(
-                f"--un-remove: slot {args.slot} is currently '{state}', not 'removed'. "
-                f"This only operates on screens confirmed to be in the Removed state "
-                f"(f1=0, f9/f10 absent, content preserved) -- refusing to touch a slot "
-                f"in any other state. Run `fit_dump.py screens` to see which slots are "
-                f"actually Removed."
+                f"--remove: slot {args.slot} is a '{unsupported_type}' screen. "
+                f"CONFIRMED via direct on-device inspection that this screen "
+                f"type has no Remove option at all in the Data Screens editor "
+                f"-- there is no --force override, because forcing this write "
+                f"here would produce a state with no on-device equivalent to "
+                f"compare it against on any profile."
             )
+        if would_hide_last_visible_screen(args.input_file, args.slot):
+            parser.error(
+                f"--remove: slot {args.slot} is currently the ONLY visible "
+                f"USER screen on this profile (Garmin-named screens don't "
+                f"count toward this). Confirmed via real on-device testing "
+                f"that the editor refuses to hide OR remove a profile's last "
+                f"remaining user screen -- there is no --force override for "
+                f"this, because it isn't a guess: show at least one other "
+                f"user screen first, then remove this one."
+            )
+        remove_screen(args.input_file, args.output_file, args.slot)
+        print(f"wrote {args.output_file}: slot {args.slot} REMOVED (f1=0, f9/f10 "
+              f"cleared, content preserved) -- this is ONE-WAY, see --remove's "
+              f"help text", file=sys.stderr)
+        return
 
     if args.fields is not None and args.swap_fields is not None:
         parser.error("--fields and --swap-fields are mutually exclusive -- "
@@ -853,7 +950,7 @@ def _cli():
                 f"screen first, then hide this one."
             )
         changes[12] = pack_enabled(False)
-    if args.new_slot or args.un_remove:
+    if args.new_slot:
         changes[1] = pack_configured_flag()
     if args.new_slot and 12 not in changes:
         # CONFIRMED via device round-trip test: every real device-created
@@ -865,9 +962,7 @@ def _cli():
         # always sets f12=0 -- succeeded. Not fully proven causal yet
         # (see BUGS below), but matching real device behavior here
         # is correct regardless, so this is now the default rather than
-        # leaving f12 untouched. --un-remove does NOT get this default:
-        # a Removed screen already has a valid, preserved f12 from
-        # before it was removed.
+        # leaving f12 untouched.
         changes[12] = pack_enabled(True)
         print("note: --new-slot without --enable/--disable -- defaulting field 12 "
               "to 0/enabled (every real device-created screen has this set; a "
@@ -895,8 +990,8 @@ def _cli():
     if args.field10 is not None:
         changes[10] = pack_uint8(args.field10)
 
-    # --new-slot / --un-remove safety net: fields 9/10 have been shown
-    # (device round-trip test) to cause the ENTIRE slot to be silently
+    # --new-slot safety net: fields 9/10 have been shown (device
+    # round-trip test) to cause the ENTIRE slot to be silently
     # discarded/merged on reboot if left colliding with an existing
     # slot's value -- f9 needs to be globally unique, and f10 needs to
     # be free among the profile's user-screen identities (CONFIRMED via
@@ -905,7 +1000,7 @@ def _cli():
     # reconciliation; a free f10 survives intact). Auto-fill only what
     # wasn't already set above by --field9/--field10/--seed-from-slot,
     # so this never overrides an explicit choice.
-    if args.new_slot or args.un_remove:
+    if args.new_slot:
         if 9 not in changes:
             auto_f9 = next_available_field9(args.input_file)
             changes[9] = pack_uint8(auto_f9)

@@ -1,6 +1,156 @@
 ```
 FIT_PATCH(1)              Garmin Edge FIT Toolkit             FIT_PATCH(1)
 
+Doc rev 27 -- refreshed 2026-08-17. **FULLY CONFIRMED via direct
+raw-byte inspection.** Doug's CyclingRoadRoadtemp.fit -- the original
+census profile, Screen 3/Screen 4 still intact at 10 fields each --
+came through on a second upload attempt. Raw field-ID arrays dumped
+directly: slot 6 (Screen 3) = [150, 149, 177, 176, 43, 437, 40, 408,
+411, 441], slot 7 (Screen 4) = [80, 42, 148, 147, 82, 83, 151, 161,
+160, 159]. Every one of the 20 corrected pairs from Doc rev 26 matches
+these raw arrays position-for-position exactly, including 177 "Torque
+Effect" under its own ID -- closing the one residual flag Doc rev 26
+was still carrying (that string had only been confirmed against ID
+148 before the transposition was found). Same direct byte-level
+verification standard as every other confirmed batch in this table
+now, not resting on device-observed inference alone. fit_dump.py now
+v2.4.20. Prior rev (26, 2026-08-17) follows.
+
+Doc rev 26 -- refreshed 2026-08-17. **RESOLVED: the 2026-08-17 batch's
+raw IDs and names were correctly identified but WRONGLY PAIRED** --
+Doug's census screens 3 and 4 got transposed when the original list
+was written up, so all 10 IDs from one screen's block were paired
+with the 10 names from the other screen's block. Caught via real
+device testing (editing Screen 4 to "Intensity Factor (IF)"/"Pedal
+Smoothness"/"Torque Effect" actually displayed "Avg W/kg"/"Lap NP"/
+"Last Lap NP" on the device). Doug re-derived the correct pairing
+directly from the census screens; it resolves all three mismatches
+exactly. FIELD ID REFERENCE table fully regenerated with the
+corrected pairing (still 137 entries, same 20 raw IDs, only the
+name assignment changed within that batch). Not independently
+re-confirmed via a raw byte dump (upload sync issue this session) --
+treated as sufficiently confirmed on the 3-for-3 match against
+observed device behavior. fit_dump.py now v2.4.19. Prior rev (25,
+2026-08-17) follows.
+
+Doc rev 25 -- refreshed 2026-08-17. **20 new confirmed field IDs,**
+this project's first batch touching power-meter/Di2-electronic-
+shifting metrics: Balance family (40/42/80/408/411/441), Power/W-kg
+(150/151/83/159), training load (149/43/437), NP (176/177), pedaling
+metrics (148/147/82), Shimano Di2 (161/160). Confirms the existing
+3s/10s/30s/Lap/Avg Power naming pattern repeats identically for
+Balance. FIELD ID REFERENCE table below fully regenerated (137
+entries, was 117) -- see the new NOTE immediately after the table for
+the full list and the Torque Effectiveness abbreviation call. No
+collisions with any prior entry. fit_dump.py now v2.4.16. Prior rev
+(24, 2026-08-16) follows.
+
+Doc rev 24 -- refreshed 2026-08-16. f10=38 "Workout"'s real-world
+meaning is now backed by Garmin's own Edge 530 Owner's Manual, not
+just inference: Training > Workouts is a separate subsystem from
+Activity Profile screens, and a running structured Workout "displays
+each step of the workout, the target (if any), and current workout
+data" -- almost certainly what this screen type renders, dynamically,
+only while a Workout is actively running, the same runtime-conditional
+pattern already established here for ClimbPro/Segment/GroupTrack List.
+New fit_dump.py `FIELD_EDIT_UNCERTAIN_TYPES` set (now v2.4.15,
+currently `{38}`) backs a new non-blocking GUI warning (gui_app.py now
+v0.19.4) rather than a hard edit block, since the write mechanism
+itself is unchanged/proven-safe -- only the on-device visible effect
+is uncertain. Not independently confirmed via an actual running
+Workout. See PROJECT_NOTES.md doc rev 54 and the "f10=38 'Workout'"
+Open Item for the full writeup. Prior rev (23, 2026-08-16) follows.
+
+Doc rev 23 -- refreshed 2026-08-16. **CORRECTION to Doc rev 22, same
+day: the real f10 values are 38 Workout, 58 eBike Metrics, 95 STEPS
+Metrics (Shimano), not 39/59/96.** Those numbers were read off this
+tool's own "Screen N" display fallback (f10+1), not the raw byte --
+caught once Doug's CyclingEbike.fit was actually inspected directly.
+f10 table corrected (fit_dump.py now v2.4.14). The f10=38 "Workout"
+field question is RESOLVED, not just flagged: confirmed via a direct
+raw-byte comparison that its field-ID array is byte-for-byte identical
+to Cycling Dynamics' (f10=63) on the same profile -- real,
+accurately-read data, not a bug, even though the on-device editor
+shows no fields/options for this type at all. See PROJECT_NOTES.md
+"Corrections and lessons learned" and Open Items for the full writeup.
+Prior rev (22, 2026-08-16, superseded) follows.
+
+Doc rev 22 -- refreshed 2026-08-16. **3 new confirmed f10 screen
+types, CyclingEbike.fit (2026-08-16 batch, Doug) -- SUPERSEDED, see
+Doc rev 23 above for the corrected f10 values.** 39 Workout, 59
+eBike Metrics, 96 STEPS Metrics (Shimano) -- the first e-bike/third-
+party-drivetrain profile this project has seen. f10 table updated
+(fit_dump.py now v2.4.13). FLAGGED, not yet resolved: f10=39
+"Workout" behaves unlike every other named type here -- the on-device
+editor shows no fields/options for it (Remove/Reorder only), but this
+toolkit's own views show it with Cycling Dynamics' field set on the
+same profile. No behavior change made pending real byte-level
+investigation -- see PROJECT_NOTES.md Open Items for the full writeup.
+Prior rev (21, 2026-08-15) follows.
+
+Doc rev 21 -- refreshed 2026-08-15. **f10=32 renamed "GroupTrack" ->
+"Reserved", Doug's decision.** This Conditional-only runtime record is
+present on every profile seen so far, active or not, regardless of
+whether GroupTrack has ever been used -- that always-present,
+content-independent behavior never actually confirmed a GroupTrack
+identity, just an assumption carried from early testing. f10=57
+("GroupTrack List", the literal on-device menu entry for the feature)
+is unaffected and remains correctly GroupTrack-specific. SCREEN STATE
+MODEL and the f10 table updated to match (fit_dump.py now v2.4.12,
+fit_patch.py now v1.14.2, doc-only in both -- no functional/behavioral
+change, screen_type_name(32) just returns a different string). Prior
+rev (20, 2026-08-14) follows.
+
+Doc rev 20 -- refreshed 2026-08-14. **GUI wrapper built, closing
+"Delete Screen" end to end.** ViewScreensPanel gained "Remove Selected
+Screen" (gui_app.py v0.17.0, Doug's go-ahead), reusing
+hide_unsupported_screen_type()/would_hide_last_visible_screen()
+directly as its two guards, same order, no override, plus a plain
+permanent-deletion confirmation -- same division of labor as the
+Show/Hide checkbox already has with --hide. RELATED TOOLS updated.
+This was the one remaining step after doc rev 19's device-test
+confirmation; all three build-plan steps (backend, device test, GUI)
+are now done. Prior rev (19, 2026-08-14) follows.
+
+Doc rev 19 -- refreshed 2026-08-14. **--remove CONFIRMED via a real
+on-device round-trip test** (fit_patch.py v1.14.1, Doug). The target
+screen was correctly removed from the on-device Data Screens order,
+matching a real Remove button press, and (as expected, matching
+--un-remove's own retirement reasoning) the removed screen was wiped
+by NewFiles rather than surviving as a recoverable Removed-state slot.
+Two of the two-phase build plan's three steps (backend + headless
+verification, then this device test) are now done -- a GUI wrapper
+(ViewScreensPanel, per Doug's placement decision) is the one remaining
+step, still withheld until asked for. STATUS/BUGS updated from "OPEN"/
+"NOT YET VERIFIED" to RESOLVED/CONFIRMED. Prior rev (18, 2026-08-14)
+follows.
+
+Doc rev 18 -- refreshed 2026-08-14. NEW: --remove (fit_patch.py
+v1.14.0), the first half of "Delete Screen" -- permanently removes a
+screen (f1=0, f9/f10 cleared to sentinel, f3/f7 content left
+untouched), reusing --hide's exact two hard guards
+(hide_unsupported_screen_type()/would_hide_last_visible_screen()) with
+no --force override for either, same as --hide. ONE-WAY by design, no
+--un-remove counterpart (retired doc rev 17). Headless-verified against
+a real profile (byte-shape correct, guards block Map/last-visible-
+screen exactly as designed, CRC valid) but NOT YET VERIFIED ON REAL
+HARDWARE -- no on-device round-trip test yet. No GUI wrapper yet either
+-- per the two-phase build plan, that's step three, after the pending
+on-device test. See OPTIONS, SCREEN STATE MODEL, and BUGS below. Prior
+rev (17, 2026-08-13) follows.
+
+Doc rev 17 -- refreshed 2026-08-13. --un-remove RETIRED entirely
+(fit_patch.py v1.13.0), Doug's decision: Restore-from-Backup already
+covers real recovery (whole-profile undo, confirmed on real
+hardware), --un-remove had a confirmed historical device-side
+data-loss hazard never re-verified after the v1.12.0 fix, and
+Garmin's own editor has no un-remove workflow either. OPTIONS entry
+kept as a historical record marked RETIRED rather than deleted;
+SCREEN STATE MODEL and BUGS sections updated to match. A future
+--remove flag (Delete Screen, scoped not yet built) will be one-way
+by design, no un-remove counterpart at all. Prior rev (16, 2026-08-11)
+follows.
+
 Doc rev 16 -- refreshed 2026-08-11. Field 320 corrected: "Conditioning"
 -> "Perf. Conditioning" -- full concept name is "Performance
 Conditioning," but Doug confirmed the actual on-device DATA FIELD
@@ -282,38 +432,81 @@ OPTIONS
               they have no f9 to swap. Ignores --slot; this is a
               separate operation from everything else in this list.
 
-       --un-remove
-              Restore a screen from the Removed state back to Active.
-              Requires --slot pointing at a slot CONFIRMED to be
-              Removed (f1=0, f9/f10 absent, content preserved) --
-              refuses otherwise. Does NOT touch f3/f7. As of v1.12.0
-              its f9/f10 auto-defaults use the same collision-free
-              logic as --new-slot (see above).
+       --remove
+              PERMANENTLY remove a screen (matches the on-device
+              "Remove" option, NOT "Hide"): sets field 1 to 0 and
+              clears fields 9/10 to the sentinel, leaving field
+              count/content (fields 3/7) untouched -- confirmed
+              Removed-state behavior is that content is preserved,
+              only identity/order signals go away. Mirrors --new-slot's
+              activation in reverse. Ignores --fields/--layout/
+              --enable/--disable/etc. when used -- a separate operation
+              from those, same as --swap-order.
 
-              *** WARNING: an EARLIER version of this tool (pre-
-              v1.12.0) was CONFIRMED via live device round-trip to
-              cause silent data loss on an UNRELATED, untouched
-              screen -- root-caused to the old hardcoded f10=0
-              default colliding with an existing screen's identity
-              (see --new-slot STATUS above). The fix removes that
-              specific collision, but --un-remove itself has NOT yet
-              been re-tested live since the fix -- only --new-slot
-              has (2026-08-05, CyclingRoadSandbox). Treat --un-remove
-              as unverified-but-plausibly-fixed, not confirmed. Back
-              up first regardless -- not just recommended, required.
+              ONE-WAY by design: there is no --un-remove (retired
+              above) -- Restore-from-Backup (whole profile) is the
+              only real undo path, matching Garmin's own editor (Hide
+              is reversible, Remove is permanent, same as Add New).
 
-              PRODUCT NOTE (2026-08-05): Garmin's own on-device editor
-              has no un-remove option at all -- Hide (temporary) and
-              Remove + Add New (permanent) are the only workflows it
-              exposes. A factory-shipped profile's Removed list
-              already contains a few entries the user never created
-              (confirmed on a brand-new template, zero edits), which
-              suggests Garmin itself may not treat Removed vs.
-              Unconfigured as a meaningfully distinct, user-facing
-              state the way this toolkit has had to. Current thinking
-              is to keep this flag available for deliberate testing
-              but likely NOT expose it as a first-class GUI feature --
-              final call deferred, not yet made. ***
+              Blocked outright (parser.error, NO --force override) by
+              the SAME two hard guards --hide already enforces --
+              CONFIRMED (2026-08-13, Doug, directly on-device) that
+              NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) bounds Remove
+              availability identically to Show/Hide, and the
+              last-visible-user-screen floor rule is documented as
+              covering Remove too -- no separate guard logic, direct
+              reuse of hide_unsupported_screen_type()/
+              would_hide_last_visible_screen().
+
+              *** STATUS (v1.14.1, 2026-08-14): CONFIRMED VIA REAL
+              ON-DEVICE ROUND-TRIP *** -- headless-verified first
+              (correct state transition, guards block exactly as
+              designed, valid CRC), then Doug ran a real device test:
+              the target screen was correctly removed from the
+              on-device Data Screens order, matching a real Remove
+              button press, and (as expected, matching --un-remove's
+              own retirement reasoning) the removed screen does NOT
+              survive as a recoverable Removed-state slot after the
+              deploy -- NewFiles wipes it, same as every other
+              Removed-state slot on any NewFiles deploy. No GUI wrapper
+              built yet -- the two-phase build plan's backend + device
+              test steps are both done; a ViewScreensPanel button is
+              the one remaining, now-unblocked step, still withheld
+              until Doug asks for it. See PROJECT_NOTES.md Open Items,
+              "Delete Screen."
+
+       --un-remove  *** RETIRED (v1.13.0, 2026-08-13) -- no longer a
+              recognized flag. Kept here as a historical record only. ***
+
+              This USED TO restore a screen from the Removed state
+              back to Active (set f1=1, assign fresh f9/f10, leave
+              f3/f7 untouched). Doug's decision to remove it entirely,
+              rather than leave it available for deliberate testing:
+              (1) Restore-from-Backup already covers the real-world
+              recovery use case -- a whole-profile undo, CONFIRMED
+              working on real hardware -- so a per-screen un-remove
+              was never load-bearing; (2) an EARLIER version of this
+              tool (pre-v1.12.0) was CONFIRMED via live device
+              round-trip to cause silent data loss on an UNRELATED,
+              untouched screen, root-caused to the old hardcoded f10=0
+              default colliding with an existing screen's identity --
+              the general fix (collision-free f10) likely also fixed
+              --un-remove specifically, but that was never re-verified
+              with its own live round-trip test, so it stayed
+              "unverified-but-plausibly-fixed" indefinitely; (3)
+              Garmin's own on-device editor has no un-remove option at
+              all -- Hide (temporary) and Remove + Add New (permanent)
+              are the only two screen-lifecycle workflows it exposes,
+              so this flag was replicating something Garmin's own
+              product doesn't offer either. See PROJECT_NOTES.md
+              "Product note on --un-remove" for the full history --
+              that note had left the final call deferred; this is that
+              call being made. --remove (v1.14.0, see above) is now
+              built as a ONE-WAY operation by design, with no CLI or
+              GUI un-remove counterpart at all -- recovery from an
+              unwanted delete is Restore-from-Backup, matching how
+              Garmin's own "Remove + Add New (permanent)" already
+              works.
 
 RELATED TOOLS
        fit_chain.py chains multiple fit_patch.py operations (each a
@@ -347,7 +540,12 @@ RELATED TOOLS
        next_available_field9(), and next_available_field10() directly
        -- it replicates --new-slot's exact defaulting logic via these
        same functions rather than reimplementing it, so the two paths
-       (CLI and GUI) can't drift apart.
+       (CLI and GUI) can't drift apart. As of gui_app.py v0.17.0,
+       ViewScreensPanel also imports remove_screen() directly --
+       "Remove Selected Screen" is guarded by the SAME two functions
+       (hide_unsupported_screen_type()/would_hide_last_visible_screen())
+       --remove itself uses, checked in the same order, with no
+       --force-equivalent override for either in the GUI either.
 
 FIELD 10 / SCREEN TYPES (CONFIRMED, side-thread Test 4, 2026-08-04)
        Field 10 (f10) is a real screen TYPE identifier, independent of
@@ -366,14 +564,34 @@ FIELD 10 / SCREEN TYPES (CONFIRMED, side-thread Test 4, 2026-08-04)
                ---   ---------------------------------------------
                 25   Map
                 26   Virtual Partner
-                32   GroupTrack (the real Conditional runtime record)
+                32   Reserved (always-present Conditional-only runtime
+                     record; NOT confirmed GroupTrack-specific -- see
+                     note below; renamed from "GroupTrack" 2026-08-15)
                 35   Compass
+                38   Workout (2026-08-16 batch, CyclingEbike.fit --
+                     CORRECTED from an initial "39" (see PROJECT_NOTES.md
+                     "Corrections and lessons learned": that number was
+                     read off this tool's own f10+1 display fallback, not
+                     the raw byte). RESOLVED, not just flagged: the
+                     on-device editor shows no fields/options for this
+                     type at all, Remove/Reorder only -- but a direct
+                     raw-byte comparison confirms its field-ID array is
+                     byte-for-byte IDENTICAL to Cycling Dynamics'
+                     (f10=63) on the same profile. Real, accurately-read
+                     data, not a bug -- see PROJECT_NOTES.md Open Items)
                 44   Elevation
                 56   Segment
                 57   GroupTrack List (always-orderable Active
-                     placeholder, structurally independent of f10=32)
+                     placeholder, structurally independent of f10=32 --
+                     this one IS the real GroupTrack menu entry)
+                58   eBike Metrics (2026-08-16 batch, CyclingEbike.fit --
+                     corrected from an initial "59", same f10+1 mixup)
                 63   Cycling Dynamics
                 74   Lap Summary
+                95   STEPS Metrics (Shimano) (2026-08-16 batch,
+                     CyclingEbike.fit -- corrected from an initial "96",
+                     same f10+1 mixup -- first Shimano-branded/third-
+                     party drivetrain screen type seen)
                104   ClimbPro
 
        (2) Plain user-created screens use a per-profile, zero-indexed
@@ -389,72 +607,135 @@ FIELD 10 / SCREEN TYPES (CONFIRMED, side-thread Test 4, 2026-08-04)
        v1.9.0 fix possible -- "how many real user screens are left" is
        now directly answerable from the file via f10, not a guess.
 
+       NOTE (2026-08-15, Doug's decision): f10=32's display name was
+       changed from "GroupTrack" to "Reserved". This Conditional-only
+       record has been seen on every profile examined so far, active
+       or not, regardless of whether GroupTrack has ever actually been
+       used -- that always-present, content-independent behavior never
+       actually confirmed a GroupTrack identity, it was an assumption
+       carried from early testing. f10=57 ("GroupTrack List," the
+       literal on-device menu entry for the feature) is unaffected and
+       remains correctly GroupTrack-specific.
+
        fit_dump.py's screen_type_name(f10) renders either form; import
        it (or NAMED_SCREEN_TYPES directly) rather than re-deriving this
        table elsewhere.
 
-FIELD ID REFERENCE (117 confirmed)
+FIELD ID REFERENCE (137 confirmed)
        ID     Name                       ID     Name
        ---    -----------------------    ---    -----------------------
-         0    Calories                    94    ETA to Next
-         2    Course Pt Dist.             95    Odometer
-         3    Cadence                     96    Battery Level
-         4    Avg Cadence                 97    GPS Signal Strength
-         5    Lap Cadence                 99    Aerobic Training Effect
-         6    Distance                   146    10s Power
-         7    Lap Dist.                  165    Last Lap HR
-         9    Elevation (ft)             178    Gears
-        11    Percent Grade              179    Front Gear
-        12    Heading                    180    Rear Gear
-        13    Heart Rate                 181    Gear Battery
-        14    Avg Heart Rate             182    Gear Ratio
-        15    Lap HR                     199    HR Zone 1 (time)
-        16    %Max Heart Rate            200    HR Zone 2 (time)
-        17    Avg %Max Heart Rate        201    HR Zone 3 (time)
-        18    Lap %Max HR                202    HR Zone 4 (time)
-        19    %Heart Rate Reserve        203    HR Zone 5 (time)
-        20    Avg %HRR                   216    WindField Widget
-        22    Heart Rate Zone            257    Time Standing
-        23    HR Zone Graph              259    Time Seated
-        27    Distance to Destination    263    Platform Center Offset
-        28    Time to Destination        266    Power Phase Right
-        29    Distance to Next           270    Avg R. Peak Pwr Phase
-        30    Time to Next               272    Power Phase Left
-        31    Dest. Location             276    Avg L. Peak Pwr Phase
-        32    Next Pt Location           295    Target Power
-        36    Power                      316    Lights Connected
-        37    Avg Power                  317    Light Battery
-        38    Kilojoules                 318    Beam Angle Status
-        39    Lap Power                  319    Light Mode
-        48    Speed                      320    Perf. Conditioning
-        49    Avg Speed                  343    Heart Rate Graph
-        50    Lap Speed                  344    Speed Graph
-        53    Sunrise                    345    Cadence Graph
-        54    Sunset                     346    Power Graph
-        55    Elapsed Time               347    HR Bars
-        56    Timer                      348    Speed Bars (see note)
-        57    Avg Lap Time               349    Cadence Bars (see note)
-        58    Lap Time                   350    Power Bars
-        59    Time of Day (TOD)          368    Elevation Graph
-        60    Total Ascent               409    Gear Combo
-        61    Total Descent              433    Anaerobic TE
-        62    Dest. Ahead                442    Lap VAM
-        63    Time Ahead                 443    Avg VAM
-        64    Calories to Go             444    Ascent Remaining
-        65    Distance to Go             445    Asc to Next Crs Pt
-        66    Heart Rate to Go           452    Respiration
-        67    Reps to Go                 478    EPOC
-        68    Time to Go                 486    Grit
-        77    VAM                        487    Lap Grit
-        78    Temperature                488    Flow
-        79    3s Power                   489    Lap Flow
-        81    Normalized Power           491    Assist Mode
-        84    Last Lap Dist              492    Shifting Advice
-        86    Last Lap Speed             493    eBike Battery
-        87    Last Lap Time              494    Travel Range
-        88    30s VAM                    495    60s Grit
-        91    Max Speed                  497    60s Flow
-        93    ETA at Destination
+         0    Calories                    99    Aerobic Training Effect
+         2    Course Pt Dist.            146    10s Power
+         3    Cadence                    147    Lap NP
+         4    Avg Cadence                148    Last Lap NP
+         5    Lap Cadence                149    Balance
+         6    Distance                   150    Avg Balance
+         7    Lap Dist.                  151    Lap Balance
+         9    Elevation (ft)             159    3s Balance
+        11    Percent Grade              160    10s Balance
+        12    Heading                    161    30s Balance
+        13    Heart Rate                 165    Last Lap HR
+        14    Avg Heart Rate             176    Pedal Smoothness
+        15    Lap HR                     177    Torque Effect (see note)
+        16    %Max Heart Rate            178    Gears
+        17    Avg %Max Heart Rate        179    Front Gear
+        18    Lap %Max HR                180    Rear Gear
+        19    %Heart Rate Reserve        181    Gear Battery
+        20    Avg %HRR                   182    Gear Ratio
+        22    Heart Rate Zone            199    HR Zone 1 (time)
+        23    HR Zone Graph              200    HR Zone 2 (time)
+        27    Distance to Destination    201    HR Zone 3 (time)
+        28    Time to Destination        202    HR Zone 4 (time)
+        29    Distance to Next           203    HR Zone 5 (time)
+        30    Time to Next               216    WindField Widget
+        31    Dest. Location             257    Time Standing
+        32    Next Pt Location           259    Time Seated
+        36    Power                      263    Platform Center Offset
+        37    Avg Power                  266    Power Phase Right
+        38    Kilojoules                 270    Avg R. Peak Pwr Phase
+        39    Lap Power                  272    Power Phase Left
+        40    Max Power                  276    Avg L. Peak Pwr Phase
+        42    %FTP                       295    Target Power
+        43    Power Zone                 316    Lights Connected
+        48    Speed                      317    Light Battery
+        49    Avg Speed                  318    Beam Angle Status
+        50    Lap Speed                  319    Light Mode
+        53    Sunrise                    320    Perf. Conditioning
+        54    Sunset                     343    Heart Rate Graph
+        55    Elapsed Time               344    Speed Graph
+        56    Timer                      345    Cadence Graph
+        57    Avg Lap Time               346    Power Graph
+        58    Lap Time                   347    HR Bars
+        59    Time of Day (TOD)          348    Speed Bars (see note)
+        60    Total Ascent               349    Cadence Bars (see note)
+        61    Total Descent              350    Power Bars
+        62    Dest. Ahead                368    Elevation Graph
+        63    Time Ahead                 408    Di2 Battery
+        64    Calories to Go             409    Gear Combo
+        65    Distance to Go             411    Di2 Shift Mode
+        66    Heart Rate to Go           433    Anaerobic TE
+        67    Reps to Go                 437    Avg W/kg
+        68    Time to Go                 441    30s W/kg
+        77    VAM                        442    Lap VAM
+        78    Temperature                443    Avg VAM
+        79    3s Power                   444    Ascent Remaining
+        80    30s Power                  445    Asc to Next Crs Pt
+        81    Normalized Power           452    Respiration
+        82    TSS                        478    EPOC
+        83    Intensity Factor (IF)      486    Grit
+        84    Last Lap Dist              487    Lap Grit
+        86    Last Lap Speed             488    Flow
+        87    Last Lap Time              489    Lap Flow
+        88    30s VAM                    491    Assist Mode
+        91    Max Speed                  492    Shifting Advice
+        93    ETA at Destination         493    eBike Battery
+        94    ETA to Next                494    Travel Range
+        95    Odometer                   495    60s Grit
+        96    Battery Level              497    60s Flow
+        97    GPS Signal Strength
+
+       NOTE: 2026-08-17 batch (20 new: 40, 42, 43, 80, 82, 83, 147,
+       148, 149, 150, 151, 159, 160, 161, 176, 177, 408, 411, 437,
+       441) -- this project's first batch touching power-meter/Di2-
+       electronic-shifting metrics, Doug's continued field census.
+       Notable: confirms the 3s/10s/30s/Lap/Avg Power naming pattern
+       (79/146/80/39/37) repeats identically for L/R Power Balance
+       (159/160/161/151/150), with 149 "Balance" as the base metric
+       mirroring 36 "Power" -- a self-consistent family, not one-off
+       guesses. No collisions with any prior entry.
+
+       NOTE: 148 CORRECTED 2026-08-17 -- initially stored as "Torque
+       Effect." (a guessed abbreviated form, by analogy to 320 "Perf.
+       Conditioning"). Doug directly confirmed the real on-device text
+       in a half-width (1/2 side-by-side) field: "Torque Effect", no
+       trailing period. Full concept name is "Torque Effectiveness."
+
+       NOTE: 2026-08-17 batch CORRECTED AGAIN, same day -- the whole
+       batch above had raw IDs and names correctly IDENTIFIED but
+       WRONGLY PAIRED. Doug's census screens 3 and 4 (Roadtemp
+       profile) got transposed when the original list was written up,
+       so all 10 IDs from one screen's block were paired with the 10
+       NAMES from the other screen's block -- a clean systematic
+       offset, not scattered errors (the SET of 20 raw IDs is
+       unchanged, only which name each points to). Caught via real
+       device testing: editing Screen 4 (slot 7, CyclingRoadROAD.fit)
+       to fields named "Intensity Factor (IF)" (437)/"Pedal
+       Smoothness" (147)/"Torque Effect" (148)/"Perf. Conditioning"
+       (320) actually displayed "Avg W/kg, Lap NP, Last Lap NP, Perf.
+       Cond." on the real device. Doug re-derived the correct pairing
+       directly from Roadtemp's screen 3/4 field order; it resolves
+       ALL THREE mismatches exactly (437 = Avg W/kg, 147 = Lap NP,
+       148 = Last Lap NP). Table above now reflects the corrected
+       pairing. FULLY CONFIRMED, same day: CyclingRoadRoadtemp.fit (the
+       original census profile, Screen 3/4 still intact at 10 fields
+       each) came through on a second upload attempt and was dumped
+       directly -- raw arrays slot 6 = [150, 149, 177, 176, 43, 437,
+       40, 408, 411, 441], slot 7 = [80, 42, 148, 147, 82, 83, 151,
+       161, 160, 159] -- match all 20 corrected pairs position-for-
+       position exactly, including 177 "Torque Effect" under its own
+       ID (closing the residual flag this note previously carried).
+       Same direct byte-level verification standard as every other
+       confirmed batch in this table.
 
        NOTE: 2026-08-10 batch (18 new: 7, 30, 31, 39, 50, 57, 61, 62,
        63, 67, 86, 88, 94, 95, 295, 442, 443, 445) -- confirmed by
@@ -493,9 +774,10 @@ FIELD ID REFERENCE (117 confirmed)
        full-width screen slot to actually draw as a bar/graph --
        placed in a shared/split row instead, silently falls back to
        plain text. Not yet independently re-verified across multiple
-       placements by this project. See PROJECT_NOTES.md "Graph/Bars
-       full-width warning" for a scoped (not yet built) GUI feature to
-       surface this.
+       placements by this project. As of gui_app.py v0.16.15
+       (2026-08-14), the GUI surfaces this directly -- see
+       PROJECT_NOTES.md "Graph/Bars full-width warning" for the full
+       design and RELATED TOOLS below.
 
        NOTE: 2026-08-11 batch (12 new: 2, 15, 18, 32, 165, 347, 350,
        433, 452, 478, 495, 497) -- Doug's continued field census in a
@@ -572,14 +854,24 @@ SCREEN STATE MODEL
                           Normal, participates in on-device order.
 
        Conditional        f1=1  f9=absent       f10=REAL (seen: 32)
-                          e.g. GroupTrack. An active feature exempt
-                          from the normal f9 ordering system.
+                          Always seen as f10=32, display name
+                          "Reserved" (purpose not actually confirmed,
+                          see NAMED_SCREEN_TYPES note above). An active
+                          record exempt from the normal f9 ordering
+                          system.
 
        Removed            f1=0  f9=absent       f10=absent
                           Content (fields 3/7) preserved AT THE MOMENT
                           OF REMOVAL -- a soft delete, confirmed via
-                          the on-device "Remove" button. No on-device
-                          "un-remove."
+                          the on-device "Remove" button, and as of
+                          v1.14.1 (2026-08-14) also producible from the
+                          toolkit itself via --remove, CONFIRMED via a
+                          real on-device round-trip test -- see OPTIONS
+                          above. No on-device "un-remove," and as of v1.13.0
+                          (2026-08-13) no toolkit --un-remove either --
+                          RETIRED, see OPTIONS above. Recovery from an
+                          unwanted removal is Restore-from-Backup
+                          (whole profile), not a per-screen undo.
 
                           CORRECTION (2026-08-04): NOT persistent
                           indefinitely as earlier documented here. A
@@ -627,6 +919,17 @@ FILES
        garmin_device.py       device detection/backup/write/eject workflow
 
 BUGS
+       RESOLVED (v1.14.1, 2026-08-14): --remove's real on-device
+       round-trip test is done -- Doug confirmed the target screen was
+       correctly removed from the on-device Data Screens order, and
+       (as expected) the removed screen was wiped by NewFiles rather
+       than surviving as a recoverable Removed-state slot, matching
+       every other Removed-state slot's behavior on any NewFiles
+       deploy and confirming --un-remove's retirement reasoning was
+       sound. No GUI wrapper exists yet -- not because of any remaining
+       verification gap, but because it hasn't been asked for yet; see
+       PROJECT_NOTES.md Open Items, "Delete Screen."
+
        RESOLVED (v1.12.0, 2026-08-05): adding a brand-new screen via
        --new-slot through NewFiles was PREVIOUSLY believed CONFIRMED
        BROKEN for any profile already touched by NewFiles -- the
@@ -641,11 +944,20 @@ BUGS
        next_available_field10()) survives a live NewFiles round-trip
        intact, verified 2026-08-05 on CyclingRoadSandbox and
        independently double-checked against the live mounted device
-       by both fit_dump.py and garmin_device.py. --un-remove uses the
-       same corrected default but has not itself been re-tested live
-       yet -- see its OPTIONS entry above. See PROJECT_NOTES.md for
-       the full investigation and the original (now superseded)
-       failure writeup.
+       by both fit_dump.py and garmin_device.py. --un-remove used the
+       same corrected default, but was RETIRED entirely in v1.13.0
+       (2026-08-13) before that specific re-test ever happened -- see
+       its OPTIONS entry above for the full retirement reasoning. See
+       PROJECT_NOTES.md for the full investigation and the original
+       (now superseded) failure writeup.
+
+       RETIRED (v1.13.0, 2026-08-13): --un-remove removed entirely.
+       Confirmed real device-side data loss pre-v1.12.0 (the same
+       f10=0 collision as above), never re-verified live after the
+       fix, Restore-from-Backup already covers real recovery, and
+       Garmin's own editor has no un-remove workflow either. See
+       OPTIONS above and PROJECT_NOTES.md "Product note on
+       --un-remove" for the full history.
 
        f10 has no confirmed pattern among NAMED Garmin screen types
        (field count does NOT reliably predict which named type a

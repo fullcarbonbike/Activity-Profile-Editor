@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "2.4.9"  # bug fix, real user report (2026-08-11): field 320 was "Conditioning" -- incomplete. The full concept name is "Performance Conditioning," but Doug confirmed the actual on-device DATA FIELD display reads "Perf. Conditioning" (abbreviated). Corrected to match this toolkit's established convention of naming fields as they display on-device rather than by their full/conceptual name (same convention behind "Lap Dist.", "Dest. Location", etc.). FIELD_ID_NAMES still 117 entries (rename only). Prior entry (2.4.8): bug fix, real user report (2026-08-11): field 49 was "Avg Speed (Alt)" with no record of how/why -- predates this project's discipline of noting confirmation method per field, same blind spot as field 58's earlier wrong "Lap Timer" guess. Doug deployed it into a full-width screen slot via the GUI and visually confirmed on-device: plain text "Avg Speed," no graph or bars. Corrected to "Avg Speed." IMPORTANT METHODOLOGICAL NOTE, not just a rename: this is a caution for the Graph/Bars "*"/"(Alt)" marker theory (v2.4.6/2.4.7) -- unlike 23/348/349, there's no record 49's old "(Alt)" label was ever a literal transcription of a real on-device marker, so this doesn't necessarily falsify the theory, but does mean an OLD placeholder name merely containing the word "(Alt)" isn't itself evidence of a real on-device marker unless that was actually recorded at the time. FIELD_ID_NAMES still 117 entries (rename only, no count change). See PROJECT_NOTES.md "Graph/Bars full-width warning" for the updated caution. Prior entry (2.4.7): add 12 confirmed field IDs, 2026-08-11 batch: 2 Course Pt Dist., 15 Lap HR, 18 Lap %Max HR, 32 Next Pt Location, 165 Last Lap HR, 347 HR Bars, 350 Power Bars, 433 Anaerobic TE, 452 Respiration, 478 EPOC, 495 60s Grit, 497 60s Flow -- from Doug's continued field census in a separate session, same direct on-device verification standard as every prior batch. Also corrects 3 placeholder names that were built around the "*"/"(Alt)" marker before its meaning was confirmed: 23 "Heart Rate (Alt)" -> "HR Zone Graph" (a distinct Graph-type field, not an alternate view of plain Heart Rate), 348 "Speed *" -> "Speed Bars", 349 "Cadence *" -> "Cadence Bars" (marker confirmed as Bars-type, not Graph -- see the field 23/343-350 comments). No collisions with any existing entry (confirmed via AST parse before insertion). FIELD_ID_NAMES now 117 confirmed entries; KNOWN_UNRESOLVED_IDS still empty. Prior entry (2.4.6): doc-only, no functional change (2026-08-11): the long-open "*" marker mystery on fields 348/349 (Speed */Cadence *) is LIKELY RESOLVED -- Doug reported confirming that "*" (and separately "(Alt)", seen on fields 23/49) marks a Graph- or Bars-style rendering that needs a full-width screen slot to actually draw as a graph/bar, falling back to plain text otherwise. Not yet independently re-verified by this project across multiple placements, so treated as the working explanation rather than stated as certain -- comments updated accordingly (348/349's block above, this entry). No FIELD_ID_NAMES entries changed. See PROJECT_NOTES.md "Graph/Bars full-width warning" (Open Items) for a scoped GUI feature this unlocks. Prior entry (2.4.5): bug fix, real user report (2026-08-11): fields 58 and 87 were transcribed as "Lap Timer" and "Last Lap Timer" -- Doug's own earlier assumption by analogy to the separate, correctly-named field 56 "Timer" -- but a closer on-device relabeling check found the real display text is "Lap Time" and "Last Lap Time," no "r." Corrected in FIELD_ID_NAMES (58, 87) and their surrounding comments (including the KNOWN_UNRESOLVED_IDS resolution note for 84/87). Field 56 "Timer" is unaffected and still correct. No new/removed field IDs, still 105 confirmed entries. FIT_PATCH.md's FIELD ID REFERENCE table and NOTE sections corrected to match (now doc rev 12). Prior entry (2.4.4): add 18 confirmed field IDs, 2026-08-10 batch: 7 Lap Dist., 30 Time to Next, 31 Dest. Location, 39 Lap Power, 50 Lap Speed, 57 Avg Lap Time, 61 Total Descent, 62 Dest. Ahead, 63 Time Ahead, 67 Reps to Go, 86 Last Lap Speed, 88 30s VAM, 94 ETA to Next, 95 Odometer, 295 Target Power, 442 Lap VAM, 443 Avg VAM, 445 Asc to Next Crs Pt -- developer arranged two screens to 10 fields each on a real profile specifically for this census, entered/selected each field by its on-device name, then cross-referenced every field's raw ID against its known on-screen position using the GUI (v0.16.4's readability/resize fixes were what made that cross-referencing practical -- see gui_app.py). No collisions with any existing FIELD_ID_NAMES entry (confirmed via grep before insertion). FIELD_ID_NAMES now 105 confirmed entries; KNOWN_UNRESOLVED_IDS still empty. Prior entry (2.4.3): add 1 confirmed field ID (58, Lap Timer) -- surfaced incidentally by real GUI Restore-from-Backup testing (an old 8/3/2026 backup had a field the GUI's picker didn't recognize), confirmed via direct visual comparison against the live device display. FIELD_ID_NAMES now 87 confirmed entries. Prior entry (2.4.2): add 2 confirmed field IDs closing the last open field-ID mystery (84 Last Lap Dist, 87 Last Lap Timer -- note: unrelated numeric coincidence to this entry's field 58, "Last Lap Timer" vs. "Lap Timer" are genuinely distinct fields, not a naming collision), confirmed via a forced-field test deployed successfully through NewFiles -- FIELD_ID_NAMES was 86 confirmed entries; KNOWN_UNRESOLVED_IDS still empty
+__version__ = "2.4.20"  # FULLY CONFIRMED via direct raw-byte inspection (2026-08-17, same day as v2.4.19): Doug's CyclingRoadRoadtemp.fit -- the original census profile itself, with Screen 3 (slot 6) and Screen 4 (slot 7) still intact at their full 10 fields each -- came through on a second upload attempt and was dumped directly via `fit_dump.py dump`. Raw field-ID arrays: 14[6].7 = [150, 149, 177, 176, 43, 437, 40, 408, 411, 441] (Screen 3), 14[7].7 = [80, 42, 148, 147, 82, 83, 151, 161, 160, 159] (Screen 4). Every one of the 20 corrected (ID, name) pairs from v2.4.19 matches these raw arrays position-for-position exactly -- including field 177 "Torque Effect" under its own ID, closing the one residual flag v2.4.19 was still carrying (that string had only been confirmed against ID 148 before the transposition was found). This is now the same direct byte-level verification standard as every other confirmed batch in this dict, no longer resting on the 3-for-3 device-observed inference alone. No dict values changed from v2.4.19 -- this entry is the independent confirmation that was pending. Prior entry (2.4.19): RESOLVED, Doug's own diagnosis (2026-08-17, same day as the v2.4.18 flag): the entire 2026-08-17 field-ID batch had its raw IDs and names correctly IDENTIFIED but WRONGLY PAIRED -- Doug's census screens 3 and 4 (Roadtemp profile) got transposed when the original list was written up, so all 10 IDs from one screen's block were paired with the 10 NAMES from the other screen's block (a clean systematic offset, not scattered errors -- the SET of 20 raw IDs is unchanged, only which name each points to). Doug re-derived the correct pairing directly from Roadtemp's screen 3/4 field order; it resolves ALL THREE real-device mismatches from v2.4.18 exactly (437 -> Avg W/kg, 147 -> Lap NP, 148 -> Last Lap NP, all now matching the device precisely). All 20 dict entries corrected; SUSPECT warnings removed. One residual flag: field 177 (now "Torque Effect", the string confirmed via v2.4.17's half-width-field test) was NOT independently re-tested under ITS OWN ID after the swap was found -- that confirmation was made against ID 148 before the transposition was discovered, so it's carried over on the strength of the transposition theory rather than a fresh direct test. Not independently re-confirmed via a raw byte-level dump either (attempted -- Doug's uploaded CyclingRoadROAD.fit/CyclingRoadRoadtemp.fit weren't readable in this session, an environment sync issue, same as the earlier CyclingEbike.fit episode) -- treated as sufficiently confirmed on the strength of the 3-for-3 exact match against independently-observed real device behavior. No count change, still 137 confirmed entries -- this is a re-pairing, not new/removed IDs. See PROJECT_NOTES.md Open Items and "Corrections and lessons learned" for the full writeup. Prior entry (2.4.18): URGENT flag, no value changes yet, Doug's report from actually checking the device: editing Screen 4 (slot 7) via the GUI to [437 "Intensity Factor (IF)", 147 "Pedal Smoothness", 148 "Torque Effect", 320 "Perf. Conditioning"] produced a screen that ACTUALLY displays "Avg W/kg, Lap NP, Last Lap NP, Perf. Cond." on the real device -- 3 of 4 wrong (320 is fine, just further-truncated display of the same correct name). Reviewed FieldPickerDialog directly (gui_app.py): no indexing/lookup bug there, it writes exactly the raw ID paired with the selected name, so this dict itself had wrong ID->name associations for at least 437/147/148, most likely a census/transcription error from how the 2026-08-17 batch (v2.4.16) was originally verified, not a code bug in the read/write/picker path. Since this dict already had separate entries for "Avg W/kg" (83), "Lap NP" (176), "Last Lap NP" (177) from the SAME batch, those three were the leading candidates for the TRUE identity of whatever raw IDs were actually stored at those 3 slot-7 positions -- confirmed correct by v2.4.19 above. Added prominent inline warnings marking the ENTIRE 2026-08-17 batch (all 20 entries) UNCONFIRMED/SUSPECT pending re-verification -- only 4 of 20 had been checked against a real device at that point and 3 were wrong. Prior entry (2.4.17): field 148 was stored as "Torque Effect." (a GUESSED abbreviated form, by analogy to field 320's "Perf. Conditioning" convention) -- Doug directly confirmed the real on-device text in a half-width (1/2 side-by-side) field is "Torque Effect", no trailing period. Corrected. No count change, still 137 confirmed entries -- this is a text correction, not a new/removed ID. FIT_PATCH.md's FIELD ID REFERENCE table and NOTE updated to match. Prior entry (2.4.16): Add 20 confirmed field IDs, 2026-08-17 batch, Doug's continued field census (this project's first batch touching power-meter/Di2-electronic-shifting metrics): 42 Balance, 80 Avg Balance, 40 Lap Balance, 441 3s Balance, 411 10s Balance, 408 30s Balance, 150 30s Power, 151 Max Power (reported "MAX Power," normalized to Title Case matching this dict's existing "91: Max Speed" convention), 83 Avg W/kg, 159 30s W/kg, 149 %FTP, 43 TSS, 437 Intensity Factor (IF), 176 Lap NP, 177 Last Lap NP, 148 Torque Effect. (reported full concept name "Torque Effectiveness (Torque Effect.)," stored abbreviated per this dict's on-device-display convention, e.g. 320 "Perf. Conditioning"), 147 Pedal Smoothness, 82 Power Zone, 161 Di2 Battery, 160 Di2 Shift Mode. Notable: confirms the Power family's 3s/10s/30s/Lap/Avg naming pattern (79 "3s Power", 146 "10s Power", both pre-existing) repeats identically for L/R Power Balance, with 42 "Balance" as the base metric mirroring 36 "Power" -- a clean, self-consistent family, not a set of one-off guesses. No collisions with any existing entry (confirmed via AST parse before insertion). FIELD_ID_NAMES now 137 confirmed entries (was 117); KNOWN_UNRESOLVED_IDS still empty. gui_app.py's FieldPickerDialog docstring (stale "117 confirmed entries") updated to match -- same recurring drift class as v0.16.5/v0.16.12's fixes, FIELD_ID_NAMES is imported live so only the comment was ever wrong. Prior entry (2.4.15): FIELD_EDIT_UNCERTAIN_TYPES = {38} ("Workout"), backing a new EditScreenPanel warning (gui_app.py v0.19.4). Doug raised a real concern: this screen doesn't show in the on-device scroll list during a normal ride (same conditional-trigger family as ClimbPro/Segment), so there's no way to see what editing its fields is actually supposed to look like -- worth flagging before offering the edit, not after. Backed by Garmin's own Edge 530 manual (Training > Workouts: starting a Workout "displays each step of the workout, the target (if any), and current workout data"), confirming the leading hypothesis from v2.4.14: "Workout" is almost certainly Garmin's structured-workout step display, a separate subsystem from Activity Profile screens entirely, only live while a Workout (GARMIN/Workouts/Guided or /Scheduled, synced via Garmin Connect or built on-device) is actively running -- matching Doug's own device having both Workouts subfolders empty (he's never used the feature, hence never seen this screen render). Deliberately a WARNING, not a hard block (unlike Map/ClimbPro's Show-toggle guard, which is backed by independent on-device confirmation neither has a toggle at all) -- the write mechanism itself is the same proven-safe path used for every other screen type, so the real risk here is a pointless/no-visible-effect edit, not device corruption, and only one profile's worth of evidence exists so far. Prior entry (2.4.14): CORRECTION to v2.4.13, same day (2026-08-16), Doug's uploaded CyclingEbike.fit now inspected directly: v2.4.13 added NAMED_SCREEN_TYPES keys 39/59/96, but those were WRONG -- Doug (and this project, before having the raw file) read those numbers off this tool's own "Screen N" fallback label, which is f10+1 (screen_type_name()'s documented convention), not the raw f10 byte. The REAL f10 values, confirmed via a direct raw dump of the actual file, are 38 "Workout" (was displaying as "Screen 39" = 38+1), 58 "eBike Metrics" ("Screen 59" = 58+1), 95 "STEPS Metrics (Shimano)" ("Screen 96" = 95+1). v2.4.13's keys of 39/59/96 would NEVER have matched these real values -- a real bug that shipped and did nothing, caught before Doug pulled the updated file (screen_type_name(39)/(59)/(96) were simply never reached, since no real profile has those exact f10 values; the display would have silently kept showing "Screen 39" etc., appearing to work purely because 39/59/96 happen to equal 38+1/58+1/95+1). Corrected all three keys to 38/58/95. Also RESOLVED, not just flagged, the f10=38 "Workout" field-reading question from v2.4.13: CONFIRMED via direct raw dump comparison (not just field-name matching) that slot 6's f10=38 record's field-ID array is byte-for-byte IDENTICAL, all 10 positions, to slot 1's Cycling Dynamics (f10=63) record on the SAME profile -- this is real, accurately-read data, not a classify_screens()/active_field_ids() bug (those functions are working correctly; the underlying bytes genuinely are a copy). Also found, while inspecting the raw dump: the two REMOVED screens with non-empty field content (slots 11 and 12) are ALSO byte-for-byte identical to the two currently-ACTIVE f10=58/95 records (eBike Metrics/STEPS Metrics) -- three confirmed exact-duplicate pairs on one profile, not a single coincidence, consistent with Garmin auto-creating these e-bike/third-party-sensor-triggered screen types from a fixed default field template each time, the same way Map/Elevation/ClimbPro already do. No code behavior change beyond the corrected dict keys -- classify_screens()/active_field_ids() were never wrong, this was purely a wrong-value bug in the new NAMED_SCREEN_TYPES entries themselves. See PROJECT_NOTES.md Open Items for the full writeup and the still-open product question (should editing f10=38 "Workout" fields via this toolkit be guarded/warned, since the on-device editor doesn't expose them at all). Prior entry (2.4.13, SUPERSEDED, kept for the record): New confirmed f10 screen types, 2026-08-16 batch (Doug, CyclingEbike.fit -- the first e-bike/third-party-drivetrain profile this project has seen): NAMED_SCREEN_TYPES gains 39 "Workout", 59 "eBike Metrics", 96 "STEPS Metrics (Shimano)" -- no collision with any existing entry (63 "Cycling Dynamics" is the nearest neighbor and is unaffected; note field ID 39 already exists in the SEPARATE FIELD_ID_NAMES dict as "Lap Power" -- a numeric coincidence across two independent namespaces, f10 screen-type identity vs. data field ID, not a real collision, same non-issue this project has flagged before for field 58/84). FLAGGED, NOT YET RESOLVED: Doug reports f10=39 "Workout" behaves unlike every other named type here -- the on-device screen editor shows no fields/options for it at all (only Remove/Reorder Screen), but this toolkit's own screens/edit-screen views show it with the same field set as a Cycling Dynamics screen on the same profile. Not yet independently verified against the raw file (this session's attempt to inspect Doug's uploaded CyclingEbike.fit directly did not succeed -- environment/upload issue, not investigated further yet), so no behavior change made for this type; screen_type_name(39) now correctly labels it "Workout," but classify_screens()/field reading are UNCHANGED pending real byte-level investigation. Leading hypothesis, unconfirmed: f10=39 may be a Garmin SYSTEM screen type like Map/ClimbPro whose field-slot bytes aren't actually meaningful/rendered by the device (matching the f10=32 "Reserved" record's own always-present-regardless-of-content pattern), rather than a real field-reading bug -- needs the raw bytes to confirm either way. See PROJECT_NOTES.md Open Items. Prior entry (2.4.12): Rename only, Doug's decision (2026-08-15): NAMED_SCREEN_TYPES[32] renamed from "GroupTrack" to "Reserved" -- this f10=32 record is a Conditional-only runtime record present on every profile seen so far, active or not, regardless of whether GroupTrack has ever actually been used, and its real purpose was never independently confirmed (unlike f10=57 "GroupTrack List," the literal on-device menu entry for the feature, which is unaffected by this rename and remains correctly GroupTrack-specific). Updated every surrounding comment/docstring in this file that asserted or implied f10=32 was confirmed GroupTrack's own record (NAMED_SCREEN_TYPES' own comment block, classify_screens()' docstring and inline comments, the `screens` subcommand's CLI section header/verbose note) to instead describe it accurately as an always-present record of unclear purpose -- no functional/behavioral change anywhere, screen_type_name(32) now just returns a different string. gui_app.py and fit_patch.py's own comments referencing this record updated to match in the same pass (see their own changelogs). Prior entry (2.4.11): New constant, no existing behavior change (2026-08-14): added GRAPH_OR_BARS_FIELD_IDS -- the 10 fields individually confirmed on-device (2026-08-11, Doug) to render as a Graph/Bars widget that only actually draws that way in a full-width screen slot (23, 343-350, 368). Kept as its own set, separate from FIELD_ID_NAMES, per the "Graph/Bars full-width warning" Open Item's design -- avoids touching every existing consumer of FIELD_ID_NAMES just to add a category flag. Backs the new gui_app.py warning (v0.16.15) surfacing this in FieldPickerDialog and EditScreenPanel/AddScreenPanel. No FIELD_ID_NAMES entries changed, still 117 confirmed entries. Prior entry (2.4.10): doc-only, no functional change (2026-08-13): updated the verbose "Removed screens" note in the `screens` subcommand -- it referenced fit_patch.py's --un-remove flag, which Doug decided to retire entirely (see fit_patch.py v1.13.0's changelog for the full reasoning: Restore-from-Backup already covers real recovery, --un-remove had a confirmed historical data-loss hazard that was never re-verified, and Garmin's own editor doesn't offer an un-remove workflow either). Note now points to Restore-from-Backup instead of a flag that no longer exists. Prior entry (2.4.9): bug fix, real user report (2026-08-11): field 320 was "Conditioning" -- incomplete. The full concept name is "Performance Conditioning," but Doug confirmed the actual on-device DATA FIELD display reads "Perf. Conditioning" (abbreviated). Corrected to match this toolkit's established convention of naming fields as they display on-device rather than by their full/conceptual name (same convention behind "Lap Dist.", "Dest. Location", etc.). FIELD_ID_NAMES still 117 entries (rename only). Prior entry (2.4.8): bug fix, real user report (2026-08-11): field 49 was "Avg Speed (Alt)" with no record of how/why -- predates this project's discipline of noting confirmation method per field, same blind spot as field 58's earlier wrong "Lap Timer" guess. Doug deployed it into a full-width screen slot via the GUI and visually confirmed on-device: plain text "Avg Speed," no graph or bars. Corrected to "Avg Speed." IMPORTANT METHODOLOGICAL NOTE, not just a rename: this is a caution for the Graph/Bars "*"/"(Alt)" marker theory (v2.4.6/2.4.7) -- unlike 23/348/349, there's no record 49's old "(Alt)" label was ever a literal transcription of a real on-device marker, so this doesn't necessarily falsify the theory, but does mean an OLD placeholder name merely containing the word "(Alt)" isn't itself evidence of a real on-device marker unless that was actually recorded at the time. FIELD_ID_NAMES still 117 entries (rename only, no count change). See PROJECT_NOTES.md "Graph/Bars full-width warning" for the updated caution. Prior entry (2.4.7): add 12 confirmed field IDs, 2026-08-11 batch: 2 Course Pt Dist., 15 Lap HR, 18 Lap %Max HR, 32 Next Pt Location, 165 Last Lap HR, 347 HR Bars, 350 Power Bars, 433 Anaerobic TE, 452 Respiration, 478 EPOC, 495 60s Grit, 497 60s Flow -- from Doug's continued field census in a separate session, same direct on-device verification standard as every prior batch. Also corrects 3 placeholder names that were built around the "*"/"(Alt)" marker before its meaning was confirmed: 23 "Heart Rate (Alt)" -> "HR Zone Graph" (a distinct Graph-type field, not an alternate view of plain Heart Rate), 348 "Speed *" -> "Speed Bars", 349 "Cadence *" -> "Cadence Bars" (marker confirmed as Bars-type, not Graph -- see the field 23/343-350 comments). No collisions with any existing entry (confirmed via AST parse before insertion). FIELD_ID_NAMES now 117 confirmed entries; KNOWN_UNRESOLVED_IDS still empty. Prior entry (2.4.6): doc-only, no functional change (2026-08-11): the long-open "*" marker mystery on fields 348/349 (Speed */Cadence *) is LIKELY RESOLVED -- Doug reported confirming that "*" (and separately "(Alt)", seen on fields 23/49) marks a Graph- or Bars-style rendering that needs a full-width screen slot to actually draw as a graph/bar, falling back to plain text otherwise. Not yet independently re-verified by this project across multiple placements, so treated as the working explanation rather than stated as certain -- comments updated accordingly (348/349's block above, this entry). No FIELD_ID_NAMES entries changed. See PROJECT_NOTES.md "Graph/Bars full-width warning" (Open Items) for a scoped GUI feature this unlocks. Prior entry (2.4.5): bug fix, real user report (2026-08-11): fields 58 and 87 were transcribed as "Lap Timer" and "Last Lap Timer" -- Doug's own earlier assumption by analogy to the separate, correctly-named field 56 "Timer" -- but a closer on-device relabeling check found the real display text is "Lap Time" and "Last Lap Time," no "r." Corrected in FIELD_ID_NAMES (58, 87) and their surrounding comments (including the KNOWN_UNRESOLVED_IDS resolution note for 84/87). Field 56 "Timer" is unaffected and still correct. No new/removed field IDs, still 105 confirmed entries. FIT_PATCH.md's FIELD ID REFERENCE table and NOTE sections corrected to match (now doc rev 12). Prior entry (2.4.4): add 18 confirmed field IDs, 2026-08-10 batch: 7 Lap Dist., 30 Time to Next, 31 Dest. Location, 39 Lap Power, 50 Lap Speed, 57 Avg Lap Time, 61 Total Descent, 62 Dest. Ahead, 63 Time Ahead, 67 Reps to Go, 86 Last Lap Speed, 88 30s VAM, 94 ETA to Next, 95 Odometer, 295 Target Power, 442 Lap VAM, 443 Avg VAM, 445 Asc to Next Crs Pt -- developer arranged two screens to 10 fields each on a real profile specifically for this census, entered/selected each field by its on-device name, then cross-referenced every field's raw ID against its known on-screen position using the GUI (v0.16.4's readability/resize fixes were what made that cross-referencing practical -- see gui_app.py). No collisions with any existing FIELD_ID_NAMES entry (confirmed via grep before insertion). FIELD_ID_NAMES now 105 confirmed entries; KNOWN_UNRESOLVED_IDS still empty. Prior entry (2.4.3): add 1 confirmed field ID (58, Lap Timer) -- surfaced incidentally by real GUI Restore-from-Backup testing (an old 8/3/2026 backup had a field the GUI's picker didn't recognize), confirmed via direct visual comparison against the live device display. FIELD_ID_NAMES now 87 confirmed entries. Prior entry (2.4.2): add 2 confirmed field IDs closing the last open field-ID mystery (84 Last Lap Dist, 87 Last Lap Timer -- note: unrelated numeric coincidence to this entry's field 58, "Last Lap Timer" vs. "Lap Timer" are genuinely distinct fields, not a naming collision), confirmed via a forced-field test deployed successfully through NewFiles -- FIELD_ID_NAMES was 86 confirmed entries; KNOWN_UNRESOLVED_IDS still empty
 """
 fit_dump.py - Dump (and diff) Garmin .FIT files for reverse-engineering
 undocumented messages/fields, e.g. Edge Sports/<Profile>.fit data-screen
@@ -274,6 +274,87 @@ FIELD_ID_NAMES = {
     494: "Travel Range",
     495: "60s Grit",
     497: "60s Flow",
+    # 2026-08-17 batch, CORRECTED 2026-08-17 (same day): the original
+    # 20-entry batch had the raw IDs and names correctly IDENTIFIED but
+    # WRONGLY PAIRED -- Doug's own census screens 3 and 4 (Roadtemp
+    # profile) got transposed when the list was written up, so every
+    # ID from screen 4's block of 10 was paired with a NAME from screen
+    # 3's block of 10 (and vice versa) -- a clean systematic offset,
+    # not scattered individual errors: the SET of 20 raw IDs is
+    # unchanged from the original batch, only which name each one
+    # points to. Caught via real device testing: Doug edited Screen 4
+    # (slot 7, CyclingRoadROAD.fit) using this toolkit to fields named
+    # "Intensity Factor (IF)" (437)/"Pedal Smoothness" (147)/"Torque
+    # Effect" (148)/"Perf. Conditioning" (320), but the profile
+    # actually displays "Avg W/kg, Lap NP, Last Lap NP, Perf. Cond." on
+    # the real device. Doug then re-derived the correct pairing
+    # directly from Roadtemp's screen 3/4 field order and it resolves
+    # ALL THREE mismatches exactly (437 -> Avg W/kg, 147 -> Lap NP, 148
+    # -> Last Lap NP, matching the device precisely) while 320 stays
+    # correctly "Perf. Conditioning" (unaffected, not part of this
+    # batch). FULLY CONFIRMED 2026-08-17, same day: Doug's
+    # CyclingRoadRoadtemp.fit (the original census profile itself --
+    # slot 6 = Screen 3, slot 7 = Screen 4) came through on a second
+    # upload attempt and was inspected directly via `fit_dump.py dump`.
+    # Raw field-ID arrays: 14[6].7 = [150, 149, 177, 176, 43, 437, 40,
+    # 408, 411, 441] (Screen 3), 14[7].7 = [80, 42, 148, 147, 82, 83,
+    # 151, 161, 160, 159] (Screen 4) -- every single one of the 20
+    # corrected (ID, name) pairs below matches these raw arrays
+    # position-for-position exactly, including field 177 "Torque
+    # Effect" under its own ID (closing the one residual flag this
+    # batch was still carrying). Same direct byte-level verification
+    # standard as every other confirmed batch in this dict.
+    80:  "30s Power",
+    42:  "%FTP",
+    148: "Last Lap NP",
+    147: "Lap NP",
+    82:  "TSS",
+    83:  "Intensity Factor (IF)",
+    151: "Lap Balance",
+    161: "30s Balance",
+    160: "10s Balance",
+    159: "3s Balance",
+    150: "Avg Balance",
+    149: "Balance",
+    177: "Torque Effect",  # reported full concept name "Torque Effectiveness (Torque Effect.)" -- stored abbreviated, no trailing period, matching the on-device text confirmed for this field; CONFIRMED under this exact ID via direct raw-byte inspection of CyclingRoadRoadtemp.fit (see batch note above)
+    176: "Pedal Smoothness",
+    43:  "Power Zone",
+    437: "Avg W/kg",
+    40:  "Max Power",  # reported "MAX Power" -- normalized to Title Case to match this dict's existing "91: Max Speed" convention; not a factual correction, just consistent casing
+    408: "Di2 Battery",
+    411: "Di2 Shift Mode",
+    441: "30s W/kg",
+}
+
+# Fields individually CONFIRMED on-device (2026-08-11, Doug) to render as
+# a Graph or Bars widget, which only actually draws that way in a
+# FULL-WIDTH screen slot -- placed in a shared/split row instead, it
+# silently falls back to plain text with no on-device indication anything
+# is wrong. Kept as its own set, separate from FIELD_ID_NAMES, so adding
+# this category doesn't require touching every existing consumer of that
+# dict. See PROJECT_NOTES.md "Graph/Bars full-width warning" (Open Items)
+# for the full history of how this was confirmed, including field 49's
+# important negative result: an OLD placeholder name merely containing
+# "(Alt)" is NOT itself sufficient evidence -- 49 was checked directly
+# on-device and turned out to be plain text, not Graph/Bars, despite its
+# old "Avg Speed (Alt)" placeholder name superficially matching the same
+# pattern as 23/348/349. This set only grows from fields where a real
+# on-device marker (a "*"/"(Alt)" UI marker or a self-evidently-named
+# Graph/Bars field) was directly observed and recorded at confirmation
+# time. LIMITATION: false negatives are possible (an unflagged field that
+# actually needs full width but hasn't been individually confirmed yet)
+# but false positives should not be -- nothing here is a guess.
+GRAPH_OR_BARS_FIELD_IDS = {
+    23,   # HR Zone Graph
+    343,  # Heart Rate Graph
+    344,  # Speed Graph
+    345,  # Cadence Graph
+    346,  # Power Graph
+    347,  # HR Bars
+    348,  # Speed Bars
+    349,  # Cadence Bars
+    350,  # Power Bars
+    368,  # Elevation Graph
 }
 
 # REMOVED (superseded below): previously had SYSTEM_SLOT_HINTS keyed by
@@ -306,24 +387,68 @@ FIELD_ID_NAMES = {
 #
 # This is what finally makes "how many REAL user screens are left"
 # answerable from the file alone -- see fit_patch.py's
-# would_hide_last_visible_screen(). GroupTrack itself has TWO independent
-# f10 representations: 32 is the actual Conditional runtime record (this
-# module's "conditional" bucket, f9 absent); 57 is a separate, always-
-# orderable Active placeholder ("GroupTrack List") -- confirmed
-# structurally independent via an on-device remove-then-re-add of List
-# alone, which left the f10=32 record completely unaffected.
+# would_hide_last_visible_screen(). f10=32 and f10=57 were originally
+# both assumed to be GroupTrack-related, but they're structurally
+# independent: 32 is a Conditional-only runtime record (this module's
+# "conditional" bucket, f9 absent) that has ALWAYS been present on
+# every profile seen so far, active or not, regardless of whether
+# GroupTrack has ever been used -- confirmed via an on-device
+# remove-then-re-add of "GroupTrack List" (f10=57) alone, which left
+# this f10=32 record completely unaffected either way. That
+# always-present, content-independent behavior is a poor fit for a
+# feature-specific record, and there's no direct confirmation this
+# is GroupTrack's record at all rather than some other always-on
+# system bookkeeping slot -- RENAMED from "GroupTrack" to "Reserved"
+# (Doug's decision, 2026-08-15) to stop asserting an identity this
+# project was never actually sure of. f10=57 ("GroupTrack List," the
+# separate, always-orderable Active placeholder a user can add/remove
+# from the on-device menu) is unaffected by this rename -- that one
+# IS confirmed GroupTrack-specific, since it's the literal on-device
+# menu entry for the feature.
 NAMED_SCREEN_TYPES = {
     25:  "Map",
     26:  "Virtual Partner",
-    32:  "GroupTrack",       # the real Conditional runtime record
+    32:  "Reserved",         # always-present Conditional-only runtime record of unclear purpose -- NOT confirmed GroupTrack-specific, see comment above (renamed from "GroupTrack" 2026-08-15)
     35:  "Compass",
+    38:  "Workout",          # 2026-08-16 batch, CyclingEbike.fit -- raw f10, NOT the "Screen 39" label this displayed as before this entry existed (screen_type_name()'s f10+1 fallback: 38+1=39). See this file's own changelog: field bytes here are byte-for-byte IDENTICAL to slot 1's Cycling Dynamics (f10=63) record on this same profile, yet the on-device editor shows no fields/options for this type at all (Remove/Reorder only) -- CONFIRMED via direct raw dump comparison, not just field-name matching.
     44:  "Elevation",
     56:  "Segment",
-    57:  "GroupTrack List",  # always-orderable Active placeholder, independent of the f10=32 record above
+    57:  "GroupTrack List",  # always-orderable Active placeholder, independent of the f10=32 record above -- this one IS the real GroupTrack menu entry
+    58:  "eBike Metrics",    # 2026-08-16 batch, CyclingEbike.fit -- raw f10 (displayed as "Screen 59" before this entry existed, via the f10+1 fallback). e-bike-specific, first non-standard-Cycling profile this project has seen.
     63:  "Cycling Dynamics",
     74:  "Lap Summary",
+    95:  "STEPS Metrics (Shimano)",  # 2026-08-16 batch, CyclingEbike.fit -- raw f10 (displayed as "Screen 96" before this entry existed, via the f10+1 fallback). Third-party drivetrain integration, first Shimano-branded screen type seen.
     104: "ClimbPro",
 }
+
+# Screen types whose stored field-slot bytes are real and correctly
+# readable (unlike Map/GroupTrack List, which have a genuinely EMPTY
+# field count -- see NAMED_SCREEN_TYPES above), but whose actual
+# on-device meaning/rendering is uncertain -- editing them via this
+# toolkit's EditScreenPanel may have no visible on-device effect at
+# all. Currently just 38 "Workout": Doug confirmed the on-device
+# screen editor shows NO field/option editing for this type (Remove/
+# Reorder only), and a direct raw-byte comparison confirmed its field
+# array is byte-for-byte IDENTICAL to Cycling Dynamics' (f10=63) own
+# record on the same profile -- consistent with Garmin auto-stamping
+# a shared default field template when creating certain system screen
+# types, whether or not that type actually consumes fields at render
+# time. Garmin's own Edge 530 manual (Training > Workouts) describes
+# a SEPARATE structured-workout subsystem, independent of Activity
+# Profile screens: starting a Workout "displays each step of the
+# workout, the target (if any), and current workout data" -- almost
+# certainly what this screen renders, dynamically, only while a
+# Workout (Training > Workouts, synced via Garmin Connect or built
+# on-device into GARMIN/Workouts/Guided or /Scheduled) is actively
+# running, the same "only meaningful under a specific runtime
+# condition" pattern already established for ClimbPro/Segment/
+# GroupTrack. Doug's own device has never used this feature (both
+# Workouts subfolders empty), matching why this screen has never been
+# seen "live." NOT independently confirmed by this project via an
+# actual running Workout -- inference from official Garmin
+# documentation plus this profile's own byte-level evidence, not a
+# direct on-device test of editing this screen's fields specifically.
+FIELD_EDIT_UNCERTAIN_TYPES = {38}
 
 
 def screen_type_name(f10):
@@ -485,9 +610,11 @@ def classify_screens(messages):
                                  by f9 -- this ordering IS the true
                                  on-device display order (confirmed via
                                  --swap-order round-trip testing).
-            "conditional":      [(idx, mesg), ...] -- the GroupTrack
-                                 Conditional record (f10=32) specifically;
-                                 active but exempt from f9 ordering.
+            "conditional":      [(idx, mesg), ...] -- the always-present
+                                 Conditional-only runtime record (f10=32,
+                                 display name "Reserved" -- NOT confirmed
+                                 GroupTrack-specific, see NAMED_SCREEN_TYPES'
+                                 comment); active but exempt from f9 ordering.
             "removed":          [(idx, mesg), ...] -- soft-deleted; content
                                  (f3/f7) preserved ONLY until the next
                                  NewFiles-mediated (toolkit) deploy --
@@ -511,7 +638,7 @@ def classify_screens(messages):
 
     unknown_ids_seen = set()
     orderable = []    # (f9, slot_idx, mesg) -- real f9, appears in main viewing sequence
-    conditional = []  # slot_idx, mesg -- f1=1, f9=None, f10=real (GroupTrack-style, still "on")
+    conditional = []  # slot_idx, mesg -- f1=1, f9=None, f10=real (Conditional-state, still "on" -- historically called "GroupTrack-style," see the Reserved rename note above NAMED_SCREEN_TYPES)
     removed = []      # slot_idx, mesg -- f1=0, f9=None, f10=None (content preserved, pulled from sequence)
     unconfigured = [] # slot_idx, mesg -- no f1==1 signal at all (f9/f10 absent, f1 not 1) -- never created
 
@@ -546,11 +673,15 @@ def classify_screens(messages):
             # persistently stable state.
             removed.append((idx, m))
         elif f1 == 1 and f10 is not None:
-            # f1 == 1, f9 absent, f10 present -- GroupTrack-style: an
-            # active feature structurally exempt from the ordering system,
-            # not a deleted screen. Confirmed f10=32 for the real GroupTrack
-            # Conditional record specifically (distinct from the separate,
-            # always-orderable GroupTrack List placeholder at f10=57).
+            # f1 == 1, f9 absent, f10 present -- Conditional state: an
+            # active record structurally exempt from the ordering system,
+            # not a deleted screen. Always seen with f10=32 in practice --
+            # display name "Reserved" (renamed 2026-08-15 from "GroupTrack,"
+            # since this record is present on every profile regardless of
+            # whether GroupTrack has ever been used, and its real purpose
+            # isn't actually confirmed; distinct from the separate,
+            # always-orderable "GroupTrack List" placeholder at f10=57,
+            # which IS the real GroupTrack menu entry).
             conditional.append((idx, m))
         else:
             # No f1==1 signal of any kind (f9 absent, f10 absent, f1 not 1)
@@ -642,13 +773,13 @@ def cmd_screens(args):
 
     if conditional:
         print()
-        print("=== Conditional screens (active feature, exempt from normal ordering -- "
-              "GroupTrack-style; --swap-order refuses these, no f9 to swap) ===")
+        print("=== Conditional screens (active record, exempt from normal ordering -- "
+              "always seen as f10=32 'Reserved'; --swap-order refuses these, no f9 to swap) ===")
         for idx, m in conditional:
             field_count = m.get(3)
             print(_row(idx, m, field_count))
         if verbose:
-            print("  NOTE: this section catches the GroupTrack-style structural exemption "
+            print("  NOTE: this section catches the Conditional-state structural exemption "
                   "(f1=1, f9 absent, f10 present). Other conditionally-TRIGGERED screens "
                   "(e.g. ClimbPro) may still have a real f9 and appear in the main ordered "
                   "list above instead -- they participate normally in scroll order even "
@@ -663,9 +794,13 @@ def cmd_screens(args):
             print(_row(idx, m, field_count))
         if verbose:
             print("  NOTE: confirmed via live Remove-button test; NOT restorable via any "
-                  "on-device menu. fit_patch.py --un-remove exists but has shown a real "
-                  "device-side hazard (unrelated content loss) in testing -- see FIT_PATCH.md "
-                  "BUGS before using it.")
+                  "on-device menu, and fit_patch.py no longer offers an --un-remove flag "
+                  "either (RETIRED v1.13.0, 2026-08-13) -- it had a real, confirmed "
+                  "device-side data-loss hazard in earlier testing and was never re-verified "
+                  "after the fix, and Garmin's own editor has no un-remove workflow at all. "
+                  "Recovery from an unwanted change is Restore-from-Backup (whole profile), "
+                  "not a per-screen undo -- see FIT_PATCH.md BUGS / PROJECT_NOTES.md "
+                  "\"Product note on --un-remove\" for the full history.")
 
     if args.show_unconfigured and unconfigured:
         print()
