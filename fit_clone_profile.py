@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "1.0.0"
+__version__ = "1.0.1"  # New constant, Doug's real on-device test (2026-08-19): PROFILE_NAME_MAX_CHARS = 15 -- Garmin's own Activity Profile name editor hard-blocks typing a 16th character (confirmed directly: typing past 15 switches straight to the checkmark/complete control instead of accepting more input). This is a real, CONFIRMED device UI limit -- distinct from, and much stricter than, NAME_FIELD_SIZE's 31-usable-byte storage capacity below, which patch_profile_name() already enforces safely (raises ValueError, never corrupts). A name between 16 and 31 bytes patches through this tool's raw byte write with no error -- Garmin's own software could never have produced one, so how the device actually renders it (visually truncated? something worse?) is untested territory this toolkit has no reason to create. Backs gui_app.py's new ClonePanel hard block (v0.19.9) -- Doug's explicit call, not a guess: this mirrors an independently-confirmed on-device fact the exact same way NO_SHOW_TOGGLE_TYPES (fit_patch.py) does, so it's enforced the same way (a real block, not soft guidance like startup.txt's character/line counts, which were never independently confirmed on real hardware). No functional change to patch_profile_name() itself -- this is a new reference constant only, the GUI does the enforcing. Prior entry (v1.0.0): initial version.
 """
 fit_clone_profile.py -- patch an Activity Profile's display name
 (sport_mesgs[0].name, mesg_num=12, field 3), for cloning a profile
@@ -32,6 +32,20 @@ from fit_crc import fit_crc
 SPORT_MESG_NUM = 12
 NAME_FIELD_DEF_NUM = 3
 NAME_FIELD_SIZE = 32  # fixed-width, confirmed via real file inspection
+
+# CONFIRMED via direct on-device testing (Doug, 2026-08-19): Garmin's own
+# Activity Profile name editor hard-blocks typing a 16th character --
+# typing past this limit switches straight to the checkmark/complete
+# control instead of accepting more input. This is a real device UI
+# limit, not a guess or a developer-documented reference figure -- and
+# it's much stricter than NAME_FIELD_SIZE's 31-usable-byte storage
+# capacity above (which patch_profile_name() already enforces safely).
+# A name between 16 and 31 bytes patches through this tool's raw byte
+# write with no error at all -- Garmin's own software could never have
+# produced one, so nothing has ever tested how the device renders it.
+# gui_app.py's ClonePanel hard-blocks Create Clone past this length,
+# for that reason -- not just a courtesy warning.
+PROFILE_NAME_MAX_CHARS = 15
 
 
 def find_sport_message(messages):

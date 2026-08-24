@@ -1,5 +1,568 @@
 # Garmin Edge 530 Activity Profile Screen Editor
 
+## What it does
+
+This toolkit reads and edits Garmin Edge 530 Activity Profile screens
+directly, on a computer, instead of through the on-device menu —
+reordering screens, changing which data fields appear and in what
+layout, showing/hiding or deleting screens outright, cloning a
+profile under a new name, restoring a profile from backup, and
+batching several changes into one device write/restart. It reaches
+data fields the on-device editor doesn't expose at all (power-meter/
+Shimano Di2 metrics, Torque Effectiveness, Balance, TSS/IF, and more).
+
+Two ways to use it, sharing the same validated backend and the same
+automatic backup-before-every-write safety net: a point-and-click
+**GUI** (`gui_app.py`) that walks through detect → back up → edit →
+review → deploy, or a set of **command-line tools** (`fit_dump.py`,
+`fit_patch.py`, and others) for the same operations plus lower-level
+inspection, useful for scripting or checking exactly what a change
+will do before it's written.
+
+## Who this is for
+
+This toolkit is built for riders who are comfortable with a terminal
+and a `pip install`, not (yet) a plug-and-play app for the general
+public. There's no installer or double-clickable application bundle —
+setup means cloning this repo, running a setup script (macOS) or a
+couple of `pip install` commands by hand (Windows), and running the
+GUI or CLI tools from a terminal with that environment active. If
+that's a step you've done before for some other tool, you'll be fine
+here; if "open a terminal" isn't something you do, this project isn't
+there yet.
+
+What you get in exchange for that setup: direct editing access to
+Activity Profile screens and data fields the on-device editor doesn't
+expose at all (power-meter/Shimano Di2 metrics, Torque Effectiveness,
+Balance, TSS/IF, and more), the ability to delete a screen outright
+rather than just hide it, clone a profile under a new name, restore a
+profile that's no longer on the device, batch several changes into one
+device restart, and automatic backups before every write.
+
+## License
+
+Released under the [MIT License](LICENSE) — free to use, modify, and
+redistribute, with no warranty.
+
+## Disclaimer
+
+This is an independent, unofficial project. It is **not affiliated
+with, endorsed by, or sponsored by Garmin Ltd. or its subsidiaries.**
+"Garmin" and "Edge" are trademarks of Garmin Ltd. or its subsidiaries;
+they're used here only to describe which devices this toolkit is
+compatible with, not to claim any official status.
+
+The `data_screen` message and related undocumented fields this project
+relies on were reverse-engineered entirely through **black-box
+observation** — making isolated changes on a real device (or via a
+custom byte-patcher) and diffing the resulting files — never by
+decompiling, disassembling, or otherwise reverse-engineering Garmin's
+own software or SDK. The official `garmin_fit_sdk` Python package is
+used only as a normal dependency, for its documented decode/encode
+support of standard FIT messages.
+
+**Use at your own risk.** This toolkit patches undocumented file
+structures and writes the result back to your device through an
+undocumented pathway (`NewFiles/`). It's been tested carefully against
+real hardware throughout development, but Garmin could change this
+behavior in a future firmware update without notice, and no guarantee
+is made against corrupting a profile, losing data, or other unintended
+device behavior. Back up your profiles before use (this toolkit does
+this automatically before every write, but the responsibility is
+ultimately yours) and don't run it on a device you can't afford to have
+misbehave.
+
+No warranty of any kind is provided, express or implied — see
+[LICENSE](LICENSE) for the full legal text.
+
+## Setup
+
+The toolkit itself (CLI tools and GUI) runs on both **macOS** and
+**Windows** — device detection is confirmed working on real hardware
+on both (see `garmin_device.py`'s changelog). The *install path*
+differs, though: macOS has a one-command setup script, Windows doesn't
+have one yet (see task list) and needs `pip install` run by hand.
+
+### macOS
+
+Run the install script — it checks your python3 version, creates a
+dedicated `.venv` (nothing touches your system or Homebrew Python),
+and installs both dependencies (`garmin-fit-sdk` and `wxPython`) into
+it:
+
+```bash
+./install.sh
+source .venv/bin/activate
+```
+
+Safe to re-run any time; add `--upgrade` to update already-installed
+packages, or `--help` for details. It's a plain bash script, no
+network access beyond pip, and no admin/sudo required.
+
+Prefer to do it by hand, or need just the CLI tools without the GUI's
+`wxPython` dependency? The manual equivalent:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install garmin-fit-sdk --break-system-packages
+```
+
+### Windows
+
+`install_windows.bat` — download or copy the whole toolkit folder
+(Doug used a `Documents` subfolder), then double-click
+`install_windows.bat` in File Explorer. It checks for Python 3.10+
+(the `py` launcher, falling back to `python.exe`), installs
+`garmin-fit-sdk` and `wxPython` directly — deliberately no virtual
+environment, see below — and verifies both import cleanly. If Python
+isn't found or is too old, it opens the python.org download page and
+stops with instructions rather than trying to install Python itself.
+**Not yet confirmed on real hardware** — written against Doug's own
+confirmed-working manual sequence below, but there's no way to
+dry-run Windows batch syntax in this project's dev environment (no
+`cmd.exe` available), so this needs a real run before it can be
+trusted the way the manual steps already are.
+
+Prefer to install by hand, or the script hits a snag? This is the
+exact sequence Doug used for the confirmed-working 2026-08-19 test, no
+venv involved:
+
+1. Install Python from [python.org](https://www.python.org/downloads/windows/)
+   (the standard Windows installer, downloaded via browser).
+2. Install the two dependencies directly — no virtual environment
+   needed for this toolkit on Windows:
+   ```powershell
+   python -m pip install garmin-fit-sdk wxPython
+   ```
+3. Copy the *whole* toolkit folder somewhere (Doug used a `Documents`
+   subfolder) — not individual `.py` files. `garmin_device.py`, for
+   example, imports `fit_dump.py` at runtime, so a partial copy fails
+   with `ModuleNotFoundError`.
+
+From there, either run the CLI tools from PowerShell (`python
+garmin_device.py detect`, etc.), or — found during testing, and a
+nicer experience once setup is done — just double-click `gui_app.py`
+in File Explorer to launch the GUI directly. That works here (and
+deliberately doesn't on macOS, see the About section/`gui_app.py`
+changelog for that story) because the python.org Windows installer
+associates `.py` files with the same Python install `pip` just used —
+there's no separate system-vs-project Python split for a file
+association to point at the wrong one.
+
+A `.venv` is optional, not required, on this path — reach for one only
+if you want this toolkit's dependencies kept isolated from other
+Python projects on the same machine:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install garmin-fit-sdk wxPython
+```
+
+(Double-clicking `gui_app.py` in File Explorer won't use a venv's
+Python, though — that path only works with the direct, no-venv install
+above; from inside a venv, launch via `python gui_app.py` in an
+activated PowerShell instead.)
+
+Confirmed on Windows 11 (2026-08-19): `detect`, `screens` (both CLI
+tools), and the full GUI workflow (add a screen, deploy, restart,
+NewFiles round-trip). Not yet tested on Windows 10 or any Linux
+distribution.
+
+## Quick start
+
+Connect your Edge 530 via USB, then:
+
+```bash
+# Confirm the device is detected (also shows device info: manufacturer/product/serial/software version)
+python3 garmin_device.py detect
+
+# See what profiles are on it
+python3 garmin_device.py list
+
+# Back everything up before touching anything
+python3 garmin_device.py backup ~/path/to/a/working/directory
+
+# See the current screen layout for one profile
+python3 garmin_device.py screens CyclingRoadRoadtest.fit
+```
+
+To make a change, stage a backed-up profile, patch it, then deploy:
+
+```bash
+python3 garmin_device.py stage CyclingRoadRoadtest.fit <backup_path> <working_dir>
+python3 fit_patch.py <staged_file> <patched_file> --slot 9 --hide
+python3 garmin_device.py deploy <patched_file> CyclingRoadRoadtest.fit
+```
+
+To make several changes before a single device write/restart, use
+`fit_chain.py` instead of calling `fit_patch.py` directly:
+
+```bash
+python3 fit_chain.py <staged_file> <patched_file> \
+    --step '--slot 9 --hide' \
+    --step '--swap-order 1,11' \
+    --step '--slot 4 --layout 1'
+python3 garmin_device.py deploy <patched_file> CyclingRoadRoadtest.fit
+```
+
+Follow the eject prompt. After the device's automatic restart
+finishes, press the power button **once** to bring it back into
+mass-storage mode (it does not remount on its own), then reconnect and
+verify:
+
+```bash
+python3 garmin_device.py wait-for-remount
+python3 garmin_device.py screens CyclingRoadRoadtest.fit
+```
+
+To view or replace the device's custom boot message (`startup.txt`,
+lives at the device root, NOT in `Sports/` — a direct overwrite, no
+`NewFiles`/eject-import involved; the existing file is backed up
+first):
+
+```bash
+python3 garmin_device.py startup-txt ~/path/to/a/working/directory                     # view
+python3 garmin_device.py startup-txt ~/path/to/a/working/directory --write new_msg.txt  # overwrite
+```
+
+Eject, then allow one **full power cycle** (off, then on) — not just
+eject/remount — for the new message to take effect (confirmed via the
+file's own on-device comment).
+
+To clone an existing profile under a new name (e.g. building a second
+bike's profile from an existing one instead of rebuilding every screen
+by hand):
+
+```bash
+python3 fit_clone_profile.py <staged_file> <cloned_file> --name "NewBikeName"
+python3 garmin_device.py deploy <cloned_file> <NEW_FILENAME>.fit   # filename must NOT match an existing profile
+```
+
+## Tools
+
+| Tool | Version | Purpose |
+|---|---|---|
+| `install.sh` | 1.0.2 | macOS setup script (see `install_windows.bat` for the Windows counterpart). **SECOND real bug found via real hardware, same test session (2026-08-13):** past the CLT/python3 checks (Homebrew python3 3.14, freshly installed), "Installing garmin-fit-sdk..." died with `PIP_EXTRA[@]: unbound variable`. Cause: bash 3.2 (macOS's stock `/bin/bash` — confirmed that's really what runs this script, via Doug's `bash-3.2$` prompt) has a long-standing bug where expanding an *empty* array under `set -u` throws unbound-variable instead of silently expanding to nothing — fixed in bash 4.4+, so it never showed up in the bash 5 dev/test sandbox, only on real hardware. Fixed in v1.0.2 by replacing the `PIP_EXTRA` array with a small `pip_install()` wrapper function that branches on `$UPGRADE` directly — no array left anywhere in the script, so this bug class is now structurally impossible, not just avoided this one instance. Also v1.0.1: on a genuinely fresh Mac with no Xcode Command Line Tools ever installed, v1.0.0 crashed silently right after "Found python3" — invoking python3 for its version check triggered macOS's own `xcode-select` "requesting install" note to stderr and a non-zero exit, which `set -e` turned into an unexplained stop with no error message from the script itself. Fixed with an explicit Command Line Tools check as its own step, before python3 is touched at all, plus defense-in-depth error handling around the version-check invocation; new `--version` flag. Checks the platform, checks Xcode CLT, checks python3 is present and at least 3.9 (warns if older than 3.10, since `wxPython` only ships pre-built PyPI wheels from 3.10 up), creates/reuses a dedicated `.venv` so nothing touches system or Homebrew Python, installs `garmin-fit-sdk` and `wxPython` into it, then imports both back to confirm the install actually works. Idempotent, `--upgrade`/`--help`/`--version` flags. Windows/Linux support deferred until device detection itself is implemented for those platforms (see `garmin_device.py`'s `_find_garmin_root_windows()` stub). |
+| `install_windows.bat` | 1.0.1 | Windows setup script. **CONFIRMED on real Windows 11 hardware (v1.0.1, 2026-08-22)** — Doug uninstalled `garmin-fit-sdk`/`wxPython` via `pip uninstall`, confirmed both failed to import, then ran this script fresh: Python detection, version check, install, and post-install import verification all worked cleanly (Python 3.14, prebuilt `wxPython` 4.3.1 wheel). One benign pip warning seen (wx's bundled demo/dev console scripts installed outside PATH) — confirmed harmless, unrelated to how this toolkit is actually launched. Double-click launch of `gui_app.py` reconfirmed post-reinstall — Windows showed a one-time "how do you want to open this file" dialog on the very first double-click (normal first-use file-association behavior for any `.py` file, not caused by this script); picking Python + "Always" made every subsequent double-click launch directly with no dialog. Confirmation-only, no code changed. Original entry (v1.0.0, Doug's go-ahead, 2026-08-20), scoped directly against his own confirmed real Windows 11 install (README.md Doc rev 54): checks for the `py` launcher (falling back to `python.exe`) and a version >= 3.10 -- a HARD floor here, stricter than `install.sh`'s soft warn-and-offer-to-continue at the same threshold on macOS, since building `wxPython` from source below 3.10 needs Visual Studio Build Tools on Windows versus a single-command Xcode CLT install on macOS. If Python's missing or too old, detects and guides (opens the python.org download page, prints instructions, stops) rather than trying to silently download/install Python itself -- Doug's explicit call, matching `install.sh`'s own treatment of missing Xcode CLT, no elevation and nothing modified without the user's own click. Installs `garmin-fit-sdk`/`wxPython` directly with NO virtual environment (deliberately different from `install.sh`) -- a venv would break the double-click-`gui_app.py`-in-File-Explorer behavior Doug's own real install produced, which only works because the python.org installer associates `.py` files with the SAME python `pip install` (no venv) puts packages into. Verifies both packages import after install. `--upgrade`/`--help`/`--version` flags, safe to re-run. |
+| `garmin_device.py` | 0.12.6 | Detect (+ device info)/list/backup/stage/write/eject/remount-wait workflow for the device itself. **Windows support CONFIRMED on real hardware (v0.12.6, 2026-08-19)** — Doug ran `detect`, `screens` (both CLI tools), and the full GUI workflow (add screen, deploy, restart, NewFiles round-trip) against a real Edge 530 on a real Windows 11 laptop; all worked with zero code changes. `D:\Garmin` has `Sports`/`NewFiles` flat at the drive root, resolving Doc rev 48's open question. Confirmation-only entry, no code changed. See Doc rev 49 above. Prior entry (v0.12.5, Doug's go-ahead): `_find_garmin_root_windows()` filled in — the single deliberately-stubbed function per this file's own module docstring. Scans drive letters C:-Z: for the same `Sports`/`NewFiles` structure check the macOS half uses, at both the drive root and one level of subfolder (mirroring macOS's own two-level nesting check). Plain `os.path`/`os.listdir` iteration, no new dependency. Headlessly verified via `ntpath`-monkeypatched fake drive trees. See Doc rev 48 above. Prior entry (v0.12.4, same-day follow-up to v0.12.3, Doug's report from testing): a second, separate cause of the startup.txt "?" corruption — a leading UTF-8 BOM decoded (via `errors="replace"`) into 3 replacement characters that rode through the preserved header and got re-encoded to 3 literal "?" on every save, self-perpetuating regardless of the v0.12.3 smart-quote fix. `read_startup_txt()` now strips a leading UTF-8 BOM before decoding. See Doc rev 43 above. Prior entry (v0.12.3, Doug's report from testing): `write_startup_txt()` now reverses common macOS smart-substitution characters (curly quotes, en/em dash, ellipsis) back to plain ASCII before writing — typed "..." was silently becoming a single "?" on save, since `wx.TextCtrl` on macOS auto-substitutes as you type and the old ASCII-only encode replaced each result with "?". Any character outside the known-substitution table still degrades honestly to "?", unchanged. Prior entry (v0.12.2): `list_backed_up_profile_filenames(working_dir)` returns every `.fit` filename ever backed up (regardless of current on-device presence), scanning all `backups/<timestamp>/` folders — filtered to `.fit` so a `startup.txt` backup (which lives in the same folder structure) isn't mistaken for a deleted profile. New `deleted-profiles` CLI subcommand. Backs `gui_app.py` v0.19.0's new second profile list. Prior entry (v0.12.1): `read_startup_txt()` now normalizes all line endings to plain `\n` right after decoding — real reported bug, the GUI's message editor was showing a blank line between every real line, likely from CRLF line endings in the file that BBEdit/vi both silently normalize on open (so it looked fine there) but `wx.TextCtrl` does not handle cleanly when fed embedded `\r\n`. Headlessly verified against a simulated CRLF file. Prior entry (v0.12.0): startup.txt (custom boot message) support — `read_startup_txt()`/`parse_startup_txt()`/`build_startup_txt()`/`write_startup_txt()`, plus a new `startup-txt` CLI subcommand (view, or `--write FILE` to overwrite). CONFIRMED via Doug's own real Edge 530 (2026-08-14): the file lives at `garmin_root` itself (same level as `Sports`/`NewFiles`), and a write is a DIRECT overwrite while mounted — NOT a NewFiles import — per the file's own on-device comment ("Allow one full power cycle after editing for your message to be updated"). `write_startup_txt()` backs up any existing file first, reusing the same `working_dir/backups/<timestamp>/` structure `backup_profiles()` uses. `parse_startup_txt()`/`build_startup_txt()` split/rejoin the file at its last comment block, so Garmin's own instructional text is preserved byte-for-byte and only the `<display=N>` value + message text are ever regenerated — headlessly round-trip-tested byte-identical against Doug's real file. Character/line-count reference constants (`STARTUP_TXT_MAX_CHARS`/`STARTUP_TXT_MAX_LINES`) are guidance only, not enforced — actual on-device wrapping is character-width-dependent (Doug's own note). Backs `gui_app.py`'s new `StartupTxtPanel`. Prior entry (v0.11.0): `list_backup_history()` lists a single profile's backup history (newest first), de-duplicating consecutive byte-identical backups — a real characteristic of this app, since every visit to the GUI's profile list re-backs-up all profiles, not just on real changes. Backs the GUI's Restore-from-Backup picker; also a new `backup-history` CLI subcommand. |
+| `fit_dump.py` | 2.4.25 | Read and inspect a `.fit` file (`dump`, `unknown`, `diff`, `screens` subcommands). **v2.4.25: CONFIRMED via GUI, real hardware (2026-08-22)** — Doug spot-checked the field picker directly against several of the 169 confirmed entries added across the three 2026-08-20 batches, confirming the labels shown match what's on-device. Closes the loop from "correctly typed in the dict" to "actually wired through and displayed correctly." No dict values changed, confirmation-only. v2.4.24: 13 new confirmed field IDs, 2026-08-20 batch #3, Doug's cross-check of his confirmed-field list against the Garmin Edge 530 Owner's Manual's own data-field appendix — 98 Watts/kg, 439 3s W/kg, 207-213 Power Z1-Z7, 418 Power Z8, 419 Power Z9 (Time in Power Zone 1-9, the Power-Zone analog of the existing 199-203 HR Zone 1-5 (time) fields — 9 zones, not 5), 24 Laps, 41 Max Lap Power (resolves an earlier ambiguous "Laps Max" note — two separate fields Doug had conflated, not one). Fills the last two gaps in the W/kg family (base + 3s variant), extends Power's own Lap/Max/Last-Lap set. No collisions with any existing entry. Closes out the manual-appendix cross-check — no further appendix-listed fields remain unconfirmed. `FIELD_ID_NAMES` now 169 confirmed entries (was 156). One real gap still open, not part of this batch: "Trainer Resistance" — hypothesized (unverified) to need a paired ANT+ FE-C smart trainer to appear on-device at all, same sensor-gated pattern as eBike Metrics. v2.4.23: 10 new confirmed field IDs, 2026-08-20 batch #2, Doug's continued field census — 265 Lap PCO, 267 Avg Right PP, 268 Lap Right PP, 269 Right PPP, 271 Lap Right PPP, 273 Avg Left PP, 274 Lap Left PP, 275 Left PPP, 277 Lap Left PPP, 440 10s W/kg. Fills out the L/R Power Phase/Peak Power Phase family alongside the existing 263/264/266/270/272/276 entries. No collisions with any existing entry. `FIELD_ID_NAMES` now 156 confirmed entries (was 146). Same batch, doc-only: Doug's investigation of the last unmapped on-device label he'd been tracking, "Battery Status" (Lights category), confirms it's an alias that navigates straight to field 317 "Light Battery" — not a separate field, no table entry needed. v2.4.22: correction, same day, Doug's own catch — the v2.4.21 batch's "Target" was mistyped as field 512; the real ID is 521 (512 never existed on-device under either name, a simple mistyped digit not a raw-ID/name mismatch). Fixed before this ever shipped in a tagged release. Doug also confirmed, unprompted, that all 9 fields from that batch are verified against the real on-device screen — same confirmation standard as every other batch here. No count change, still 146 entries (corrected key, not new/removed). v2.4.21: 9 new confirmed field IDs, 2026-08-20 batch, Doug's continued field census — 521 Target (see correction above), 523 Step Time, 522 Duration, 511 Workout Comparison, 45 Workout Step, 100 Last Lap Power, 258 Lap Time Standing, 260 Lap Time Seated, 264 Avg PCO. No collisions with any existing entry. Notable: 5 of these 9 (45, 511, 521, 522, 523) read by name as Workout/structured-step fields — directly adjacent to this project's still-open f10=38 "Workout" SCREEN-TYPE question (see `PROJECT_NOTES.md` Open Items and `FIELD_EDIT_UNCERTAIN_TYPES` below): whether that screen's field slots are actually meaningful/rendered on-device, since the on-device editor exposes no field options for it at all. That's a separate, still-unconfirmed question from these fields' own identity, which Doug's on-device verification establishes with the same confidence as any other entry. The other 4 extend already-populated families: Power (100, matching the existing 3s/10s/30s/Lap/Avg pattern) and Cycling Dynamics (258/260/264, standing/seated lap time + PCO). `FIELD_ID_NAMES` now 146 confirmed entries (was 137). v2.4.20: FULLY CONFIRMED via direct raw-byte inspection — `CyclingRoadRoadtemp.fit` (the original census profile, Screen 3/4 intact at 10 fields each) came through and was dumped directly; raw arrays match all 20 corrected pairs from v2.4.19 position-for-position exactly, including 177 "Torque Effect" under its own ID. No values changed — this closes out the last open question from the fix below. v2.4.19: RESOLVED — the entire 2026-08-17 field-ID batch had raw IDs and names correctly identified but wrongly paired (Doug's census screens 3 and 4 got transposed when the original list was written up, so all 10 IDs from one screen's block were paired with the 10 names from the other's — same 20 raw IDs, only the pairing changed). Caught via real device testing (editing a screen to "Intensity Factor (IF)"/"Pedal Smoothness"/"Torque Effect" actually displayed "Avg W/kg"/"Lap NP"/"Last Lap NP"); Doug re-derived the correct pairing from the census screens and it resolves all three mismatches exactly. v2.4.18 (superseded by the fix above): flagged the whole batch SUSPECT with no value changes, pending re-verification. v2.4.17: real bug fix, Doug's report from checking the device — field 148 was stored as "Torque Effect." (a guessed abbreviated form, by analogy to field 320's "Perf. Conditioning" convention); Doug directly confirmed the real on-device text in a half-width field is "Torque Effect", no trailing period. Corrected; no count change, still 137 entries. v2.4.16: 20 new confirmed field IDs, 2026-08-17 batch — this project's first batch touching power-meter/Di2 metrics: Balance family (42/80/40/441/411/408 — Balance, Avg, Lap, 3s, 10s, 30s), Power/W-kg (150 30s Power, 151 Max Power, 83 Avg W/kg, 159 30s W/kg), training load (149 %FTP, 43 TSS, 437 Intensity Factor (IF)), NP (176 Lap NP, 177 Last Lap NP), pedaling metrics (148 Torque Effect, 147 Pedal Smoothness, 82 Power Zone), Shimano Di2 (161 Di2 Battery, 160 Di2 Shift Mode) — confirms the existing 3s/10s/30s/Lap/Avg Power naming pattern repeats identically for Balance. No collisions. `FIELD_ID_NAMES` now 137 confirmed entries (was 117). v2.4.15: new `FIELD_EDIT_UNCERTAIN_TYPES` set (currently `{38}`, "Workout") — flags screen types whose stored field bytes are real and correctly readable but whose actual on-device meaning/rendering is uncertain, backing a new non-blocking warning in the GUI's Edit Screen panel. Built in response to Doug's question about the Workout screen's edit guard; backed by Garmin's own Edge 530 manual confirming Workouts are a separate, dynamically-rendered subsystem (see Doc rev 42 above and `PROJECT_NOTES.md` doc rev 54). v2.4.14 (correction, same day): v2.4.13's new keys were wrong (39/59/96, read off this tool's own `f10+1` display fallback) — corrected to the real f10 values, 38 "Workout", 58 "eBike Metrics", 95 "STEPS Metrics (Shimano)". Also resolved the f10=38 "Workout" field question: confirmed via a direct raw-byte comparison of `CyclingEbike.fit` that its fields are byte-for-byte identical to Cycling Dynamics' on the same profile — real data, correctly read, not a bug. See `PROJECT_NOTES.md` Open Items. v2.4.12 (rename only, Doug's decision): `NAMED_SCREEN_TYPES[32]` renamed "GroupTrack" → "Reserved" — this Conditional-only record is present on every profile regardless of GroupTrack usage, so its real purpose was never actually confirmed (f10=57 "GroupTrack List" is unaffected, remains correctly GroupTrack-specific). No functional change. v2.4.11: new `GRAPH_OR_BARS_FIELD_IDS` set (10 fields confirmed needing a full-width screen slot to render as a graph/bar), kept separate from `FIELD_ID_NAMES`, backing the GUI's new Graph/Bars full-width warning — no `FIELD_ID_NAMES` entries changed. v2.4.10 (doc-only): the `screens` subcommand's verbose "Removed screens" note referenced `fit_patch.py`'s now-retired `--un-remove` flag — updated to point at Restore-from-Backup instead. `classify_screens()`/`active_field_ids()`/`screen_type_name()` are print-free, importable data functions — the seam the GUI reads screens through. `FIELD_ID_NAMES` has 117 confirmed entries (`KNOWN_UNRESOLVED_IDS` still empty; v2.4.9: field 320 corrected "Conditioning" → "Perf. Conditioning" — full concept name is "Performance Conditioning," but the actual on-device DATA FIELD display reads "Perf. Conditioning" (abbreviated), matching this toolkit's on-device-display naming convention; v2.4.8: field 49 corrected "Avg Speed (Alt)" → "Avg Speed" — deployed into a full-width slot and visually confirmed as plain text, no graph/bars; flagged as a caution (not a falsification) for the Graph/Bars marker theory below, since there's no record this field's old "(Alt)" label was ever a real on-device marker transcription like 23/348/349 were; v2.4.7, 2026-08-11 batch: 12 new IDs plus 3 corrected placeholder names — 23 "Heart Rate (Alt)" → "HR Zone Graph", 348/349 "Speed */Cadence *" → "Speed Bars"/"Cadence Bars" — confirming the "*"/"(Alt)" marker denotes a Graph/Bars-style field needing a full-width slot; v2.4.6, doc-only: the long-open "*" marker mystery on fields 348/349 is likely resolved — marks a Graph/Bars-style rendering needing a full-width screen slot, else falls back to plain text; v2.4.5: fields 58/87 corrected from "Lap Timer"/"Last Lap Timer" to "Lap Time"/"Last Lap Time" — a mistaken analogy to the separate, correctly-named field 56 "Timer"; 2026-08-10 batch: 18 IDs confirmed via a dedicated two-screen, 10-field-each census on a real profile, cross-referencing on-device field names against their GUI-shown position); `NAMED_SCREEN_TYPES` has 10 confirmed f10 screen-type codes (Map, Compass, Segment, ClimbPro, etc.) — `screens` output now shows real screen names. |
+| `fit_patch.py` | 1.14.2 | Patch a screen's fields, layout, order, or visibility. v1.14.2 (doc-only, Doug's decision): comments referencing f10=32 as "GroupTrack" updated to "Reserved" — its real purpose was never actually confirmed, this record is present regardless of GroupTrack usage; f10=57 "GroupTrack List" unaffected. No functional change. **`--remove` CONFIRMED via a real on-device round-trip test (v1.14.1, 2026-08-14)** — target screen correctly removed from the on-device order, and the removed screen was wiped by NewFiles rather than surviving as recoverable, matching `--un-remove`'s own retirement reasoning. GUI wrapper (`ViewScreensPanel`) is now unblocked, still unbuilt until asked for. `--remove`/`remove_screen()` (v1.14.0) — the backend half of "Delete Screen": permanently transitions a slot to Removed (f1=0, f9/f10 cleared, content preserved), reusing `--hide`'s exact two hard guards (Map/ClimbPro block, last-visible-user-screen floor) with no new guard logic. **Remove availability for named types confirmed and clarified (2026-08-13, on-device):** Map and ClimbPro are the only common named screen types with Remove disabled — Elevation, "GroupTrack List" (the on-device label — not to be confused with the separate GroupTrack Conditional record, which isn't a selectable row at all), Cycling Dynamics, Lap Summary, Virtual Partner, Compass, and Segment all show it active. That's the complete confirmed set, same boundary `NO_SHOW_TOGGLE_TYPES` already hard-codes for the Show Screen toggle. Doc-only, directly informs the still-scoped `--remove`/"Delete Screen" feature — see `PROJECT_NOTES.md` Open Items. **`--un-remove` RETIRED (2026-08-13, real user decision)** — Restore-from-Backup already covers real recovery from an accidental delete (whole-profile undo, confirmed on real hardware), `--un-remove` had a confirmed historical device-side data-loss hazard never re-verified after the fix below, and Garmin's own editor doesn't offer an un-remove workflow either — see `PROJECT_NOTES.md` "Product note on `--un-remove`" for the full history. `next_available_field10()` auto-computes a collision-free screen identity for `--new-slot`, replacing the old hardcoded f10=0 default — root cause of the now-RESOLVED "Add New Screen always fails" limitation; CONFIRMED working via live on-device round-trip. `check_system_screen_guard()` is f10-based and CERTAIN for any Active screen (old content-pattern/field-count heuristics are a fallback only for Removed-state slots) — fixed a real false positive on a confirmed user screen. `would_hide_last_visible_screen()` is a HARD, non-heuristic guard (no `--force`) blocking `--hide`/`--disable` on a profile's last remaining real USER screen, counted via f10. `hide_unsupported_screen_type()` is a SECOND hard guard blocking `--hide` on Map or ClimbPro entirely — confirmed neither has a Show Screen toggle at all, on any profile type. |
+| `fit_chain.py` | 1.0.0 | Apply several `fit_patch.py` operations in sequence before one device write |
+| `fit_clone_profile.py` | 1.0.1 | Clone a profile under a new display name (patches `sport_mesgs[0].name`). v1.0.1: new `PROFILE_NAME_MAX_CHARS = 15` reference constant — Doug's real on-device test (2026-08-19) confirmed Garmin's own Activity Profile name editor hard-blocks typing a 16th character. Distinct from, and much stricter than, the existing `NAME_FIELD_SIZE` byte-capacity check (31 usable bytes) `patch_profile_name()` already enforces safely. No functional change to `patch_profile_name()` itself — `gui_app.py`'s `ClonePanel` (v0.19.9) does the enforcing. |
+| `fit_raw_walk.py` | 1.0.0 | Internal support — generic FIT byte-offset walker, not meant to be run directly |
+| `fit_crc.py` | 1.0.0 | Internal support — FIT CRC-16, not meant to be run directly |
+| `gui_app.py` | 0.19.12 | wxPython GUI — covers steps 1-10 plus Restore-from-Backup, Clone Profile, and Startup Message. Cosmetic doc-only fix (v0.19.12, 2026-08-20): `FieldPickerDialog`'s docstring said "156 confirmed entries" — stale after `fit_dump.py` v2.4.24's third 2026-08-20 batch (Doug's Garmin manual appendix cross-check) added 13 new field IDs, bringing `FIELD_ID_NAMES` to 169. No functional change. Prior entry, cosmetic doc-only fix (v0.19.11, 2026-08-20): `FieldPickerDialog`'s docstring said "146 confirmed entries" — stale after `fit_dump.py` v2.4.23's second 2026-08-20 batch added 10 new field IDs (L/R Power Phase/Peak Power Phase family + 10s W/kg), bringing `FIELD_ID_NAMES` to 156. No functional change. Prior entry, cosmetic doc-only fix (v0.19.10, 2026-08-20): `FieldPickerDialog`'s docstring said "137 confirmed entries" — stale after `fit_dump.py` v2.4.21's 2026-08-20 batch added 9 new field IDs, bringing `FIELD_ID_NAMES` to 146. No functional change — the field picker reads `FIELD_ID_NAMES` live, so it was never wrong, only this comment. Prior entry, new hard block, Doug's report + direct on-device confirmation (v0.19.9, 2026-08-19): the Clone Profile "New display name" field had no length check at all. Doug found a note that Garmin limits Activity Profile names to 15 characters and confirmed it directly on his own device — typing a 16th character does nothing, the editor just switches to the checkmark/complete control. `ClonePanel` now hard-blocks Create Clone past 15 characters (`fit_clone_profile.py` v1.0.1's new `PROFILE_NAME_MAX_CHARS` constant), the validation message shows a live "(N/15 characters)" count, and the same check runs as a belt-and-suspenders guard in `on_create()`. Separate from, and much stricter than, `fit_clone_profile.py`'s existing 31-usable-byte storage cap, which was already safely enforced. Also confirmed while scoping this (no change needed): the "New filename" field already required the `.fit` suffix and checked for case-insensitive collisions against every profile on the device. Prior entry, real bug fix, Doug's report from actually using the GUI (v0.19.8, 2026-08-19): unchecking "Show Screen" for a named type (Lap Summary, Cycling Dynamics, Elevation) popped a dialog claiming hiding it was "genuinely UNTESTED," even though Doug had already confirmed it worked, repeatedly. That soft confirm ran for any named-type match downstream of two hard blocks (Map/ClimbPro, last-visible-user-screen) that already run first — and since the Map/ClimbPro list was derived as *exhaustive* (direct on-device inspection, not a sample), anything reaching the soft confirm is by elimination a type with a working toggle. Removed entirely, not just reworded, once Doug confirmed he'd tested every named type with an on-device Show Screen checkbox — hiding one now behaves exactly like hiding a plain user screen. The separate guard on editing a named screen's *fields* is untouched. Prior entry, real bug fix, Doug's report from actually editing a profile (v0.19.7, 2026-08-19): "Stage Selected for Edit" and "View Screens" were two separate clicks — staging set the frame's staged-profile state and enabled View Screens, but selecting a *different* profile in the list afterward never reset either one, so View Screens stayed clickable and silently opened whichever profile was staged first, not the one now highlighted. Discussed with Doug before fixing (staging turned out to be a plain local file copy, no device I/O at all) and merged the two into one: `stage_btn` removed entirely, "View Screens →" now stages the currently-selected profile immediately before navigating, on every click — no second piece of state left to drift out of sync with the list selection. Also brings this button in line with how Restore/Clone (same panel) already behave — one click, no separate staging step. Prior entry, real bug fix, Doug's report from Windows 11 testing (v0.19.6, 2026-08-19): `StartupTxtPanel`'s message box showed only ~2 lines on Windows vs. ~5 on the Mac for the same file — the multiline `TextCtrl` had no explicit minimum height (just proportion=1/EXPAND in its sizer), so its visible size was whatever leftover space remained after every fixed-size sibling control, and that leftover genuinely differs by platform font metrics/DPI. Fixed with a `SetMinSize()` floor computed from `GetCharHeight()` × `STARTUP_TXT_MAX_LINES` (6) — guarantees at least 6 lines visible with no scrolling on any platform's real font metrics rather than a pixel value tuned to one machine; still grows taller than this floor when more room's available. Prior entry, cosmetic doc-only fix (v0.19.5): field picker's docstring count updated 117 -> 137 to match `fit_dump.py` v2.4.16's 2026-08-17 batch (20 new field IDs), no functional change. Prior entry (v0.19.4): new `field_edit_uncertain_warning_text()` warning on the Edit Screen panel, fires only for a "Workout" (f10=38) screen — explains the on-device editor offers no field editing for this type at all, so an edit here may have no visible effect even though it's mechanically safe (same write path as every other screen); backed by `fit_dump.py`'s new `FIELD_EDIT_UNCERTAIN_TYPES` set and Garmin's own Edge 530 manual confirming Workouts are a separate, dynamically-rendered subsystem. Prior entry, doc-only, no code change (v0.19.3): "Restore a Deleted Profile" CONFIRMED via Doug's own real GUI test — a deliberately-deleted profile correctly appeared in the "Deleted, but available to restore" list, and restoring it worked cleanly end to end. Prior entry, real bug fix (v0.19.2, Doug's report from testing): v0.19.1's redundant-backup fix didn't work in practice — every "‹ Back" click from the profile list routes through the Detect screen, which auto-re-detects every time it's shown, and that was itself resetting the new `needs_backup` flag on every visit. Now only resets it on a genuine reconnect (the detected device path actually changes), not a same-device re-verification. Prior entry (v0.19.1, Doug's go-ahead, low priority): "Reduce redundant profile backups" — the profile list no longer re-backs-up every profile on every ordinary visit; a new `needs_backup` flag (set on a fresh Detect or a confirmed post-deploy reconnect) gates the real backup call, and the Refresh button still always forces one regardless. Prior entry (v0.19.0, Doug's go-ahead): "Restore a Deleted Profile" — the profile list gets a second list, "Deleted, but available to restore," populated from `garmin_device.list_backed_up_profile_filenames()` minus what's currently live; the existing "Restore from Backup..." button now works from either list (no new button, no new panel — per Doug's own 2026-08-11 design decision). The Restore confirmation now says "RECREATING" instead of "REPLACING" for a profile that isn't currently on the device. Prior entry (v0.18.1, doc-only, Doug's decision: the f10=32 "GroupTrack"→"Reserved" rename lives in `fit_dump.py`; this file's two user-facing display strings referencing the old name updated to match, no functional change; v0.18.0: new `StartupTxtPanel`, reached via a "Startup Message..." button on the Detect screen — view/edit the device's `startup.txt` boot message, built on `garmin_device.py` v0.12.0. Editable fields are the `<display=N>` seconds value and the free-form message text; Garmin's own comment scaffolding is preserved byte-for-byte. Live char/line-count guidance shown, deliberately NOT a hard block on Save — Doug's own call, since actual on-device wrapping depends on character width in a way this toolkit can't predict; the safety net is the automatic pre-write backup instead. Save flow: confirm -> direct device write (no NewFiles) -> eject/full-power-cycle instructions, reusing `DeployPanel`'s eject-button pattern; deliberately no post-write verification step, since a boot message can't be read back by this app. Back button warns on unsaved edits, same style as `ViewScreensPanel`'s v0.16.17 fix. Prior entry, v0.17.0: "Remove Selected Screen" on the Screens view — the GUI wrapper for `--remove`, completing "Delete Screen" now that the backend and a real device test are both confirmed; reuses `--remove`'s exact two CLI guards with no override, plus an explicit permanent-deletion confirmation; same change split that view's single 9-button row into two, per real feedback that it ran the full window width; v0.16.17: reworded the Back-button warning per Doug's feedback — the old wording wrongly implied a resumable state, now his own direct wording, no logic change; v0.16.16: real bug fix found using v0.16.15's new warning — it blew out the Edit Screen window's width, the fourth time this codebase has hit that bug class; fixed via `textwrap`-based hard wrapping rather than `wx.StaticText.Wrap()` (untestable in the dev sandbox, documented bad behavior with pre-existing newlines); v0.16.15: Graph/Bars full-width warning — new helpers derived from `LAYOUT_GRIDS` surfaced in the field picker (static note) and Edit/Add Screen panels (context-aware, recomputed on every refresh); v0.16.14: real bug fix — the Screens view's Back button now warns before discarding an in-progress, undeployed edit instead of silently losing it, matching the existing confirm-dialog style used elsewhere; v0.16.13: doc-only, two comments updated now that `fit_patch.py`'s `--un-remove` is retired entirely rather than just unexposed in the GUI — no functional change; v0.16.12: cosmetic doc-only fix, field picker's docstring count updated 105 -> 117 to match `fit_dump.py` v2.4.9's current entry count (the picker itself was never wrong — it reads `FIELD_ID_NAMES` live — only the comment had drifted stale, caught while confirming pre-release state ahead of a possible v1.0.1 tag); v0.16.11: doc-only, the "restore a profile no longer on the device" feature's one real open risk (whether NewFiles can recreate a genuinely deleted profile, not just replace/create-new) is now CONFIRMED via a direct `garmin_device.py deploy` test against a deliberately-deleted profile — only the GUI entry point itself remains unbuilt; v0.16.10: doc-only, no code change — Clone Profile CONFIRMED via real hardware, reported after the fact (two working clones deployed via NewFiles under brand-new filenames: `Clonebox`, `CloneRoad`), correcting a stale "not yet tested through the actual GUI" note and resolving whether NewFiles accepts a genuinely new filename, not just a replacement — see the toolkit table's v0.16.0 entry below for the corrected text; v0.16.9: pre-Windows-support housekeeping — the default backup working directory was hardcoded to a specific Mac path, now `~/GarminBackups` (resolves correctly on any OS/user); the working directory is now also persisted across restarts via a small config file (`~/.garmin_screen_editor_config.json`), so a custom location picked via "Change..." is remembered instead of resetting every launch; v0.16.8: new "About" button on the detect screen opens a short summary dialog — name/version, "not affiliated with Garmin" disclaimer, reverse-engineering method note, MIT mention pointing to `LICENSE`/`README.md` for the full text; v0.16.7: window title renamed to "Activity Profile Screen Editor for Garmin Edge" ahead of a possible public release — this is an independent, unofficial project, not a Garmin product; see `LICENSE` and `README_DISCLAIMER_DRAFT.md` (pending review) for the rest of that pass; v0.16.6: fixed a real bug where v0.16.3's own fix for the Fields-column width issue was itself wrong — capping the column stopped the window from growing but silently truncated text instead, with no scrollbar; correct fix decouples the frame's size from the column's width via a `ScreensListCtrl` subclass, letting the column go back to full auto-size and the list's real native horizontal scroll work as intended — see `PROJECT_NOTES.md` toolkit table row and "Corrections and lessons learned" for the full story; v0.16.5: cosmetic doc-only fix, field picker's docstring count updated 87 -> 105 to match `fit_dump.py` v2.4.4's new field IDs, no functional change; v0.16.4: bumped the on-device layout diagram's font from 9pt to 13pt for readability, per real feedback with a screenshot — safe change, no width/height risk since that panel is custom-painted at a fixed size, unlike the widgets behind v0.16.2/v0.16.3; v0.16.3: same-day follow-up to v0.16.2 — the identical unresolved-field-ID window-widening bug also hit the Fields column on the main Screens view, not just the Edit Screen panel; fixed with the same terse-label approach plus a width ceiling on that column; v0.16.2: fixed a real bug where editing a screen with an unresolved field ID permanently oversized/off-screened the window — see `PROJECT_NOTES.md` toolkit table row for the full root-cause writeup; v0.16.1: the "not connected" message and window title are now model-generic/version-visible — see `PROJECT_NOTES.md` "Model portability") (detect, list/backup, select+stage, view screens with a real Type column and screen-level Move Up/Down reordering, add a brand-new screen, edit one screen's fields/layout/Show-Hide/type, review accumulated changes, deploy to the device, post-write verification, restore any profile from its backup history, and clone a profile under a new name). **This closes out the GUI's full feature backlog.** NEW (v0.16.0): `ClonePanel` — "Clone..." on the profile list patches `sport_mesgs[0].name` via `fit_clone_profile.py`'s `patch_profile_name()` (CLI-validated full-fidelity on real hardware already), with live filename-collision checking against every profile currently on the device (deploying under an existing filename would silently overwrite it) and an auto-suggested filename from the display name. Hands off straight to Deploy, same as Restore — no staged-vs-editing diff applies to a clone. Headless-verified: filename validation, byte-for-byte-structurally-identical clone output, and zero screen differences between source and clone via `describe_screen_changes()`. **CONFIRMED via real hardware (2026-08-11, reported after the fact):** at least two clones deployed and working correctly through NewFiles under brand-new filenames not previously present on the device (`Clonebox` from `Sandbox`, `CloneRoad` from `Road`) — this also confirms NewFiles correctly accepts a genuinely new filename, not just a replacement of an existing one, a question that had been open until now. Prior entry (v0.15.2): cosmetic doc-only fix (a stale field-count reference in a docstring, no functional change). v0.15.1: fixed a real bug found via testing — backing out of a Restore attempt without completing it left a stale reference to the abandoned backup file in place, so a subsequent normal Stage silently showed that leftover instead of the profile just staged ("View Screens shows the backup I was about to restore, not what I just staged"). A fresh Stage now always clears any prior session's state first. v0.15.0: "Restore from Backup..." on the profile list now goes somewhere — `RestorePanel` lists the selected profile's backup history with a plain-English screen summary per entry ("8 screen(s): Screen 1, Lap Summary, Map, ..."), and picking one hands off straight to Deploy, skipping the staged-vs-editing review (nothing to review — you already picked a known backup). The backup file is used directly, never copied. "Back" from Deploy now returns to wherever it was actually reached from. v0.14.0: the moment "Check for Reconnected Device" succeeds, the GUI automatically re-pulls the live profile from the device and compares it against what was sent, reusing the same plain-English per-screen summary as "Review & Deploy..." (now shared as a module-level `describe_screen_changes()`). Compares visible/active screens only — the device's known Removed-list wipe on NewFiles import (a side effect that's always happened, unrelated to anything this GUI does) isn't reported, matching the fact that neither Garmin's own editor nor this GUI offers an un-remove workflow. **CONFIRMED live on real hardware** (2026-08-06) alongside a full deploy of a new 10-field screen. v0.13.0: "Continue to Deploy" now goes somewhere — `DeployPanel` writes the working copy to the device's `NewFiles/` (with byte-for-byte write-back verification), then a confirm-then-`diskutil eject` button (plus an "I Ejected It Myself" fallback for non-macOS/Finder), then a manual "Check for Reconnected Device" button. User-confirmed design decision: no background polling for the reconnect wait (this app has never used a background thread, and it's not worth the new failure-mode class for saving a few clicks) — each Check click is one immediate, non-blocking connectivity check. v0.12.0: "Review & Deploy..." now describes changes in plain English per screen (e.g. "Screen 4: added Cadence, removed Grade") instead of a raw `fit_dump.py diff`-style unified diff — real user feedback that the byte-level diff was too technical for the GUI's actual audience (a rider, not a developer); the CLI tools remain there for anyone who wants that detail. Covers new/removed screens, field changes, layout changes, show/hide changes, and position changes, with a fallback line so real changes are never silently under-reported; whether there's anything to deploy is still decided from the raw bytes directly. v0.11.1: fixed a real reported bug where the Fields column silently clipped (not wrapped) any screen with more than ~3-4 short field names — a 10-field screen only showed 3 fields and part of a 4th; the column now auto-sizes to its actual content on every refresh. v0.11.0: fixed a real reported bug where manually enlarging the window (e.g. to see more of the screens list) snapped back to a smaller size the moment any button triggered a refresh — `_relayout()` was calling `Fit()`, which resizes in both directions including shrinking; now only grows the window when content needs more room, never shrinks it. v0.10.0: "Review & Deploy..." is a pre-flight step showing a `fit_dump.py diff`-style comparison against the untouched staged file plus a real CRC check against the working file's actual bytes — REVISES the original "pending/preview state" plan to match how the GUI actually works (every change is already applied immediately, click by click; there's no separate queue to apply, only a review+verify step). Continue to Deploy is a placeholder until deploy/eject/remount is built. "Change Type..." is Add-New-Screen and EditScreenPanel's "Replace Field" — swaps one field's ID without the Remove+Add+reposition workaround. Add-New-Screen panel replicates `--new-slot`'s exact defaulting logic — auto-assigns f9/f10, enforces the confirmed 10-user-screen cap with a friendly message; **CONFIRMED live on real hardware** (2026-08-05), including a confirmed field-type change on ClimbPro after overriding the guard. Screen-level reordering is select + Move Up/Down on the main screens list, wired to `swap_display_order()` — same validated primitive as `--swap-order`. Show/Hide hard-blocks hiding a profile's last real user screen (f10-based) AND hiding Map/ClimbPro at all (neither has an on-device toggle). Guard dialogs no longer false-positive on confirmed user screens (real GUI testing found and fixed this). Swallows a cosmetic teardown-only `wxAssertionError` on exit. Field picker offers 169 confirmed IDs. |
+
+## GUI
+
+`gui_app.py` is the editor GUI, built incrementally, one step of the
+agreed flow (see `PROJECT_NOTES.md`) at a time — each step wired to
+its already-validated backend function, tested against real hardware
+before the next step is added. **All 10 flow steps plus
+Restore-from-Backup, Clone Profile, and Startup Message are now
+built**: detect the device and show its
+info; list profiles (via an automatic backup-all-profiles call);
+select a profile and stage it for editing; view the staged profile's
+current screens, read-only, with screen-level reordering (Move
+Up/Down); a real Add-New-Screen panel (pick fields and layout, the
+tool auto-assigns everything else — CONFIRMED live on real hardware);
+drill into a single screen to reorder, add, remove, or change the type
+of its fields and change its A/B layout, with a live visual diagram of
+the on-device grid (built from the developer's own text-based Edge 530
+layout reference — see `PROJECT_NOTES.md` / "On-device layout
+geometry") — the field-type swap ("Change Type...") is CONFIRMED live
+on real hardware including a guard-overridden edit to ClimbPro; a
+"Review & Deploy..." pre-flight step showing a plain-English,
+per-screen change summary plus a real CRC check; "Deploy to Device"
+(write to `NewFiles/`, guided eject, manual reconnect check) —
+CONFIRMED live on real hardware alongside a full 10-field new screen;
+automatic post-write verification the instant reconnect is confirmed,
+re-pulling the live profile and comparing it against what was sent;
+"Restore from Backup..." — pick any of a profile's past backups
+from a plain-English-summarized list and it goes through the same
+Deploy/verify pipeline as a normal edit; and "Clone..." — clone the
+selected profile under a new display name (`fit_clone_profile.py`,
+already CLI-validated on real hardware) with live filename-collision
+checking, going through the same Deploy pipeline as Restore. See
+`PROJECT_NOTES.md` / "Clone Profile" for the full writeup. And
+"Startup Message..." — reached directly from the Detect screen (not
+from the profile flow, since `startup.txt` is a device-root file, not
+a profile) — view/edit the device's custom boot message, with
+Garmin's own comment scaffolding preserved byte-for-byte and a direct
+(non-NewFiles) write path of its own. See `PROJECT_NOTES.md` /
+"startup.txt" for the full writeup.
+
+Editing architecture: rather than an abstract in-memory list of
+"pending changes," a scratch working copy of the staged file (which
+persists across edits to multiple screens in one session) IS the
+queue — every button click is a real, immediately-applied
+`fit_patch.py` operation, and the screen always re-reads the actual
+resulting bytes afterward instead of trusting an in-memory guess.
+"Discard Edits" on the screens view resets back to the untouched
+staged file.
+
+The Show/Hide checkbox is guarded two ways, checked in order: a HARD
+block (unhideable, no override) if hiding this screen would leave the
+profile with zero visible Active/Display screens — confirmed via real
+on-device testing that Garmin's own editor refuses this too — followed
+by the existing softer heuristic guard for likely system/overlay
+screens (content-pattern match OR field count ≤2, `--force`-style
+confirm dialog).
+
+Editing UX decision (recorded ahead of building it): reordering is
+select + Move Up/Move Down buttons, not drag-and-drop — it maps
+directly onto the already-validated `--swap-order`/`--swap-fields`
+primitives with no new backend logic. Field count changes and
+reassigning which fields appear on a screen go through `--fields`
+(replaces the whole list, count follows from its length), fed from a
+picker over the known field ID catalog rather than free-text entry,
+and guarded by the same heuristic the CLI uses.
+
+```bash
+./install.sh              # installs wxPython too -- see Setup above
+source .venv/bin/activate
+python3 gui_app.py
+```
+
+(Manual equivalent without the script: `pip install wxPython
+--break-system-packages`.)
+
+Full CLI reference: [`FIT_PATCH.md`](FIT_PATCH.md). (A companion
+`FIT_DUMP.md` reference is planned but not yet written.)
+
+## ⚠️ Before you write anything to a real device
+
+- Always run `garmin_device.py backup` first.
+- Always verify a patched file with `fit_crc.py` and
+  `fit_dump.py screens` *before* deploying it.
+- Adding a brand-new screen via `fit_patch.py --new-slot` is now
+  CONFIRMED WORKING (v1.12.0+, live on-device round-trip verified
+  2026-08-05) — the earlier "must use the on-device Add New menu"
+  guidance is superseded. Still verify with `fit_dump.py screens` and
+  `fit_crc.py` before every deploy, and expect the profile's entire
+  Removed-screen list to be purged by the deploy regardless of what
+  it targets. See `PROJECT_NOTES.md`/`FIT_PATCH.md` BUGS for the full
+  writeup.
+- `fit_patch.py --un-remove` uses the same corrected auto-default as
+  `--new-slot` but has NOT itself been re-tested live since the fix.
+  Also: Garmin's own on-device editor has no un-remove option at all,
+  so this is likely never going to be a first-class GUI feature —
+  kept available for deliberate testing, final call deferred. Back up
+  first, not just recommended, required.
+- `fit_patch.py --fields` refuses to overwrite a slot whose current
+  content matches a pattern commonly seen on system/overlay screens
+  (empty, Elevation/Grade, Cycling Dynamics) unless you pass
+  `--force` — a "did you mean to?" pause, not a certain
+  identification. Verify what the screen actually is on-device first.
+
+## Changelog
+
+Detailed, chronological doc-revision notes -- every fix, feature, and
+correction to this project, newest first. Most readers won't need
+this; it's kept for the full history.
+
+*Doc rev 62 — refreshed 2026-08-22.* **`install_windows.bat` CONFIRMED
+on real Windows 11 hardware — the toolkit's own testing checklist
+before v1.1.1.** Doug uninstalled `garmin-fit-sdk`/`wxPython` via pip,
+confirmed both failed to import, then ran the script fresh: detection,
+version check, install, and post-install import verification all
+worked cleanly (Python 3.14). Double-click launch of `gui_app.py`
+reconfirmed too, including a normal one-time Windows file-association
+dialog on the very first double-click (unrelated to this script,
+harmless, doesn't recur). Also confirmed: the 169-entry `FIELD_ID_NAMES`
+field picker shows correct on-device labels for the three 2026-08-20
+batches, spot-checked directly in the GUI. `install_windows.bat` is
+now v1.0.1, `fit_dump.py` is now v2.4.25 — both confirmation-only
+entries, no code changed either place. This closes out the real-world
+testing Doug wanted done before tagging v1.1.1.
+
+*Doc rev 61 — refreshed 2026-08-21.* **README restructured, Doug's
+request:** the document now opens with a new "What it does" section
+(covering both the GUI and CLI in one place) leading straight into
+"Who this is for" (moved up from further down, unchanged text) —
+readers get the pitch and the experience-level expectation before
+anything else. "License" and "Disclaimer" follow, then "Setup",
+"Quick start", "Tools", "GUI", and the pre-write warning, in that same
+order as before. The entire 46-entry "Doc rev" changelog block (this
+one included) moved from the top of the document to a new
+"## Changelog" section at the very end — same content, unchanged,
+just relocated so a first-time reader hits the toolkit's own
+explanation before 60+ revisions of edit history. No content removed.
+
+*Doc rev 60 — refreshed 2026-08-20. **13 new confirmed field IDs —
+Doug's cross-check against the Garmin manual's own data-field
+appendix.** 98 Watts/kg, 439 3s W/kg, 207-213 Power Z1-Z7, 418 Power
+Z8, 419 Power Z9, 24 Laps, 41 Max Lap Power — `fit_dump.py`'s
+`FIELD_ID_NAMES` now has 169 confirmed entries (was 156). Fills the
+last two gaps in the W/kg family (base + 3s variant) and adds the
+Power-Zone analog of the existing 5 HR-Zone-time fields (9 zones
+here, not 5). 24/41 resolve an earlier same-day ambiguous "Laps Max"
+note — turned out to be two separate fields Doug had conflated in his
+own notes, not one oddly-named field. No collisions with any existing
+entry. This closes out Doug's manual-appendix cross-check — no
+further appendix-listed fields remain unconfirmed. One real gap still
+open, not part of this batch: "Trainer Resistance," hypothesized
+(unverified) to need a paired ANT+ FE-C smart trainer to even appear
+on-device, the same sensor-gated pattern already seen for eBike
+Metrics fields. See `FIT_PATCH.md` Doc rev 31 for the regenerated
+field ID table. No code changed beyond the new dict entries and a
+stale docstring count in `gui_app.py`. Prior rev (59, 2026-08-20)
+follows.*
+
+*Doc rev 59 — refreshed 2026-08-20. **10 new confirmed field IDs.**
+Doug's continued field census: 265 Lap PCO, 267 Avg Right PP, 268 Lap
+Right PP, 269 Right PPP, 271 Lap Right PPP, 273 Avg Left PP, 274 Lap
+Left PP, 275 Left PPP, 277 Lap Left PPP, 440 10s W/kg —
+`fit_dump.py`'s `FIELD_ID_NAMES` now has 156 confirmed entries (was
+146). Fills out the L/R Power Phase/Peak Power Phase family alongside
+the existing 263/264/266/270/272/276 entries — Doug supplied both the
+on-device display label (stored, per this dict's established
+convention) and each field's full concept name for the record (e.g.
+"Avg Right PP" = "Avg Right Pwr Phase"). No collisions with any
+existing entry. Same batch, doc-only: Doug's investigation of the
+last unmapped on-device label he'd been tracking, "Battery Status"
+(Lights category), confirms it's an alias/duplicate menu entry that
+navigates straight to field 317 "Light Battery" — not a separate
+field, no table entry added or needed. See `FIT_PATCH.md` Doc rev 30
+for the regenerated field ID table. No code changed beyond the new
+dict entries and a stale docstring count in `gui_app.py`. Prior rev
+(58, 2026-08-20) follows.*
+
+*Doc rev 58 — refreshed 2026-08-20. **Correction, same day: "Target"
+is field 521, not 512 — Doug's own catch.** A transcription typo in
+the Doc rev 56 batch writeup, not a raw-ID/name mismatch — 512 never
+existed on-device under either name. Fixed before this ever shipped
+in a tagged release. Doug also confirmed, unprompted, that all 9
+fields from that batch are verified against the real on-device
+screen — same confirmation standard as every other batch in
+`fit_dump.py`'s `FIELD_ID_NAMES`, not just a naming guess for the 5
+that read as Workout-related. `fit_dump.py` now v2.4.22 (was 146
+entries, still 146 — a corrected key, not a new/removed one).
+`FIT_PATCH.md`'s FIELD ID REFERENCE table and NOTE updated to match
+(Doc rev 29). Prior rev (57, 2026-08-20) follows.*
+
+*Doc rev 57 — refreshed 2026-08-20. **New `install_windows.bat` setup
+script, Doug's go-ahead.** Prompted by real feedback — a rider who
+wanted to try the toolkit found the install burden more than he
+wanted to take on — plus Doug's own confirmation that double-clicking
+`gui_app.py` in File Explorer already works once Python/dependencies
+are in place. Scoped directly against Doug's own confirmed real
+Windows 11 install (Doc rev 54 below): checks for Python 3.10+ (`py`
+launcher, falling back to `python.exe`), installs `garmin-fit-sdk`/
+`wxPython` directly with no virtual environment (a venv would break
+that double-click behavior), verifies both import, `--upgrade`/
+`--help`/`--version` flags. If Python's missing or too old, it detects
+and guides (opens the python.org download page, stops) rather than
+silently downloading/installing Python itself — Doug's explicit
+call, matching `install.sh`'s own treatment of missing Xcode CLT on
+macOS. One real platform-specific deviation from `install.sh`: the
+3.10 floor is a HARD requirement here, not a soft warn-and-continue,
+since building `wxPython` from source below that needs Visual Studio
+Build Tools on Windows (a much bigger ask than macOS's one-command
+Xcode CLT). **Not yet confirmed on real hardware** — there's no
+`cmd.exe` in this project's dev sandbox to dry-run Windows batch
+syntax against at all, so this is less tested going in than any other
+single-platform code in this toolkit; Doug plans to uninstall and
+re-test via this script on the Windows laptop before the next
+release. Windows Setup section above now leads with the script,
+keeping the manual sequence as a documented fallback. See the new
+`install_windows.bat` toolkit table row below for the full writeup.
+Prior rev (56, 2026-08-20) follows.*
+
+*Doc rev 56 — refreshed 2026-08-20. **9 new confirmed field IDs.**
+Doug's continued field census: 512 Target, 523 Step Time, 522
+Duration, 511 Workout Comparison, 45 Workout Step, 100 Last Lap
+Power, 258 Lap Time Standing, 260 Lap Time Seated, 264 Avg PCO —
+`fit_dump.py`'s `FIELD_ID_NAMES` now has 146 confirmed entries (was
+137). No collisions with any existing entry. Worth flagging: 5 of
+these 9 (45, 511, 512, 522, 523) read by name as Workout/structured-
+step fields (Workout Step, Workout Comparison, Target, Duration, Step
+Time) — directly adjacent to this project's still-open f10=38
+"Workout" screen-type question (see `PROJECT_NOTES.md` Open Items):
+whether that screen's field slots are actually meaningful/rendered
+on-device, since the on-device editor exposes no field options for it
+at all. A naming lead worth watching, not new evidence either way — a
+field's name alone doesn't confirm where or how it renders. The other
+4 extend already-populated families (Power; Cycling Dynamics). See
+`FIT_PATCH.md` Doc rev 28 for the regenerated field ID table. No code
+changed beyond the new dict entries and a stale docstring count in
+`gui_app.py`. Prior rev (55, 2026-08-19) follows.*
+
+*Doc rev 55 — refreshed 2026-08-19. **New hard block: Clone Profile's
+display name is now capped at 15 characters.** Doug found a note that
+Garmin limits Activity Profile display names to 15 characters, and
+confirmed it directly on his own device: typing a 16th character in
+Garmin's own name editor does nothing — it just switches straight to
+the checkmark/complete control instead of accepting more input. Since
+that's a confirmed device fact, not a guess, `gui_app.py`'s Clone
+Profile panel now hard-blocks Create Clone past 15 characters (new
+`fit_clone_profile.py` v1.0.1 constant `PROFILE_NAME_MAX_CHARS`), the
+same way Map/ClimbPro's hide-toggle guard is a hard block rather than
+a warning. Also confirmed (no change needed): the "New filename" field
+already enforced the required `.fit` suffix and a case-insensitive
+collision check against every profile on the device. Prior rev (54,
+2026-08-19) follows.*
+
+*Doc rev 54 — refreshed 2026-08-19. **Correction: the Windows Setup
+section had the wrong install steps.** Doug corrected this directly
+after re-reading it: the venv-based sequence written there was never
+actually what he ran on the Windows 11 laptop — that was an
+unconfirmed inference on this project's part (mirroring the macOS
+pattern), not something Doug had verified. What he actually did: install
+Python from python.org via browser, `python -m pip install
+garmin-fit-sdk wxPython` directly (no venv at all), copy the whole
+toolkit folder to a `Documents` subfolder, then run from PowerShell —
+plus a genuinely nice discovery, double-clicking `gui_app.py` in File
+Explorer launches the GUI directly with no wrapper script needed,
+because the python.org installer associates `.py` files with the same
+Python `pip` installed into, unlike macOS's Python Launcher pointing
+at a different `python3` than the one with `wx` (see `gui_app.py`'s
+own ModuleNotFoundError episode this same week for that contrast). The
+Windows section now leads with this confirmed no-venv path, keeps a
+venv as an explicitly optional alternative (with a note that
+double-click launch won't use it), and no longer misattributes a
+theoretical sequence to Doug's real test. No code changed — README.md
+only. Prior rev (53, 2026-08-19) follows.*
+
+*Doc rev 53 — refreshed 2026-08-19. **Real bug fix: stale "hide is
+untested" warning removed for named Garmin screens.** Doug's report:
+unchecking "Show Screen" for Lap Summary, Cycling Dynamics, Elevation,
+and others he'd tested popped a dialog claiming hiding it via a raw
+file write was "genuinely UNTESTED" — even though he'd already
+confirmed it worked, repeatedly. Root cause: that soft confirm ran for
+ANY named-type match, downstream of two HARD blocks (Map/ClimbPro,
+last-visible-user-screen) that already run first — and since
+`NO_SHOW_TOGGLE_TYPES` (Map, ClimbPro) was derived as an *exhaustive*
+list via direct on-device inspection, anything reaching the soft
+confirm is, by elimination, a type with a working toggle. The
+"untested" claim was stale the moment real testing caught up with
+that logic. Removed entirely (not just reworded) after Doug confirmed
+he's now tested hiding every named type that has an on-device Show
+Screen checkbox — `gui_app.py` now v0.19.8. Hiding a named screen now
+behaves exactly like hiding a plain user screen, no popup. The
+separate guard on *editing a named screen's fields* is untouched — a
+genuinely different, still-cautious case. See `PROJECT_NOTES.md` for
+the full writeup. Prior rev (52, 2026-08-19) follows.*
+
+*Doc rev 52 — refreshed 2026-08-19. **Real bug fix: "View Screens"
+could silently open the wrong profile.** Doug's report from actually
+editing one of his main profiles: stage Profile A, then click a
+different profile (B) in the list — "View Screens" stayed enabled and
+advancing to Edit Screens showed A, not the one now highlighted.
+Root cause: staging and navigation were two separate buttons/clicks,
+and selecting a different profile never reset the first one's state.
+Fixed by merging them — "View Screens →" now stages the profile
+that's actually selected immediately before navigating, on every
+click, so there's no second piece of state left to go stale. Doug
+chose this over two smaller alternatives (disabling the button on
+reselect, or warning before opening a stale selection) once it was
+clear staging itself is just a local file copy with no device
+involved — free to redo every time. `gui_app.py` now v0.19.7. See
+`PROJECT_NOTES.md` for the full writeup. Prior rev (51, 2026-08-19)
+follows.*
+
 *Doc rev 51 — refreshed 2026-08-19. **New "Who this is for" section**,
 between Disclaimer and Setup, ahead of Doug posting this update to
 GitHub -- prompted by Doug's own reflection after hitting setup
@@ -515,301 +1078,3 @@ skeleton covering step 1 of the agreed flow (detect device + show
 device info) — see `PROJECT_NOTES.md` for the full flow and what's
 built vs. still to come.
 
-## License
-
-Released under the [MIT License](LICENSE) — free to use, modify, and
-redistribute, with no warranty.
-
-## Disclaimer
-
-This is an independent, unofficial project. It is **not affiliated
-with, endorsed by, or sponsored by Garmin Ltd. or its subsidiaries.**
-"Garmin" and "Edge" are trademarks of Garmin Ltd. or its subsidiaries;
-they're used here only to describe which devices this toolkit is
-compatible with, not to claim any official status.
-
-The `data_screen` message and related undocumented fields this project
-relies on were reverse-engineered entirely through **black-box
-observation** — making isolated changes on a real device (or via a
-custom byte-patcher) and diffing the resulting files — never by
-decompiling, disassembling, or otherwise reverse-engineering Garmin's
-own software or SDK. The official `garmin_fit_sdk` Python package is
-used only as a normal dependency, for its documented decode/encode
-support of standard FIT messages.
-
-**Use at your own risk.** This toolkit patches undocumented file
-structures and writes the result back to your device through an
-undocumented pathway (`NewFiles/`). It's been tested carefully against
-real hardware throughout development, but Garmin could change this
-behavior in a future firmware update without notice, and no guarantee
-is made against corrupting a profile, losing data, or other unintended
-device behavior. Back up your profiles before use (this toolkit does
-this automatically before every write, but the responsibility is
-ultimately yours) and don't run it on a device you can't afford to have
-misbehave.
-
-No warranty of any kind is provided, express or implied — see
-[LICENSE](LICENSE) for the full legal text.
-
-## Who this is for
-
-This toolkit is built for riders who are comfortable with a terminal
-and a `pip install`, not (yet) a plug-and-play app for the general
-public. There's no installer or double-clickable application bundle —
-setup means cloning this repo, running a setup script (macOS) or a
-couple of `pip install` commands by hand (Windows), and running the
-GUI or CLI tools from a terminal with that environment active. If
-that's a step you've done before for some other tool, you'll be fine
-here; if "open a terminal" isn't something you do, this project isn't
-there yet.
-
-What you get in exchange for that setup: direct editing access to
-Activity Profile screens and data fields the on-device editor doesn't
-expose at all (power-meter/Shimano Di2 metrics, Torque Effectiveness,
-Balance, TSS/IF, and more), the ability to delete a screen outright
-rather than just hide it, clone a profile under a new name, restore a
-profile that's no longer on the device, batch several changes into one
-device restart, and automatic backups before every write.
-
-## Setup
-
-The toolkit itself (CLI tools and GUI) runs on both **macOS** and
-**Windows** — device detection is confirmed working on real hardware
-on both (see `garmin_device.py`'s changelog). The *install path*
-differs, though: macOS has a one-command setup script, Windows doesn't
-have one yet (see task list) and needs `pip install` run by hand.
-
-### macOS
-
-Run the install script — it checks your python3 version, creates a
-dedicated `.venv` (nothing touches your system or Homebrew Python),
-and installs both dependencies (`garmin-fit-sdk` and `wxPython`) into
-it:
-
-```bash
-./install.sh
-source .venv/bin/activate
-```
-
-Safe to re-run any time; add `--upgrade` to update already-installed
-packages, or `--help` for details. It's a plain bash script, no
-network access beyond pip, and no admin/sudo required.
-
-Prefer to do it by hand, or need just the CLI tools without the GUI's
-`wxPython` dependency? The manual equivalent:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install garmin-fit-sdk --break-system-packages
-```
-
-### Windows
-
-There's no `install.sh` equivalent yet for Windows — `install.sh`
-itself hard-stops immediately with an error message if run there (it
-checks `uname -s == Darwin` as its very first step). Until a
-`.ps1`/`.bat` setup script exists, install by hand in PowerShell —
-this is the exact sequence Doug used for the confirmed-working
-2026-08-19 test:
-
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install garmin-fit-sdk wxPython
-```
-
-Copy the whole toolkit folder over, not individual `.py` files —
-`garmin_device.py`, for example, imports `fit_dump.py` at runtime, so
-a partial copy fails with `ModuleNotFoundError`.
-
-Confirmed on Windows 11 (2026-08-19): `detect`, `screens` (both CLI
-tools), and the full GUI workflow (add a screen, deploy, restart,
-NewFiles round-trip). Not yet tested on Windows 10 or any Linux
-distribution.
-
-## Quick start
-
-Connect your Edge 530 via USB, then:
-
-```bash
-# Confirm the device is detected (also shows device info: manufacturer/product/serial/software version)
-python3 garmin_device.py detect
-
-# See what profiles are on it
-python3 garmin_device.py list
-
-# Back everything up before touching anything
-python3 garmin_device.py backup ~/path/to/a/working/directory
-
-# See the current screen layout for one profile
-python3 garmin_device.py screens CyclingRoadRoadtest.fit
-```
-
-To make a change, stage a backed-up profile, patch it, then deploy:
-
-```bash
-python3 garmin_device.py stage CyclingRoadRoadtest.fit <backup_path> <working_dir>
-python3 fit_patch.py <staged_file> <patched_file> --slot 9 --hide
-python3 garmin_device.py deploy <patched_file> CyclingRoadRoadtest.fit
-```
-
-To make several changes before a single device write/restart, use
-`fit_chain.py` instead of calling `fit_patch.py` directly:
-
-```bash
-python3 fit_chain.py <staged_file> <patched_file> \
-    --step '--slot 9 --hide' \
-    --step '--swap-order 1,11' \
-    --step '--slot 4 --layout 1'
-python3 garmin_device.py deploy <patched_file> CyclingRoadRoadtest.fit
-```
-
-Follow the eject prompt. After the device's automatic restart
-finishes, press the power button **once** to bring it back into
-mass-storage mode (it does not remount on its own), then reconnect and
-verify:
-
-```bash
-python3 garmin_device.py wait-for-remount
-python3 garmin_device.py screens CyclingRoadRoadtest.fit
-```
-
-To view or replace the device's custom boot message (`startup.txt`,
-lives at the device root, NOT in `Sports/` — a direct overwrite, no
-`NewFiles`/eject-import involved; the existing file is backed up
-first):
-
-```bash
-python3 garmin_device.py startup-txt ~/path/to/a/working/directory                     # view
-python3 garmin_device.py startup-txt ~/path/to/a/working/directory --write new_msg.txt  # overwrite
-```
-
-Eject, then allow one **full power cycle** (off, then on) — not just
-eject/remount — for the new message to take effect (confirmed via the
-file's own on-device comment).
-
-To clone an existing profile under a new name (e.g. building a second
-bike's profile from an existing one instead of rebuilding every screen
-by hand):
-
-```bash
-python3 fit_clone_profile.py <staged_file> <cloned_file> --name "NewBikeName"
-python3 garmin_device.py deploy <cloned_file> <NEW_FILENAME>.fit   # filename must NOT match an existing profile
-```
-
-## Tools
-
-| Tool | Version | Purpose |
-|---|---|---|
-| `install.sh` | 1.0.2 | macOS-only setup script. **SECOND real bug found via real hardware, same test session (2026-08-13):** past the CLT/python3 checks (Homebrew python3 3.14, freshly installed), "Installing garmin-fit-sdk..." died with `PIP_EXTRA[@]: unbound variable`. Cause: bash 3.2 (macOS's stock `/bin/bash` — confirmed that's really what runs this script, via Doug's `bash-3.2$` prompt) has a long-standing bug where expanding an *empty* array under `set -u` throws unbound-variable instead of silently expanding to nothing — fixed in bash 4.4+, so it never showed up in the bash 5 dev/test sandbox, only on real hardware. Fixed in v1.0.2 by replacing the `PIP_EXTRA` array with a small `pip_install()` wrapper function that branches on `$UPGRADE` directly — no array left anywhere in the script, so this bug class is now structurally impossible, not just avoided this one instance. Also v1.0.1: on a genuinely fresh Mac with no Xcode Command Line Tools ever installed, v1.0.0 crashed silently right after "Found python3" — invoking python3 for its version check triggered macOS's own `xcode-select` "requesting install" note to stderr and a non-zero exit, which `set -e` turned into an unexplained stop with no error message from the script itself. Fixed with an explicit Command Line Tools check as its own step, before python3 is touched at all, plus defense-in-depth error handling around the version-check invocation; new `--version` flag. Checks the platform, checks Xcode CLT, checks python3 is present and at least 3.9 (warns if older than 3.10, since `wxPython` only ships pre-built PyPI wheels from 3.10 up), creates/reuses a dedicated `.venv` so nothing touches system or Homebrew Python, installs `garmin-fit-sdk` and `wxPython` into it, then imports both back to confirm the install actually works. Idempotent, `--upgrade`/`--help`/`--version` flags. Windows/Linux support deferred until device detection itself is implemented for those platforms (see `garmin_device.py`'s `_find_garmin_root_windows()` stub). |
-| `garmin_device.py` | 0.12.6 | Detect (+ device info)/list/backup/stage/write/eject/remount-wait workflow for the device itself. **Windows support CONFIRMED on real hardware (v0.12.6, 2026-08-19)** — Doug ran `detect`, `screens` (both CLI tools), and the full GUI workflow (add screen, deploy, restart, NewFiles round-trip) against a real Edge 530 on a real Windows 11 laptop; all worked with zero code changes. `D:\Garmin` has `Sports`/`NewFiles` flat at the drive root, resolving Doc rev 48's open question. Confirmation-only entry, no code changed. See Doc rev 49 above. Prior entry (v0.12.5, Doug's go-ahead): `_find_garmin_root_windows()` filled in — the single deliberately-stubbed function per this file's own module docstring. Scans drive letters C:-Z: for the same `Sports`/`NewFiles` structure check the macOS half uses, at both the drive root and one level of subfolder (mirroring macOS's own two-level nesting check). Plain `os.path`/`os.listdir` iteration, no new dependency. Headlessly verified via `ntpath`-monkeypatched fake drive trees. See Doc rev 48 above. Prior entry (v0.12.4, same-day follow-up to v0.12.3, Doug's report from testing): a second, separate cause of the startup.txt "?" corruption — a leading UTF-8 BOM decoded (via `errors="replace"`) into 3 replacement characters that rode through the preserved header and got re-encoded to 3 literal "?" on every save, self-perpetuating regardless of the v0.12.3 smart-quote fix. `read_startup_txt()` now strips a leading UTF-8 BOM before decoding. See Doc rev 43 above. Prior entry (v0.12.3, Doug's report from testing): `write_startup_txt()` now reverses common macOS smart-substitution characters (curly quotes, en/em dash, ellipsis) back to plain ASCII before writing — typed "..." was silently becoming a single "?" on save, since `wx.TextCtrl` on macOS auto-substitutes as you type and the old ASCII-only encode replaced each result with "?". Any character outside the known-substitution table still degrades honestly to "?", unchanged. Prior entry (v0.12.2): `list_backed_up_profile_filenames(working_dir)` returns every `.fit` filename ever backed up (regardless of current on-device presence), scanning all `backups/<timestamp>/` folders — filtered to `.fit` so a `startup.txt` backup (which lives in the same folder structure) isn't mistaken for a deleted profile. New `deleted-profiles` CLI subcommand. Backs `gui_app.py` v0.19.0's new second profile list. Prior entry (v0.12.1): `read_startup_txt()` now normalizes all line endings to plain `\n` right after decoding — real reported bug, the GUI's message editor was showing a blank line between every real line, likely from CRLF line endings in the file that BBEdit/vi both silently normalize on open (so it looked fine there) but `wx.TextCtrl` does not handle cleanly when fed embedded `\r\n`. Headlessly verified against a simulated CRLF file. Prior entry (v0.12.0): startup.txt (custom boot message) support — `read_startup_txt()`/`parse_startup_txt()`/`build_startup_txt()`/`write_startup_txt()`, plus a new `startup-txt` CLI subcommand (view, or `--write FILE` to overwrite). CONFIRMED via Doug's own real Edge 530 (2026-08-14): the file lives at `garmin_root` itself (same level as `Sports`/`NewFiles`), and a write is a DIRECT overwrite while mounted — NOT a NewFiles import — per the file's own on-device comment ("Allow one full power cycle after editing for your message to be updated"). `write_startup_txt()` backs up any existing file first, reusing the same `working_dir/backups/<timestamp>/` structure `backup_profiles()` uses. `parse_startup_txt()`/`build_startup_txt()` split/rejoin the file at its last comment block, so Garmin's own instructional text is preserved byte-for-byte and only the `<display=N>` value + message text are ever regenerated — headlessly round-trip-tested byte-identical against Doug's real file. Character/line-count reference constants (`STARTUP_TXT_MAX_CHARS`/`STARTUP_TXT_MAX_LINES`) are guidance only, not enforced — actual on-device wrapping is character-width-dependent (Doug's own note). Backs `gui_app.py`'s new `StartupTxtPanel`. Prior entry (v0.11.0): `list_backup_history()` lists a single profile's backup history (newest first), de-duplicating consecutive byte-identical backups — a real characteristic of this app, since every visit to the GUI's profile list re-backs-up all profiles, not just on real changes. Backs the GUI's Restore-from-Backup picker; also a new `backup-history` CLI subcommand. |
-| `fit_dump.py` | 2.4.20 | Read and inspect a `.fit` file (`dump`, `unknown`, `diff`, `screens` subcommands). v2.4.20: FULLY CONFIRMED via direct raw-byte inspection — `CyclingRoadRoadtemp.fit` (the original census profile, Screen 3/4 intact at 10 fields each) came through and was dumped directly; raw arrays match all 20 corrected pairs from v2.4.19 position-for-position exactly, including 177 "Torque Effect" under its own ID. No values changed — this closes out the last open question from the fix below. v2.4.19: RESOLVED — the entire 2026-08-17 field-ID batch had raw IDs and names correctly identified but wrongly paired (Doug's census screens 3 and 4 got transposed when the original list was written up, so all 10 IDs from one screen's block were paired with the 10 names from the other's — same 20 raw IDs, only the pairing changed). Caught via real device testing (editing a screen to "Intensity Factor (IF)"/"Pedal Smoothness"/"Torque Effect" actually displayed "Avg W/kg"/"Lap NP"/"Last Lap NP"); Doug re-derived the correct pairing from the census screens and it resolves all three mismatches exactly. v2.4.18 (superseded by the fix above): flagged the whole batch SUSPECT with no value changes, pending re-verification. v2.4.17: real bug fix, Doug's report from checking the device — field 148 was stored as "Torque Effect." (a guessed abbreviated form, by analogy to field 320's "Perf. Conditioning" convention); Doug directly confirmed the real on-device text in a half-width field is "Torque Effect", no trailing period. Corrected; no count change, still 137 entries. v2.4.16: 20 new confirmed field IDs, 2026-08-17 batch — this project's first batch touching power-meter/Di2 metrics: Balance family (42/80/40/441/411/408 — Balance, Avg, Lap, 3s, 10s, 30s), Power/W-kg (150 30s Power, 151 Max Power, 83 Avg W/kg, 159 30s W/kg), training load (149 %FTP, 43 TSS, 437 Intensity Factor (IF)), NP (176 Lap NP, 177 Last Lap NP), pedaling metrics (148 Torque Effect, 147 Pedal Smoothness, 82 Power Zone), Shimano Di2 (161 Di2 Battery, 160 Di2 Shift Mode) — confirms the existing 3s/10s/30s/Lap/Avg Power naming pattern repeats identically for Balance. No collisions. `FIELD_ID_NAMES` now 137 confirmed entries (was 117). v2.4.15: new `FIELD_EDIT_UNCERTAIN_TYPES` set (currently `{38}`, "Workout") — flags screen types whose stored field bytes are real and correctly readable but whose actual on-device meaning/rendering is uncertain, backing a new non-blocking warning in the GUI's Edit Screen panel. Built in response to Doug's question about the Workout screen's edit guard; backed by Garmin's own Edge 530 manual confirming Workouts are a separate, dynamically-rendered subsystem (see Doc rev 42 above and `PROJECT_NOTES.md` doc rev 54). v2.4.14 (correction, same day): v2.4.13's new keys were wrong (39/59/96, read off this tool's own `f10+1` display fallback) — corrected to the real f10 values, 38 "Workout", 58 "eBike Metrics", 95 "STEPS Metrics (Shimano)". Also resolved the f10=38 "Workout" field question: confirmed via a direct raw-byte comparison of `CyclingEbike.fit` that its fields are byte-for-byte identical to Cycling Dynamics' on the same profile — real data, correctly read, not a bug. See `PROJECT_NOTES.md` Open Items. v2.4.12 (rename only, Doug's decision): `NAMED_SCREEN_TYPES[32]` renamed "GroupTrack" → "Reserved" — this Conditional-only record is present on every profile regardless of GroupTrack usage, so its real purpose was never actually confirmed (f10=57 "GroupTrack List" is unaffected, remains correctly GroupTrack-specific). No functional change. v2.4.11: new `GRAPH_OR_BARS_FIELD_IDS` set (10 fields confirmed needing a full-width screen slot to render as a graph/bar), kept separate from `FIELD_ID_NAMES`, backing the GUI's new Graph/Bars full-width warning — no `FIELD_ID_NAMES` entries changed. v2.4.10 (doc-only): the `screens` subcommand's verbose "Removed screens" note referenced `fit_patch.py`'s now-retired `--un-remove` flag — updated to point at Restore-from-Backup instead. `classify_screens()`/`active_field_ids()`/`screen_type_name()` are print-free, importable data functions — the seam the GUI reads screens through. `FIELD_ID_NAMES` has 117 confirmed entries (`KNOWN_UNRESOLVED_IDS` still empty; v2.4.9: field 320 corrected "Conditioning" → "Perf. Conditioning" — full concept name is "Performance Conditioning," but the actual on-device DATA FIELD display reads "Perf. Conditioning" (abbreviated), matching this toolkit's on-device-display naming convention; v2.4.8: field 49 corrected "Avg Speed (Alt)" → "Avg Speed" — deployed into a full-width slot and visually confirmed as plain text, no graph/bars; flagged as a caution (not a falsification) for the Graph/Bars marker theory below, since there's no record this field's old "(Alt)" label was ever a real on-device marker transcription like 23/348/349 were; v2.4.7, 2026-08-11 batch: 12 new IDs plus 3 corrected placeholder names — 23 "Heart Rate (Alt)" → "HR Zone Graph", 348/349 "Speed */Cadence *" → "Speed Bars"/"Cadence Bars" — confirming the "*"/"(Alt)" marker denotes a Graph/Bars-style field needing a full-width slot; v2.4.6, doc-only: the long-open "*" marker mystery on fields 348/349 is likely resolved — marks a Graph/Bars-style rendering needing a full-width screen slot, else falls back to plain text; v2.4.5: fields 58/87 corrected from "Lap Timer"/"Last Lap Timer" to "Lap Time"/"Last Lap Time" — a mistaken analogy to the separate, correctly-named field 56 "Timer"; 2026-08-10 batch: 18 IDs confirmed via a dedicated two-screen, 10-field-each census on a real profile, cross-referencing on-device field names against their GUI-shown position); `NAMED_SCREEN_TYPES` has 10 confirmed f10 screen-type codes (Map, Compass, Segment, ClimbPro, etc.) — `screens` output now shows real screen names. |
-| `fit_patch.py` | 1.14.2 | Patch a screen's fields, layout, order, or visibility. v1.14.2 (doc-only, Doug's decision): comments referencing f10=32 as "GroupTrack" updated to "Reserved" — its real purpose was never actually confirmed, this record is present regardless of GroupTrack usage; f10=57 "GroupTrack List" unaffected. No functional change. **`--remove` CONFIRMED via a real on-device round-trip test (v1.14.1, 2026-08-14)** — target screen correctly removed from the on-device order, and the removed screen was wiped by NewFiles rather than surviving as recoverable, matching `--un-remove`'s own retirement reasoning. GUI wrapper (`ViewScreensPanel`) is now unblocked, still unbuilt until asked for. `--remove`/`remove_screen()` (v1.14.0) — the backend half of "Delete Screen": permanently transitions a slot to Removed (f1=0, f9/f10 cleared, content preserved), reusing `--hide`'s exact two hard guards (Map/ClimbPro block, last-visible-user-screen floor) with no new guard logic. **Remove availability for named types confirmed and clarified (2026-08-13, on-device):** Map and ClimbPro are the only common named screen types with Remove disabled — Elevation, "GroupTrack List" (the on-device label — not to be confused with the separate GroupTrack Conditional record, which isn't a selectable row at all), Cycling Dynamics, Lap Summary, Virtual Partner, Compass, and Segment all show it active. That's the complete confirmed set, same boundary `NO_SHOW_TOGGLE_TYPES` already hard-codes for the Show Screen toggle. Doc-only, directly informs the still-scoped `--remove`/"Delete Screen" feature — see `PROJECT_NOTES.md` Open Items. **`--un-remove` RETIRED (2026-08-13, real user decision)** — Restore-from-Backup already covers real recovery from an accidental delete (whole-profile undo, confirmed on real hardware), `--un-remove` had a confirmed historical device-side data-loss hazard never re-verified after the fix below, and Garmin's own editor doesn't offer an un-remove workflow either — see `PROJECT_NOTES.md` "Product note on `--un-remove`" for the full history. `next_available_field10()` auto-computes a collision-free screen identity for `--new-slot`, replacing the old hardcoded f10=0 default — root cause of the now-RESOLVED "Add New Screen always fails" limitation; CONFIRMED working via live on-device round-trip. `check_system_screen_guard()` is f10-based and CERTAIN for any Active screen (old content-pattern/field-count heuristics are a fallback only for Removed-state slots) — fixed a real false positive on a confirmed user screen. `would_hide_last_visible_screen()` is a HARD, non-heuristic guard (no `--force`) blocking `--hide`/`--disable` on a profile's last remaining real USER screen, counted via f10. `hide_unsupported_screen_type()` is a SECOND hard guard blocking `--hide` on Map or ClimbPro entirely — confirmed neither has a Show Screen toggle at all, on any profile type. |
-| `fit_chain.py` | 1.0.0 | Apply several `fit_patch.py` operations in sequence before one device write |
-| `fit_clone_profile.py` | 1.0.0 | Clone a profile under a new display name (patches `sport_mesgs[0].name`) |
-| `fit_raw_walk.py` | 1.0.0 | Internal support — generic FIT byte-offset walker, not meant to be run directly |
-| `fit_crc.py` | 1.0.0 | Internal support — FIT CRC-16, not meant to be run directly |
-| `gui_app.py` | 0.19.6 | wxPython GUI — covers steps 1-10 plus Restore-from-Backup, Clone Profile, and Startup Message. Real bug fix, Doug's report from Windows 11 testing (v0.19.6, 2026-08-19): `StartupTxtPanel`'s message box showed only ~2 lines on Windows vs. ~5 on the Mac for the same file — the multiline `TextCtrl` had no explicit minimum height (just proportion=1/EXPAND in its sizer), so its visible size was whatever leftover space remained after every fixed-size sibling control, and that leftover genuinely differs by platform font metrics/DPI. Fixed with a `SetMinSize()` floor computed from `GetCharHeight()` × `STARTUP_TXT_MAX_LINES` (6) — guarantees at least 6 lines visible with no scrolling on any platform's real font metrics rather than a pixel value tuned to one machine; still grows taller than this floor when more room's available. Prior entry, cosmetic doc-only fix (v0.19.5): field picker's docstring count updated 117 -> 137 to match `fit_dump.py` v2.4.16's 2026-08-17 batch (20 new field IDs), no functional change. Prior entry (v0.19.4): new `field_edit_uncertain_warning_text()` warning on the Edit Screen panel, fires only for a "Workout" (f10=38) screen — explains the on-device editor offers no field editing for this type at all, so an edit here may have no visible effect even though it's mechanically safe (same write path as every other screen); backed by `fit_dump.py`'s new `FIELD_EDIT_UNCERTAIN_TYPES` set and Garmin's own Edge 530 manual confirming Workouts are a separate, dynamically-rendered subsystem. Prior entry, doc-only, no code change (v0.19.3): "Restore a Deleted Profile" CONFIRMED via Doug's own real GUI test — a deliberately-deleted profile correctly appeared in the "Deleted, but available to restore" list, and restoring it worked cleanly end to end. Prior entry, real bug fix (v0.19.2, Doug's report from testing): v0.19.1's redundant-backup fix didn't work in practice — every "‹ Back" click from the profile list routes through the Detect screen, which auto-re-detects every time it's shown, and that was itself resetting the new `needs_backup` flag on every visit. Now only resets it on a genuine reconnect (the detected device path actually changes), not a same-device re-verification. Prior entry (v0.19.1, Doug's go-ahead, low priority): "Reduce redundant profile backups" — the profile list no longer re-backs-up every profile on every ordinary visit; a new `needs_backup` flag (set on a fresh Detect or a confirmed post-deploy reconnect) gates the real backup call, and the Refresh button still always forces one regardless. Prior entry (v0.19.0, Doug's go-ahead): "Restore a Deleted Profile" — the profile list gets a second list, "Deleted, but available to restore," populated from `garmin_device.list_backed_up_profile_filenames()` minus what's currently live; the existing "Restore from Backup..." button now works from either list (no new button, no new panel — per Doug's own 2026-08-11 design decision). The Restore confirmation now says "RECREATING" instead of "REPLACING" for a profile that isn't currently on the device. Prior entry (v0.18.1, doc-only, Doug's decision: the f10=32 "GroupTrack"→"Reserved" rename lives in `fit_dump.py`; this file's two user-facing display strings referencing the old name updated to match, no functional change; v0.18.0: new `StartupTxtPanel`, reached via a "Startup Message..." button on the Detect screen — view/edit the device's `startup.txt` boot message, built on `garmin_device.py` v0.12.0. Editable fields are the `<display=N>` seconds value and the free-form message text; Garmin's own comment scaffolding is preserved byte-for-byte. Live char/line-count guidance shown, deliberately NOT a hard block on Save — Doug's own call, since actual on-device wrapping depends on character width in a way this toolkit can't predict; the safety net is the automatic pre-write backup instead. Save flow: confirm -> direct device write (no NewFiles) -> eject/full-power-cycle instructions, reusing `DeployPanel`'s eject-button pattern; deliberately no post-write verification step, since a boot message can't be read back by this app. Back button warns on unsaved edits, same style as `ViewScreensPanel`'s v0.16.17 fix. Prior entry, v0.17.0: "Remove Selected Screen" on the Screens view — the GUI wrapper for `--remove`, completing "Delete Screen" now that the backend and a real device test are both confirmed; reuses `--remove`'s exact two CLI guards with no override, plus an explicit permanent-deletion confirmation; same change split that view's single 9-button row into two, per real feedback that it ran the full window width; v0.16.17: reworded the Back-button warning per Doug's feedback — the old wording wrongly implied a resumable state, now his own direct wording, no logic change; v0.16.16: real bug fix found using v0.16.15's new warning — it blew out the Edit Screen window's width, the fourth time this codebase has hit that bug class; fixed via `textwrap`-based hard wrapping rather than `wx.StaticText.Wrap()` (untestable in the dev sandbox, documented bad behavior with pre-existing newlines); v0.16.15: Graph/Bars full-width warning — new helpers derived from `LAYOUT_GRIDS` surfaced in the field picker (static note) and Edit/Add Screen panels (context-aware, recomputed on every refresh); v0.16.14: real bug fix — the Screens view's Back button now warns before discarding an in-progress, undeployed edit instead of silently losing it, matching the existing confirm-dialog style used elsewhere; v0.16.13: doc-only, two comments updated now that `fit_patch.py`'s `--un-remove` is retired entirely rather than just unexposed in the GUI — no functional change; v0.16.12: cosmetic doc-only fix, field picker's docstring count updated 105 -> 117 to match `fit_dump.py` v2.4.9's current entry count (the picker itself was never wrong — it reads `FIELD_ID_NAMES` live — only the comment had drifted stale, caught while confirming pre-release state ahead of a possible v1.0.1 tag); v0.16.11: doc-only, the "restore a profile no longer on the device" feature's one real open risk (whether NewFiles can recreate a genuinely deleted profile, not just replace/create-new) is now CONFIRMED via a direct `garmin_device.py deploy` test against a deliberately-deleted profile — only the GUI entry point itself remains unbuilt; v0.16.10: doc-only, no code change — Clone Profile CONFIRMED via real hardware, reported after the fact (two working clones deployed via NewFiles under brand-new filenames: `Clonebox`, `CloneRoad`), correcting a stale "not yet tested through the actual GUI" note and resolving whether NewFiles accepts a genuinely new filename, not just a replacement — see the toolkit table's v0.16.0 entry below for the corrected text; v0.16.9: pre-Windows-support housekeeping — the default backup working directory was hardcoded to a specific Mac path, now `~/GarminBackups` (resolves correctly on any OS/user); the working directory is now also persisted across restarts via a small config file (`~/.garmin_screen_editor_config.json`), so a custom location picked via "Change..." is remembered instead of resetting every launch; v0.16.8: new "About" button on the detect screen opens a short summary dialog — name/version, "not affiliated with Garmin" disclaimer, reverse-engineering method note, MIT mention pointing to `LICENSE`/`README.md` for the full text; v0.16.7: window title renamed to "Activity Profile Screen Editor for Garmin Edge" ahead of a possible public release — this is an independent, unofficial project, not a Garmin product; see `LICENSE` and `README_DISCLAIMER_DRAFT.md` (pending review) for the rest of that pass; v0.16.6: fixed a real bug where v0.16.3's own fix for the Fields-column width issue was itself wrong — capping the column stopped the window from growing but silently truncated text instead, with no scrollbar; correct fix decouples the frame's size from the column's width via a `ScreensListCtrl` subclass, letting the column go back to full auto-size and the list's real native horizontal scroll work as intended — see `PROJECT_NOTES.md` toolkit table row and "Corrections and lessons learned" for the full story; v0.16.5: cosmetic doc-only fix, field picker's docstring count updated 87 -> 105 to match `fit_dump.py` v2.4.4's new field IDs, no functional change; v0.16.4: bumped the on-device layout diagram's font from 9pt to 13pt for readability, per real feedback with a screenshot — safe change, no width/height risk since that panel is custom-painted at a fixed size, unlike the widgets behind v0.16.2/v0.16.3; v0.16.3: same-day follow-up to v0.16.2 — the identical unresolved-field-ID window-widening bug also hit the Fields column on the main Screens view, not just the Edit Screen panel; fixed with the same terse-label approach plus a width ceiling on that column; v0.16.2: fixed a real bug where editing a screen with an unresolved field ID permanently oversized/off-screened the window — see `PROJECT_NOTES.md` toolkit table row for the full root-cause writeup; v0.16.1: the "not connected" message and window title are now model-generic/version-visible — see `PROJECT_NOTES.md` "Model portability") (detect, list/backup, select+stage, view screens with a real Type column and screen-level Move Up/Down reordering, add a brand-new screen, edit one screen's fields/layout/Show-Hide/type, review accumulated changes, deploy to the device, post-write verification, restore any profile from its backup history, and clone a profile under a new name). **This closes out the GUI's full feature backlog.** NEW (v0.16.0): `ClonePanel` — "Clone..." on the profile list patches `sport_mesgs[0].name` via `fit_clone_profile.py`'s `patch_profile_name()` (CLI-validated full-fidelity on real hardware already), with live filename-collision checking against every profile currently on the device (deploying under an existing filename would silently overwrite it) and an auto-suggested filename from the display name. Hands off straight to Deploy, same as Restore — no staged-vs-editing diff applies to a clone. Headless-verified: filename validation, byte-for-byte-structurally-identical clone output, and zero screen differences between source and clone via `describe_screen_changes()`. **CONFIRMED via real hardware (2026-08-11, reported after the fact):** at least two clones deployed and working correctly through NewFiles under brand-new filenames not previously present on the device (`Clonebox` from `Sandbox`, `CloneRoad` from `Road`) — this also confirms NewFiles correctly accepts a genuinely new filename, not just a replacement of an existing one, a question that had been open until now. Prior entry (v0.15.2): cosmetic doc-only fix (a stale field-count reference in a docstring, no functional change). v0.15.1: fixed a real bug found via testing — backing out of a Restore attempt without completing it left a stale reference to the abandoned backup file in place, so a subsequent normal Stage silently showed that leftover instead of the profile just staged ("View Screens shows the backup I was about to restore, not what I just staged"). A fresh Stage now always clears any prior session's state first. v0.15.0: "Restore from Backup..." on the profile list now goes somewhere — `RestorePanel` lists the selected profile's backup history with a plain-English screen summary per entry ("8 screen(s): Screen 1, Lap Summary, Map, ..."), and picking one hands off straight to Deploy, skipping the staged-vs-editing review (nothing to review — you already picked a known backup). The backup file is used directly, never copied. "Back" from Deploy now returns to wherever it was actually reached from. v0.14.0: the moment "Check for Reconnected Device" succeeds, the GUI automatically re-pulls the live profile from the device and compares it against what was sent, reusing the same plain-English per-screen summary as "Review & Deploy..." (now shared as a module-level `describe_screen_changes()`). Compares visible/active screens only — the device's known Removed-list wipe on NewFiles import (a side effect that's always happened, unrelated to anything this GUI does) isn't reported, matching the fact that neither Garmin's own editor nor this GUI offers an un-remove workflow. **CONFIRMED live on real hardware** (2026-08-06) alongside a full deploy of a new 10-field screen. v0.13.0: "Continue to Deploy" now goes somewhere — `DeployPanel` writes the working copy to the device's `NewFiles/` (with byte-for-byte write-back verification), then a confirm-then-`diskutil eject` button (plus an "I Ejected It Myself" fallback for non-macOS/Finder), then a manual "Check for Reconnected Device" button. User-confirmed design decision: no background polling for the reconnect wait (this app has never used a background thread, and it's not worth the new failure-mode class for saving a few clicks) — each Check click is one immediate, non-blocking connectivity check. v0.12.0: "Review & Deploy..." now describes changes in plain English per screen (e.g. "Screen 4: added Cadence, removed Grade") instead of a raw `fit_dump.py diff`-style unified diff — real user feedback that the byte-level diff was too technical for the GUI's actual audience (a rider, not a developer); the CLI tools remain there for anyone who wants that detail. Covers new/removed screens, field changes, layout changes, show/hide changes, and position changes, with a fallback line so real changes are never silently under-reported; whether there's anything to deploy is still decided from the raw bytes directly. v0.11.1: fixed a real reported bug where the Fields column silently clipped (not wrapped) any screen with more than ~3-4 short field names — a 10-field screen only showed 3 fields and part of a 4th; the column now auto-sizes to its actual content on every refresh. v0.11.0: fixed a real reported bug where manually enlarging the window (e.g. to see more of the screens list) snapped back to a smaller size the moment any button triggered a refresh — `_relayout()` was calling `Fit()`, which resizes in both directions including shrinking; now only grows the window when content needs more room, never shrinks it. v0.10.0: "Review & Deploy..." is a pre-flight step showing a `fit_dump.py diff`-style comparison against the untouched staged file plus a real CRC check against the working file's actual bytes — REVISES the original "pending/preview state" plan to match how the GUI actually works (every change is already applied immediately, click by click; there's no separate queue to apply, only a review+verify step). Continue to Deploy is a placeholder until deploy/eject/remount is built. "Change Type..." is Add-New-Screen and EditScreenPanel's "Replace Field" — swaps one field's ID without the Remove+Add+reposition workaround. Add-New-Screen panel replicates `--new-slot`'s exact defaulting logic — auto-assigns f9/f10, enforces the confirmed 10-user-screen cap with a friendly message; **CONFIRMED live on real hardware** (2026-08-05), including a confirmed field-type change on ClimbPro after overriding the guard. Screen-level reordering is select + Move Up/Down on the main screens list, wired to `swap_display_order()` — same validated primitive as `--swap-order`. Show/Hide hard-blocks hiding a profile's last real user screen (f10-based) AND hiding Map/ClimbPro at all (neither has an on-device toggle). Guard dialogs no longer false-positive on confirmed user screens (real GUI testing found and fixed this). Swallows a cosmetic teardown-only `wxAssertionError` on exit. Field picker offers 137 confirmed IDs. |
-
-## GUI
-
-`gui_app.py` is the editor GUI, built incrementally, one step of the
-agreed flow (see `PROJECT_NOTES.md`) at a time — each step wired to
-its already-validated backend function, tested against real hardware
-before the next step is added. **All 10 flow steps plus
-Restore-from-Backup, Clone Profile, and Startup Message are now
-built**: detect the device and show its
-info; list profiles (via an automatic backup-all-profiles call);
-select a profile and stage it for editing; view the staged profile's
-current screens, read-only, with screen-level reordering (Move
-Up/Down); a real Add-New-Screen panel (pick fields and layout, the
-tool auto-assigns everything else — CONFIRMED live on real hardware);
-drill into a single screen to reorder, add, remove, or change the type
-of its fields and change its A/B layout, with a live visual diagram of
-the on-device grid (built from the developer's own text-based Edge 530
-layout reference — see `PROJECT_NOTES.md` / "On-device layout
-geometry") — the field-type swap ("Change Type...") is CONFIRMED live
-on real hardware including a guard-overridden edit to ClimbPro; a
-"Review & Deploy..." pre-flight step showing a plain-English,
-per-screen change summary plus a real CRC check; "Deploy to Device"
-(write to `NewFiles/`, guided eject, manual reconnect check) —
-CONFIRMED live on real hardware alongside a full 10-field new screen;
-automatic post-write verification the instant reconnect is confirmed,
-re-pulling the live profile and comparing it against what was sent;
-"Restore from Backup..." — pick any of a profile's past backups
-from a plain-English-summarized list and it goes through the same
-Deploy/verify pipeline as a normal edit; and "Clone..." — clone the
-selected profile under a new display name (`fit_clone_profile.py`,
-already CLI-validated on real hardware) with live filename-collision
-checking, going through the same Deploy pipeline as Restore. See
-`PROJECT_NOTES.md` / "Clone Profile" for the full writeup. And
-"Startup Message..." — reached directly from the Detect screen (not
-from the profile flow, since `startup.txt` is a device-root file, not
-a profile) — view/edit the device's custom boot message, with
-Garmin's own comment scaffolding preserved byte-for-byte and a direct
-(non-NewFiles) write path of its own. See `PROJECT_NOTES.md` /
-"startup.txt" for the full writeup.
-
-Editing architecture: rather than an abstract in-memory list of
-"pending changes," a scratch working copy of the staged file (which
-persists across edits to multiple screens in one session) IS the
-queue — every button click is a real, immediately-applied
-`fit_patch.py` operation, and the screen always re-reads the actual
-resulting bytes afterward instead of trusting an in-memory guess.
-"Discard Edits" on the screens view resets back to the untouched
-staged file.
-
-The Show/Hide checkbox is guarded two ways, checked in order: a HARD
-block (unhideable, no override) if hiding this screen would leave the
-profile with zero visible Active/Display screens — confirmed via real
-on-device testing that Garmin's own editor refuses this too — followed
-by the existing softer heuristic guard for likely system/overlay
-screens (content-pattern match OR field count ≤2, `--force`-style
-confirm dialog).
-
-Editing UX decision (recorded ahead of building it): reordering is
-select + Move Up/Move Down buttons, not drag-and-drop — it maps
-directly onto the already-validated `--swap-order`/`--swap-fields`
-primitives with no new backend logic. Field count changes and
-reassigning which fields appear on a screen go through `--fields`
-(replaces the whole list, count follows from its length), fed from a
-picker over the known field ID catalog rather than free-text entry,
-and guarded by the same heuristic the CLI uses.
-
-```bash
-./install.sh              # installs wxPython too -- see Setup above
-source .venv/bin/activate
-python3 gui_app.py
-```
-
-(Manual equivalent without the script: `pip install wxPython
---break-system-packages`.)
-
-Full CLI reference: [`FIT_PATCH.md`](FIT_PATCH.md). (A companion
-`FIT_DUMP.md` reference is planned but not yet written.)
-
-## ⚠️ Before you write anything to a real device
-
-- Always run `garmin_device.py backup` first.
-- Always verify a patched file with `fit_crc.py` and
-  `fit_dump.py screens` *before* deploying it.
-- Adding a brand-new screen via `fit_patch.py --new-slot` is now
-  CONFIRMED WORKING (v1.12.0+, live on-device round-trip verified
-  2026-08-05) — the earlier "must use the on-device Add New menu"
-  guidance is superseded. Still verify with `fit_dump.py screens` and
-  `fit_crc.py` before every deploy, and expect the profile's entire
-  Removed-screen list to be purged by the deploy regardless of what
-  it targets. See `PROJECT_NOTES.md`/`FIT_PATCH.md` BUGS for the full
-  writeup.
-- `fit_patch.py --un-remove` uses the same corrected auto-default as
-  `--new-slot` but has NOT itself been re-tested live since the fix.
-  Also: Garmin's own on-device editor has no un-remove option at all,
-  so this is likely never going to be a first-class GUI feature —
-  kept available for deliberate testing, final call deferred. Back up
-  first, not just recommended, required.
-- `fit_patch.py --fields` refuses to overwrite a slot whose current
-  content matches a pattern commonly seen on system/overlay screens
-  (empty, Elevation/Grade, Cycling Dynamics) unless you pass
-  `--force` — a "did you mean to?" pause, not a certain
-  identification. Verify what the screen actually is on-device first.

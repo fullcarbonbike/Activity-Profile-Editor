@@ -1,6 +1,62 @@
 ```
 FIT_PATCH(1)              Garmin Edge FIT Toolkit             FIT_PATCH(1)
 
+Doc rev 31 -- refreshed 2026-08-20. **13 new confirmed field IDs,**
+Doug's cross-check of his confirmed-field list against the Garmin
+Edge 530 Owner's Manual's own data-field appendix, then locating each
+remaining gap on-device: 98 Watts/kg, 439 3s W/kg, 207-213 Power
+Z1-Z7, 418 Power Z8, 419 Power Z9, 24 Laps, 41 Max Lap Power. Fills
+the last two gaps in the W/kg family and adds the Power-Zone analog
+of the existing 5 HR-Zone-time fields (9 zones here, not 5). 24/41
+resolve an earlier ambiguous "Laps Max" note from the same day -- two
+separate fields Doug had conflated, not one field. No collisions with
+any prior entry. Closes out the manual-appendix cross-check -- no
+further appendix-listed fields remain unconfirmed. One real gap still
+open: "Trainer Resistance," hypothesized (unverified) to need a
+paired ANT+ FE-C smart trainer to even appear on-device, same
+sensor-gated pattern as eBike Metrics. FIELD ID REFERENCE table
+regenerated (169 entries, was 156). fit_dump.py now v2.4.24. Prior
+rev (30, 2026-08-20) follows.
+
+Doc rev 30 -- refreshed 2026-08-20. **10 new confirmed field IDs,**
+Doug's continued field census: 265 Lap PCO, 267 Avg Right PP, 268
+Lap Right PP, 269 Right PPP, 271 Lap Right PPP, 273 Avg Left PP, 274
+Lap Left PP, 275 Left PPP, 277 Lap Left PPP, 440 10s W/kg. Fills out
+the L/R Power Phase/Peak Power Phase family alongside the existing
+263/264/266/270/272/276 entries. No collisions with any prior entry.
+Same day, doc-only: Doug's investigation of the last unmapped
+on-device label, "Battery Status" (Lights category), confirms it's an
+alias for field 317 "Light Battery", not a separate field -- no table
+entry needed. FIELD ID REFERENCE table regenerated (156 entries, was
+146). fit_dump.py now v2.4.23. Prior rev (29, 2026-08-20) follows.
+
+Doc rev 29 -- refreshed 2026-08-20. **Correction, same day: "Target"
+is field 521, not 512 -- Doug's own catch.** A simple transcription
+typo when the Doc rev 28 batch was written up, not a raw-ID/name
+mismatch (512 never existed on-device under either name, unlike the
+2026-08-17 batch's real screen-3/4 transposition). Fixed before this
+ever shipped in a tagged release. Doug also confirmed, unprompted,
+that all 9 fields from that batch are verified against the real
+on-device screen -- same standard as every other batch here, not just
+a naming guess for the 5 that read as Workout-related. FIELD ID
+REFERENCE table's row updated (still 146 entries, corrected key not a
+new/removed one); NOTE after the table revised to match. fit_dump.py
+now v2.4.22. Prior rev (28, 2026-08-20) follows.
+
+Doc rev 28 -- refreshed 2026-08-20. **9 new confirmed field IDs,**
+Doug's continued field census: 45 Workout Step, 100 Last Lap Power,
+258 Lap Time Standing, 260 Lap Time Seated, 264 Avg PCO, 511 Workout
+Comparison, 512 Target, 522 Duration, 523 Step Time. No collisions
+with any prior entry. Flagged, not resolved: 5 of these 9 (45, 511,
+512, 522, 523) read by name as Workout/structured-step fields --
+directly adjacent to this project's still-open f10=38 "Workout"
+screen-type question (see PROJECT_NOTES.md Open Items and this
+document's own f10=38 entries below) -- naming alone doesn't confirm
+where/how they actually render, so this is a lead worth watching, not
+new evidence either way. FIELD ID REFERENCE table regenerated (146
+entries, was 137) -- see the new NOTE immediately after the table.
+fit_dump.py now v2.4.21. Prior rev (27, 2026-08-17) follows.
+
 Doc rev 27 -- refreshed 2026-08-17. **FULLY CONFIRMED via direct
 raw-byte inspection.** Doug's CyclingRoadRoadtemp.fit -- the original
 census profile, Screen 3/Screen 4 still intact at 10 fields each --
@@ -621,78 +677,164 @@ FIELD 10 / SCREEN TYPES (CONFIRMED, side-thread Test 4, 2026-08-04)
        it (or NAMED_SCREEN_TYPES directly) rather than re-deriving this
        table elsewhere.
 
-FIELD ID REFERENCE (137 confirmed)
+FIELD ID REFERENCE (169 confirmed)
        ID     Name                       ID     Name
        ---    -----------------------    ---    -----------------------
-         0    Calories                    99    Aerobic Training Effect
-         2    Course Pt Dist.            146    10s Power
-         3    Cadence                    147    Lap NP
-         4    Avg Cadence                148    Last Lap NP
-         5    Lap Cadence                149    Balance
-         6    Distance                   150    Avg Balance
-         7    Lap Dist.                  151    Lap Balance
-         9    Elevation (ft)             159    3s Balance
-        11    Percent Grade              160    10s Balance
-        12    Heading                    161    30s Balance
-        13    Heart Rate                 165    Last Lap HR
-        14    Avg Heart Rate             176    Pedal Smoothness
-        15    Lap HR                     177    Torque Effect (see note)
-        16    %Max Heart Rate            178    Gears
-        17    Avg %Max Heart Rate        179    Front Gear
-        18    Lap %Max HR                180    Rear Gear
-        19    %Heart Rate Reserve        181    Gear Battery
-        20    Avg %HRR                   182    Gear Ratio
-        22    Heart Rate Zone            199    HR Zone 1 (time)
-        23    HR Zone Graph              200    HR Zone 2 (time)
-        27    Distance to Destination    201    HR Zone 3 (time)
-        28    Time to Destination        202    HR Zone 4 (time)
-        29    Distance to Next           203    HR Zone 5 (time)
-        30    Time to Next               216    WindField Widget
-        31    Dest. Location             257    Time Standing
-        32    Next Pt Location           259    Time Seated
-        36    Power                      263    Platform Center Offset
-        37    Avg Power                  266    Power Phase Right
-        38    Kilojoules                 270    Avg R. Peak Pwr Phase
-        39    Lap Power                  272    Power Phase Left
-        40    Max Power                  276    Avg L. Peak Pwr Phase
-        42    %FTP                       295    Target Power
-        43    Power Zone                 316    Lights Connected
-        48    Speed                      317    Light Battery
-        49    Avg Speed                  318    Beam Angle Status
-        50    Lap Speed                  319    Light Mode
-        53    Sunrise                    320    Perf. Conditioning
-        54    Sunset                     343    Heart Rate Graph
-        55    Elapsed Time               344    Speed Graph
-        56    Timer                      345    Cadence Graph
-        57    Avg Lap Time               346    Power Graph
-        58    Lap Time                   347    HR Bars
-        59    Time of Day (TOD)          348    Speed Bars (see note)
-        60    Total Ascent               349    Cadence Bars (see note)
-        61    Total Descent              350    Power Bars
-        62    Dest. Ahead                368    Elevation Graph
-        63    Time Ahead                 408    Di2 Battery
-        64    Calories to Go             409    Gear Combo
-        65    Distance to Go             411    Di2 Shift Mode
-        66    Heart Rate to Go           433    Anaerobic TE
-        67    Reps to Go                 437    Avg W/kg
-        68    Time to Go                 441    30s W/kg
-        77    VAM                        442    Lap VAM
-        78    Temperature                443    Avg VAM
-        79    3s Power                   444    Ascent Remaining
-        80    30s Power                  445    Asc to Next Crs Pt
-        81    Normalized Power           452    Respiration
-        82    TSS                        478    EPOC
-        83    Intensity Factor (IF)      486    Grit
-        84    Last Lap Dist              487    Lap Grit
-        86    Last Lap Speed             488    Flow
-        87    Last Lap Time              489    Lap Flow
-        88    30s VAM                    491    Assist Mode
-        91    Max Speed                  492    Shifting Advice
-        93    ETA at Destination         493    eBike Battery
-        94    ETA to Next                494    Travel Range
-        95    Odometer                   495    60s Grit
-        96    Battery Level              497    60s Flow
-        97    GPS Signal Strength
+         0    Calories                   176    Pedal Smoothness
+         2    Course Pt Dist.            177    Torque Effect (see note)
+         3    Cadence                    178    Gears
+         4    Avg Cadence                179    Front Gear
+         5    Lap Cadence                180    Rear Gear
+         6    Distance                   181    Gear Battery
+         7    Lap Dist.                  182    Gear Ratio
+         9    Elevation (ft)             199    HR Zone 1 (time)
+        11    Percent Grade              200    HR Zone 2 (time)
+        12    Heading                    201    HR Zone 3 (time)
+        13    Heart Rate                 202    HR Zone 4 (time)
+        14    Avg Heart Rate             203    HR Zone 5 (time)
+        15    Lap HR                     207    Power Z1
+        16    %Max Heart Rate            208    Power Z2
+        17    Avg %Max Heart Rate        209    Power Z3
+        18    Lap %Max HR                210    Power Z4
+        19    %Heart Rate Reserve        211    Power Z5
+        20    Avg %HRR                   212    Power Z6
+        22    Heart Rate Zone            213    Power Z7
+        23    HR Zone Graph              216    WindField Widget
+        24    Laps                       257    Time Standing
+        27    Distance to Destination    258    Lap Time Standing
+        28    Time to Destination        259    Time Seated
+        29    Distance to Next           260    Lap Time Seated
+        30    Time to Next               263    Platform Center Offset
+        31    Dest. Location             264    Avg PCO
+        32    Next Pt Location           265    Lap PCO
+        36    Power                      266    Power Phase Right
+        37    Avg Power                  267    Avg Right PP
+        38    Kilojoules                 268    Lap Right PP
+        39    Lap Power                  269    Right PPP
+        40    Max Power                  270    Avg R. Peak Pwr Phase
+        41    Max Lap Power              271    Lap Right PPP
+        42    %FTP                       272    Power Phase Left
+        43    Power Zone                 273    Avg Left PP
+        45    Workout Step               274    Lap Left PP
+        48    Speed                      275    Left PPP
+        49    Avg Speed                  276    Avg L. Peak Pwr Phase
+        50    Lap Speed                  277    Lap Left PPP
+        53    Sunrise                    295    Target Power
+        54    Sunset                     316    Lights Connected
+        55    Elapsed Time               317    Light Battery
+        56    Timer                      318    Beam Angle Status
+        57    Avg Lap Time               319    Light Mode
+        58    Lap Time                   320    Perf. Conditioning
+        59    Time of Day (TOD)          343    Heart Rate Graph
+        60    Total Ascent               344    Speed Graph
+        61    Total Descent              345    Cadence Graph
+        62    Dest. Ahead                346    Power Graph
+        63    Time Ahead                 347    HR Bars
+        64    Calories to Go             348    Speed Bars (see note)
+        65    Distance to Go             349    Cadence Bars (see note)
+        66    Heart Rate to Go           350    Power Bars
+        67    Reps to Go                 368    Elevation Graph
+        68    Time to Go                 408    Di2 Battery
+        77    VAM                        409    Gear Combo
+        78    Temperature                411    Di2 Shift Mode
+        79    3s Power                   418    Power Z8
+        80    30s Power                  419    Power Z9
+        81    Normalized Power           433    Anaerobic TE
+        82    TSS                        437    Avg W/kg
+        83    Intensity Factor (IF)      439    3s W/kg
+        84    Last Lap Dist              440    10s W/kg
+        86    Last Lap Speed             441    30s W/kg
+        87    Last Lap Time              442    Lap VAM
+        88    30s VAM                    443    Avg VAM
+        91    Max Speed                  444    Ascent Remaining
+        93    ETA at Destination         445    Asc to Next Crs Pt
+        94    ETA to Next                452    Respiration
+        95    Odometer                   478    EPOC
+        96    Battery Level              486    Grit
+        97    GPS Signal Strength        487    Lap Grit
+        98    Watts/kg                   488    Flow
+        99    Aerobic Training Effect    489    Lap Flow
+       100    Last Lap Power             491    Assist Mode
+       146    10s Power                  492    Shifting Advice
+       147    Lap NP                     493    eBike Battery
+       148    Last Lap NP                494    Travel Range
+       149    Balance                    495    60s Grit
+       150    Avg Balance                497    60s Flow
+       151    Lap Balance                511    Workout Comparison
+       159    3s Balance                 521    Target
+       160    10s Balance                522    Duration
+       161    30s Balance                523    Step Time
+       165    Last Lap HR
+
+       NOTE: 2026-08-20 batch (9 new: 45, 100, 258, 260, 264, 511,
+       521, 522, 523), Doug's continued field census, all 9 verified
+       against the on-device screen -- same confirmation standard as
+       every other batch in this table. No collisions with any prior
+       entry. CORRECTION, same day: "Target" is field 521, not 512 --
+       Doug's own catch of a transcription typo (512 never existed
+       on-device under either name), fixed before this ever shipped
+       in a tagged release. Notable: 5 of these 9 (45 Workout Step,
+       511 Workout Comparison, 521 Target, 522 Duration, 523 Step
+       Time) read by name as Workout/structured-step fields --
+       directly adjacent to this project's still-open f10=38
+       "Workout" SCREEN-TYPE question (see PROJECT_NOTES.md Open
+       Items): whether that screen's field slots are actually
+       meaningful/rendered on-device, since the on-device editor
+       exposes no field options for it at all. That's a separate,
+       still-unconfirmed question from these 5 fields' own identity --
+       Doug's on-device verification confirms the ID->name mapping
+       itself, same as any other entry here, it just doesn't by
+       itself establish whether/how these fields relate to f10=38.
+       The other 4 (100 Last Lap Power, 258/260/264) extend
+       already-populated families: Power (100, matching the existing
+       3s/10s/30s/Lap/Avg pattern) and Cycling Dynamics (258/260/264,
+       standing/seated lap time + PCO).
+
+       NOTE: 2026-08-20 batch #3 (13 new: 98, 439, 207, 208, 209,
+       210, 211, 212, 213, 418, 419, 24, 41), Doug's cross-check of
+       his confirmed-field list against the Garmin Edge 530 Owner's
+       Manual's own data-field appendix, then locating each remaining
+       gap on-device. Closes out that cross-check -- no further
+       appendix-listed fields remain unconfirmed. 98 Watts/kg and 439
+       3s W/kg (3s Watts/kg) fill the last two gaps in the W/kg
+       family (was Avg/10s/30s only), now a complete mirror of
+       Power's own base/3s/10s/30s/Avg shape. 207-213 Power Z1-Z7,
+       418 Power Z8, 419 Power Z9 (Time in Power Zone 1-9) are the
+       Power-Zone analog of the existing 199-203 HR Zone 1-5 (time)
+       fields -- 9 zones, not 5. 24 Laps and 41 Max Lap Power resolve
+       an earlier ambiguous "Laps Max" note from the same day, which
+       turned out to be two separate fields Doug had conflated, not
+       one oddly-named field; 41 extends Power's own Lap/Max/Last-Lap
+       set with the one remaining combination. No collisions with any
+       prior entry. One real gap still open, not part of this batch:
+       "Trainer Resistance" -- working hypothesis, unverified, is
+       that it needs a paired ANT+ FE-C smart trainer to appear in
+       the on-device picker at all, the same sensor-gated pattern
+       already seen for eBike Metrics fields; Doug doesn't currently
+       have one to test against.
+
+       NOTE: 2026-08-20 batch #2 (10 new: 265, 267, 268, 269, 271,
+       273, 274, 275, 277, 440), Doug's continued field census. Fills
+       out the L/R Power Phase / Peak Power Phase family alongside
+       the existing 263/264 (PCO), 266/272 (instant Power Phase
+       Right/Left), 270/276 (Avg R./L. Peak Pwr Phase) entries -- this
+       batch adds the missing Avg/Lap variants for both sides plus
+       the Right-side Peak Pwr Phase pair that had no entries yet:
+       265 Lap PCO (Lap PCO), 267 Avg Right PP (Avg Right Pwr Phase),
+       268 Lap Right PP (Lap Right Pwr Phase), 269 Right PPP (Right
+       Peak Pwr Phase), 271 Lap Right PPP (Lap R. Peak Pwr Phase),
+       273 Avg Left PP (Avg Left Pwr Phase), 274 Lap Left PP (Lap
+       Left Pwr Phase), 275 Left PPP (Left Peak Pwr Phase), 277 Lap
+       Left PPP (Lap L. Peak Pwr Phase) -- values shown are the
+       on-device display labels, full concept names in parentheses.
+       440 10s W/kg (10s Watts/kg) extends the existing 3s/10s/30s
+       Power family the same way 159/441 already did for W/kg. No
+       collisions with any prior entry. Same day, doc-only: Doug
+       investigated the last unmapped on-device label he'd been
+       tracking, "Battery Status" (Lights category) -- confirmed it's
+       an alias/duplicate menu entry that navigates straight to field
+       317 "Light Battery", not a separate field. No table entry
+       added for it.
 
        NOTE: 2026-08-17 batch (20 new: 40, 42, 43, 80, 82, 83, 147,
        148, 149, 150, 151, 159, 160, 161, 176, 177, 408, 411, 437,
