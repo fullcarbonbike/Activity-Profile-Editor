@@ -1,5 +1,12 @@
 ```
-FIT_PATCH(1)              Garmin Edge FIT Toolkit             FIT_PATCH(1)
+FIT_PATCH(1)     Activity Profile Editor for Garmin Edge      FIT_PATCH(1)
+
+Doc rev 32 -- refreshed 2026-08-25. **Doc-only: banner renamed to
+match the project's canonical name.** Was "Garmin Edge FIT Toolkit" --
+Doug clarified the canonical public name is "Activity Profile Editor
+for Garmin Edge" (no "Screen," no "530," matching his GitHub repo name
+and Release titles; see PROJECT_NOTES.md Doc rev 83 for the full
+writeup). No content change, banner only.
 
 Doc rev 31 -- refreshed 2026-08-20. **13 new confirmed field IDs,**
 Doug's cross-check of his confirmed-field list against the Garmin

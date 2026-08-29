@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-__version__ = "0.19.12"  # Cosmetic doc-only fix (2026-08-20): FieldPickerDialog's docstring said "156 confirmed entries" -- stale after fit_dump.py v2.4.24's third 2026-08-20 batch (Doug's Garmin manual appendix cross-check) added 13 new field IDs, bringing FIELD_ID_NAMES to 169. No functional change -- same recurring drift class as v0.16.5/v0.16.12/v0.19.5/v0.19.10/v0.19.11. Prior entry (v0.19.11): Cosmetic doc-only fix (2026-08-20): FieldPickerDialog's docstring said "146 confirmed entries" -- stale after fit_dump.py v2.4.23's second 2026-08-20 batch added 10 new field IDs (L/R Power Phase/Peak Power Phase family + 10s W/kg), bringing FIELD_ID_NAMES to 156. No functional change -- FIELD_ID_NAMES is imported live from fit_dump.py, so the actual field picker was never wrong, only this comment; same recurring drift class as v0.16.5/v0.16.12/v0.19.5/v0.19.10. Prior entry (v0.19.10): Cosmetic doc-only fix (2026-08-20): FieldPickerDialog's docstring said "137 confirmed entries" -- stale after fit_dump.py v2.4.21's 2026-08-20 batch added 9 new field IDs, bringing FIELD_ID_NAMES to 146. No functional change -- FIELD_ID_NAMES is imported live from fit_dump.py, so the actual field picker was never wrong, only this comment; same recurring drift class as v0.16.5/v0.16.12/v0.19.5. Prior entry (v0.19.9): New hard block, Doug's report + direct on-device confirmation (2026-08-19): ClonePanel's "New display name" field had NO length check at all -- only Create Clone's filename field (_filename_problem()) was validated. Doug found a note that Garmin limits Activity Profile display names to 15 characters, and when asked whether this should be soft guidance or a hard block (same soft/hard distinction this project already uses for startup.txt's unconfirmed character/line counts vs. NO_SHOW_TOGGLE_TYPES' confirmed Map/ClimbPro fact), Doug directly tested it on his own device and confirmed: typing a 16th character in Garmin's own Activity Profile name editor does nothing at all -- it just switches straight to the checkmark/complete control instead of accepting more input. That's a CONFIRMED device UI fact, not a guess, so this gets the same HARD-block treatment as NO_SHOW_TOGGLE_TYPES, not soft guidance. New PROFILE_NAME_MAX_CHARS = 15 constant added to fit_clone_profile.py (v1.0.1, imported here) -- separate from, and much stricter than, that file's existing NAME_FIELD_SIZE byte-capacity check (31 usable bytes, already safely enforced by patch_profile_name() itself via ValueError); a name between 16 and 31 bytes would patch through fine at the byte level, but Garmin's own software could never have produced one, so how the device would actually render it is genuinely untested territory this toolkit has no reason to create. New ClonePanel._name_problem() helper (mirrors _filename_problem()'s existing shape/pattern exactly): empty-name check (unchanged from before) plus the new length check, with a message explaining the 16th-character behavior in plain terms rather than just stating a number. Wired into both existing validation call sites: _update_validation() now calls self._name_problem(new_name) or self._filename_problem(new_filename) (was: a bare "if not new_name" check), and its success message now shows a live "(N/15 characters)" count so a user approaching the limit can see it before hitting Create; on_create()'s own guard (belt-and-suspenders, since Create is already disabled in this state) updated identically. Compiled clean; AST-confirmed ClonePanel has no duplicate methods and _name_problem() is defined exactly once. Real GUI behavior needs Doug's own run -- wxPython can't be installed in the dev sandbox. Prior entry (v0.19.8): Real bug fix, Doug's report from actually using the GUI (2026-08-19): unchecking "Show Screen" for a named Garmin screen type (Lap Summary, Cycling Dynamics, Elevation, etc.) popped a confirm dialog claiming hiding it via a raw file write was "genuinely UNTESTED," even though Doug had already successfully tested it -- reported after he'd hidden several such screens without issue. Root cause: EditScreenPanel._confirm_hide_guard() fired for ANY named-type match from check_system_screen_guard() (fit_patch.py), a SOFT confirm sitting downstream of two HARD, non-overridable blocks that already run first in on_show_toggle() -- hide_unsupported_screen_type() (Map/ClimbPro only, CONFIRMED via direct on-device inspection to have no Show Screen toggle at all, on any profile) and would_hide_last_visible_screen(). Since NO_SHOW_TOGGLE_TYPES = {Map, ClimbPro} was derived as an EXHAUSTIVE list, not a partial sample, anything reaching the soft guard -- having already cleared the Map/ClimbPro hard block -- is BY ELIMINATION a type with a working toggle; the "untested" framing was stale the moment real-device testing caught up to that logical fact. Discussed/scoped with Doug before changing anything (he offered "less severe warning" or "none at all" -- chose the latter after this reasoning): confirmed via his own testing across every named type with an on-device Show Screen checkbox, not just the handful he happened to mention. _confirm_hide_guard() REMOVED entirely (method deleted, call site in on_show_toggle() removed) -- hiding a named type now proceeds exactly like hiding a plain user screen, no popup. The SEPARATE guard on field-CONTENT changes to a named screen (_confirm_guard(), used by Add/Remove Field) is untouched -- genuinely different, still-legitimate territory, not what was reported. Compiled clean; AST-confirmed EditScreenPanel has no duplicate methods and _confirm_hide_guard no longer exists anywhere in the file. Real GUI behavior needs Doug's own run -- wxPython can't be installed in the dev sandbox. Prior entry (v0.19.7), real bug fix, Doug's report from actually using the GUI (2026-08-19): "Stage Selected for Edit" and "View Screens" were two separate buttons/clicks -- staging (on_stage()) set self.staged_path/frame.staged_path/frame.profile_filename and enabled next_btn, but on_profile_selected() (fired when the list selection changes) never touched any of that, only Restore/Clone's enabled state. Result: after staging profile A then clicking a different profile B in the list, "View Screens" stayed enabled and silently opened A -- whatever was staged FIRST -- not B, the one visually highlighted. Exactly Doug's reported symptom: advancing to Edit Screens shows "the Profile that I originally picked," not the one just clicked. Discussed with Doug before fixing (he explicitly asked to scope it first, correctly suspecting the GUI's logic depended on what's underneath): stage_for_edit() (garmin_device.py) is a plain local file copy of the already-backed-up profile plus a lineage sidecar -- no device I/O, no CLI subprocess, effectively instant -- so merging Stage into View Screens (Doug's chosen option over two alternatives: disabling next_btn on reselect, or warning on a stale click) costs nothing and removes the whole two-buttons/two-states bug class structurally, not just this one instance. ProfileListPanel.stage_btn REMOVED entirely; on_stage() folded into on_next(), which now stages the CURRENTLY selected profile immediately before navigating, every single click -- see on_next()'s own docstring for the full writeup. next_btn is now enabled/disabled by on_profile_selected()/on_deleted_profile_selected() exactly like restore_btn/clone_btn already were, rather than by a separate stage step. Also brings this panel's View Screens in line with how Restore/Clone (same panel) already behave -- one click, straight from "profile selected" to the next panel, no separate staging step for either of those either. Compiled clean; AST-confirmed no duplicate methods, stage_btn fully removed with no dangling references. Real GUI behavior needs Doug's own run -- wxPython can't be installed in the dev sandbox. Prior entry (v0.19.6), real bug fix, Doug's report from Windows 11 testing (2026-08-19): StartupTxtPanel.message_text (the multiline TextCtrl showing startup.txt's message) only had proportion=1/EXPAND in its vertical sizer, no explicit minimum height -- its visible line count was whatever leftover space remained after every fixed-size sibling control, which happened to be ~5 lines on Doug's Mac but only ~2 lines on his Windows 11 laptop (same code, genuinely different font-metric/DPI leftover space per platform), forcing a scroll to see the rest of an existing 5-line message. Fixed with an explicit SetMinSize() floor computed from self.message_text.GetCharHeight() * garmin_device.STARTUP_TXT_MAX_LINES -- guarantees at least STARTUP_TXT_MAX_LINES (6) lines are visible with no scrolling on any platform's actual font metrics, not a hardcoded pixel guess tuned to one machine. Proportion=1/EXPAND left in place, so the control still grows taller than this floor whenever more room is available (e.g. Doug's Mac should now show 6 lines instead of the previous incidental 5). Compiled clean; real GUI behavior on both platforms needs Doug's own run -- wxPython can't be installed in the dev sandbox. Prior entry (v0.19.5), cosmetic doc-only fix (2026-08-17): FieldPickerDialog's docstring said "117 confirmed entries" -- stale after fit_dump.py's 2026-08-17 batch (v2.4.16) added 20 confirmed field IDs, bringing FIELD_ID_NAMES to 137. No functional change -- FIELD_ID_NAMES is imported live from fit_dump.py, so the actual field picker was never wrong, only this comment; same recurring drift class as v0.16.5/v0.16.12. Prior entry (v0.19.4): field_edit_uncertain_warning_text(), a new EditScreenPanel warning for editing a "Workout" (f10=38) screen. Doug's own concern, well-founded: this screen type doesn't appear in the on-device scroll list during a normal ride (same conditional-trigger family as ClimbPro/Segment), so there's no way to see what its fields are actually supposed to look like before editing them here. New self.field_edit_warning_text label (same textwrap.fill()/GRAPH_WARNING_WRAP_WIDTH hard-wrap pattern as graph_warning_text, to not reproduce that wx-best-size bug class a sixth time), populated in refresh_from_file() from fit_dump.field_edit_uncertain_warning_text(mesg.get(10)) -- empty for every screen type except the new fit_dump.py FIELD_EDIT_UNCERTAIN_TYPES set (currently just 38). Explains plainly that the on-device editor offers no field editing for this type at all, these bytes are likely inert (probably Garmin's own structured-workout step display, a separate subsystem, only live during an actual running Workout), and the edit itself is safe mechanically (same proven write path as every other screen) even if it turns out to have no visible on-device effect. Deliberately a WARNING, not a hard block, unlike Map/ClimbPro's Show-toggle guard (that one's backed by independent on-device confirmation neither has a toggle at all; this is one profile's worth of evidence, and the downside of a wrong edit here is a no-op, not device damage). Compiled clean; AST-confirmed no duplicate methods; headlessly verified (fires only for f10=38, empty for every other type including None) via a wx-stubbed import. Real GUI behavior needs Doug's own run -- wxPython can't be installed in the dev sandbox. Prior entry (v0.19.3): Doc-only, no code change (2026-08-15): "Restore a Deleted Profile" (v0.19.0) CONFIRMED via Doug's own real GUI test -- a deliberately-deleted profile appeared correctly in the "Deleted, but available to restore" list below the on-device ones, and restoring it worked cleanly end to end. This was the one remaining real-GUI-behavior gap this feature was carrying (headless/CLI-level mechanics had already been confirmed on 2026-08-11); now closed. Prior entry (v0.19.2): Real bug fix, Doug's report from actually testing v0.19.1 (2026-08-15): the "reduce redundant profile backups" fix didn't actually reduce them in a real session. Doug's test: select a profile (Stage), Back, select a different profile (Stage), Back, re-select the FIRST profile again -- his own terminal log showed a full "Backed up 9 profile(s)..." right before that third selection, with no device disconnect anywhere in between. Root cause: ProfileListPanel.on_back() has always routed to "detect" (it's the only place that button goes), and DetectPanel.on_show() has always called on_detect(None) unconditionally every time that panel becomes active -- so every single "‹ Back" click from the profile list was itself re-running on_detect(), which v0.19.1 treated as one of the two real "device state may have changed" events and set frame.needs_backup = True every time, regardless of whether the device had actually changed at all. Fixed in DetectPanel.on_detect(): captures previous_root = self.frame.garmin_root BEFORE overwriting it, and only sets needs_backup = True when root != previous_root -- i.e. a GENUINE reconnect (None -> a path, or a different device/mount point), not a redundant re-verification of the same already-connected device that on_show()'s auto-detect triggers on every ordinary Back click. DeployPanel.on_check()'s needs_backup = True is untouched -- that's a manual, deliberate click after a real device write, not an automatic every-visit call, so it doesn't have this problem. Compiled clean; AST-confirmed no duplicate methods. Real GUI behavior needs Doug's own run -- wxPython can't be installed in the dev sandbox. Prior entry (v0.19.1): New feature, Doug's go-ahead (2026-08-15): "Reduce redundant profile backups" (low priority, scoped 2026-08-11, see PROJECT_NOTES.md). ProfileListPanel previously called garmin_device.backup_profiles() (a real device read/write of every profile in Sports/) unconditionally on EVERY visit to the panel via on_show(), even a plain "go View Screens, then Back" round-trip with zero edits -- a tester reported the confusing side effect directly: re-selecting a different profile printed another "Backed up X profile(s)..." message with nothing having changed. Fix: new frame-level self.needs_backup flag (MainFrame.__init__, starts True), reset to True by the two real "device state may have changed" events -- DetectPanel.on_detect() on a fresh confirmed connection, and DeployPanel.on_check() on a confirmed post-deploy reconnect (the write that was just deployed IS a real change). ProfileListPanel.on_refresh()/on_show() collapsed into a shared _refresh_list(force_backup) -- on_show() (every ordinary visit) passes force_backup=False, so a real backup_profiles() call only happens when needs_backup is True (or there's no cached self.backup_paths yet at all, e.g. first visit this session); on_refresh() (the "Refresh (re-backup + re-list)" button) passes force_backup=True unconditionally, honoring its own label regardless of the flag. The cheap, non-device-dependent parts (re-listing from self.backup_paths, the "Deleted, but available to restore" list via list_backed_up_profile_filenames()) still run every visit either way -- only the real device backup call itself is now conditional. Status line now distinguishes "Backed up N profile(s)..." (a real backup just happened) from "N profile(s) on this device (nothing's changed since the last backup)..." (using the cached list) so the skip is visible, not silent. Compiled clean; AST-confirmed no duplicate methods introduced. Real GUI behavior needs Doug's own run -- wxPython can't be installed in the dev sandbox. Prior entry (v0.19.0): New feature, Doug's go-ahead (2026-08-15): "Restore a Deleted Profile" (see PROJECT_NOTES.md Open Items). Built per the DESIGN CHOSEN back on 2026-08-11 (Doug): ProfileListPanel gets a SECOND list widget, "Deleted, but available to restore" (new self.deleted_list, own header label), NOT a new button or a new panel -- deliberately avoiding the class of wx.ListCtrl/ListBox best-size trouble this project has already hit three times, which a single-list-with-inline-divider shape risked reopening. on_refresh() now also populates deleted_list from garmin_device.list_backed_up_profile_filenames() (NEW, garmin_device.py v0.12.2) minus self.backup_paths (whatever's currently live) -- every profile ever backed up that isn't in Sports/ right now. The existing "Restore from Backup..." button now checks BOTH lists (self.profile_list.GetStringSelection() or self.deleted_list.GetStringSelection()) -- the two are kept mutually exclusive by on_profile_selected()/new on_deleted_profile_selected(), each clearing the other's selection, so on_restore() is never ambiguous about which profile is meant. Stage/Clone/View Screens stay gated to the live list only, via on_deleted_profile_selected() leaving them disabled -- those genuinely require the profile to currently exist. Also added an "On Device:" header label above the existing live list, for visual parity with the new one below it. RestorePanel itself needed one small change to serve both cases correctly: on_restore()'s confirmation dialog and _refresh()'s status line now check frame.known_profiles and say "RECREATING" instead of "REPLACING" when the target profile isn't currently live -- "replacing" was simply false for a deleted profile -- citing the 2026-08-11 on-device confirmation (NewFiles correctly recreating a deliberately-deleted profile) directly rather than leaving it unstated. No new panel, no new frame-level "return to" state needed -- RestorePanel's Back button is unchanged, still always returns to ProfileListPanel, since there's only ever the one entry point. Zero new backend/Deploy logic beyond the one discovery function -- the real risk this feature depends on (can NewFiles actually RECREATE a deleted profile, not just replace/create-new) was already CONFIRMED via a direct on-device test back on 2026-08-11. Compiled clean; AST-confirmed ProfileListPanel/RestorePanel have unique methods, no duplicates introduced. Real GUI behavior needs Doug's own run -- wxPython can't be installed in the dev sandbox. Prior entry (v0.18.1): Doc-only, no functional change, Doug's decision (2026-08-15): the f10=32 Conditional record's display name changed from "GroupTrack" to "Reserved" lives entirely in fit_dump.py v2.4.12's NAMED_SCREEN_TYPES -- screen_type_name(32) is read live from there, so nothing in this file needed a code change. Updated the two comments here that explained/described the record by its old name: ViewScreensPanel's "Conditional screens" summary line (was "e.g. GroupTrack", now names the record directly: "always seen as a f10=32 \"Reserved\" record, purpose unclear") and a comment in AddScreenPanel's screen-count logic. Prior entry (v0.18.0): New feature, Doug's go-ahead (2026-08-14): StartupTxtPanel -- view/edit the device's startup.txt custom boot message, reached via a new "Startup Message..." button on DetectPanel (enabled/disabled in lockstep with next_btn, since it needs a detected device the same way). Built on garmin_device.py v0.12.0's new read_startup_txt()/parse_startup_txt()/build_startup_txt()/write_startup_txt(), themselves built from Doug's own real-device confirmation of startup.txt's on-device path and write mechanism (see that file's changelog and PROJECT_NOTES.md's "startup.txt" section). Editable fields, per Doug's own scoping answer: the <display=N> seconds value (wx.SpinCtrl) and the free-form message text (wx.TextCtrl multiline) -- everything else (Garmin's own comment scaffolding, exact spacing) is preserved byte-for-byte via parse_startup_txt()'s header/message split, never regenerated from scratch. Live char/line-count guidance (STARTUP_TXT_MAX_CHARS/STARTUP_TXT_MAX_LINES) shown via a new warning_text label, deliberately NOT a hard block on Save -- Doug's explicit call: "different width characters cause the same number of characters to wrap at a different character count... if a user wants to have it wrap at a specific spot they can always redo the file till they get it the way they want it and we will be backing up the original." Warning text hard-wrapped via the same textwrap.fill()/GRAPH_WARNING_WRAP_WIDTH helper the Graph/Bars warning uses (v0.16.16), to not reproduce that same wx-best-size bug class a fifth time. Save flow: YES/NO confirm (states plainly this is a direct device write, no NewFiles, backs up the existing file first) -> write_startup_txt() -> stage flips to "saved", showing eject controls (Eject Now (diskutil) / I Ejected It Myself, same pattern as DeployPanel, reusing garmin_device._volume_mount_point()) and a Done button back to Detect. Deliberately NO "Check for Reconnected Device"/post-write verification step the way DeployPanel has one -- a boot-time message can't be read back by this app, so the eject/power-cycle instructions are the end of this flow, not a lead-in to further checks. Back button warns (same wx.YES_NO/ICON_WARNING style as ViewScreensPanel's v0.16.17 fix) if there are unsaved edits, via a new _is_dirty() check against baseline values captured on_show(). Compiled clean; AST-confirmed StartupTxtPanel's methods are each defined exactly once. Real GUI behavior needs Doug's own run -- wxPython can't be installed in the dev sandbox. Prior entry (v0.17.0): New feature, Doug's go-ahead (2026-08-14): "Remove Selected Screen" on ViewScreensPanel -- the GUI wrapper for fit_patch.py's --remove (v1.14.0, CONFIRMED via a real on-device round-trip test, v1.14.1), completing "Delete Screen" (see PROJECT_NOTES.md Open Items) now that both build-plan steps (headless verification, then the device test) are done. New self.remove_btn, placed next to Move Up/Down per the earlier placement decision -- same row-select-then-act pattern as those buttons, same panel (a list-level operation, not a screen property, which is why it's here and not EditScreenPanel). New on_remove() handler: checks the selected row's slot against the exact same two hard guards --remove enforces at the CLI level (hide_unsupported_screen_type() for Map/ClimbPro, would_hide_last_visible_screen() for the last-visible-user-screen floor), each with its own explicit OK/ICON_ERROR dialog and no override (neither guard is a guess); then a YES/NO/ICON_WARNING confirmation stating plainly this is PERMANENT and undoable only via Restore-from-Backup; then remove_screen() applied to frame.editing_path via the same "first edit creates the scratch copy" pattern on_edit()/_swap_screen_order() already use. Guard checks run against get_working_path() (editing_path if set, staged_path otherwise) -- the same file screens_list itself was populated from, so the guard can never check a different state than what's about to be modified. remove_btn's enabled state follows edit_btn's exactly (on_row_selected()/on_row_deselected()/_reselect_row()/on_refresh()'s several Disable() blocks) since both need a row selected the same way. SAME COMMIT: split ViewScreensPanel's single button row into two (button_row1/button_row2) -- real feedback from Doug that one row of 9 buttons ran the full window width. Row 1 = session/navigation actions (Back, Re-read File, Discard Edits, Review & Deploy...); Row 2 = screens-list actions (Move Up/Down, Remove, Add New Screen, Edit Selected Screen). Compiled clean; AST-confirmed on_remove() is defined exactly once and every other ViewScreensPanel method is still present and unique. Real GUI behavior (does the button actually work end to end) needs Doug's own run -- wxPython can't be installed in the dev sandbox. Prior entry (v0.16.17): Real bug fix, Doug's report from actually using the GUI (2026-08-14): the Back-button confirm dialog's wording ("...if you stage this (or any other) profile again before returning here, they'll be lost for good") implied a user could come back later and pick up where they left off -- not true, there's no resumable state, Back abandons the edit immediately regardless of whether/when the user stages anything again. Replaced with Doug's own more direct wording: "You have edits from this session that haven't been deployed to the device yet. If you go back you will lose those edits and have to start over!" No functional change -- ViewScreensPanel.on_back()'s actual check/guard logic is untouched, this is purely the message text. Prior entry (v0.16.16): Real bug fix, Doug's report from actually running the GUI (2026-08-14): the new Graph/Bars warning text (v0.16.15) blew out EditScreenPanel's window width, pushing the layout diagram off the right edge of the screen -- the FOURTH time this exact codebase has hit the "wx widget reports best-size from an unwrapped string's full pixel width" bug class (see v0.16.2/v0.16.3/v0.16.6, PROJECT_NOTES.md "Corrections and lessons learned"). Fixed via a new graph_bars_warning_text() helper that HARD-WRAPS each warning through Python's stdlib textwrap.fill() (new GRAPH_WARNING_WRAP_WIDTH = 42 chars) before it ever reaches graph_warning_text's SetLabel(), rather than relying on wx.StaticText's own Wrap() method -- deliberately, since Wrap() can't be exercised at all in the dev sandbox (no wxPython available there) and its documented behavior when the label ALREADY contains newlines (which stacking multiple warnings would) is explicitly "not going to be rewrapped in a sensible way," an unverifiable risk this project has no way to test for itself. textwrap.fill() is pure stdlib, fully headlessly testable, and produces a deterministic result independent of font/DPI/platform. Reworded graph_bars_warnings()' individual message text shorter at the same time (fewer characters per warning = fewer wrapped lines = less vertical growth when several stack). Also applied the same textwrap-based wrap to FieldPickerDialog's static note for consistency, even though that dialog's fixed constructor size makes it lower-risk (no Fit() is ever called on it). Headlessly verified via textwrap.fill() directly against the real warning strings graph_bars_warnings() produces -- confirmed every wrapped line stays within the target width. Compiled clean; real visual confirmation (does the window actually stay put now) needs Doug's own run. Prior entry (v0.16.15): New feature, scoped 2026-08-11, built 2026-08-14: Graph/Bars full-width warning. fit_dump.py's new GRAPH_OR_BARS_FIELD_IDS (v2.4.11) lists the 10 fields Doug individually confirmed on-device need a full-width screen slot to actually render as a graph/bar -- placed in a shared/split row instead, they silently fall back to plain text with no on-device indication anything's wrong. New module-level helpers is_position_full_width()/graph_bars_warnings(), fully derived from LAYOUT_GRIDS (the same data LayoutDiagramPanel's preview already uses -- no new geometry model needed). Surfaced in two complementary places per the scoped design: (1) FieldPickerDialog gets a static note (independent of placement) whenever the currently-selected/highlighted field is a Graph/Bars type, updated live via a new EVT_LISTBOX handler; (2) EditScreenPanel and AddScreenPanel both get a new graph_warning_text label, recomputed on every refresh_from_file()/_refresh_widgets() call, that names any CURRENTLY PLACED Graph/Bars field whose position isn't full-width for the screen's current field count + layout variant -- recalculates automatically as fields are added/removed/reordered/layout-toggled, since row membership can change with any of those. Deliberately a warning, not a hard block -- a non-full-width placement isn't invalid, it just silently degrades to plain text, so the user should be free to do it deliberately (e.g. testing) with eyes open. Known limitation, inherited from the underlying data and already flagged when this was scoped: false negatives are possible (an unconfirmed field that actually needs full width won't be flagged) but false positives should not be -- nothing in GRAPH_OR_BARS_FIELD_IDS is a guess. Compiled clean (py_compile; wxPython itself can't be installed in the dev sandbox, so this is syntax/import-level verification only -- real GUI behavior needs Doug's own run). Prior entry (v0.16.14): Real bug fix (2026-08-14): ViewScreensPanel.on_back() was a bare self.frame.show_panel("profiles") call with no check of frame.editing_path at all, so any edit accumulated this session (Add New Screen, Move Up/Down, or an EditScreenPanel change -- all applied immediately to the scratch .editing.fit file per this app's "every click is a real, immediately-applied operation" architecture) was silently left behind with zero warning if the user clicked Back. ProfileListPanel.on_stage() unconditionally discards frame.editing_path before staging (v0.15.1's own fix, for an unrelated bug), so re-staging that same profile -- or any profile -- afterward made the loss permanent from the app's perspective, since editing_path filenames are deterministic and re-derived fresh each Stage, leaving no way for the GUI to rediscover an abandoned scratch file. Fixed: on_back() now checks frame.editing_path is not None and shows a wx.MessageBox(wx.YES_NO | wx.ICON_WARNING) confirm before navigating away, same style already used for RestorePanel.on_restore()'s destructive-action confirm. Deliberately did NOT touch EditScreenPanel.on_back()/AddScreenPanel.on_back() -- both return to "screens" (staying inside the same editing session, never exiting it) and neither panel ever holds a pending/not-yet-applied state to lose, so this fix is scoped to the one panel where the risk is real. Scoped with Doug 2026-08-13 (see PROJECT_NOTES.md Open Items), built 2026-08-14. Prior entry (v0.16.13): Doc-only, no functional change (2026-08-13): two comment blocks (describe_screen_changes(), DeployPanel.on_check()) referenced fit_patch.py's --un-remove flag as merely "not exposed in the GUI." Doug decided to retire --un-remove entirely from fit_patch.py (v1.13.0) -- Restore-from-Backup already covers real recovery, --un-remove had a confirmed historical data-loss hazard never re-verified after the fix, and Garmin's own editor doesn't offer an un-remove workflow either. Updated both comments to say the flag no longer exists at all, not just that the GUI doesn't surface it. No code changes -- the GUI never called --un-remove directly. Prior entry (v0.16.12): Cosmetic doc-only fix (2026-08-13): FieldPickerDialog's docstring said "105 confirmed entries" -- stale after fit_dump.py grew to 117 across the 2026-08-11 batch (v2.4.7) and the 49/320 rename-only corrections (v2.4.8/2.4.9); same class of drift already fixed once before at v0.16.5 (87->105). No functional change -- FIELD_ID_NAMES is imported live from fit_dump.py, so the actual field picker was never wrong, only this comment. Caught while confirming pre-release state ahead of a possible v1.0.1 tag. Prior entry (v0.16.11): Doc-only, no code change (2026-08-11): the "restore a profile no longer on the device" enhancement (scoped, not yet built -- see PROJECT_NOTES.md Open Items, task list #57) had one real open technical risk: whether the device's NewFiles import can actually RECREATE a profile that's been deleted from Sports/, not just replace an existing one or accept a brand-new never-before-seen filename (Clone Profile's case, confirmed separately this same day). Doug tested this exact scenario directly via garmin_device.py deploy <backup_of_a_deleted_profile.fit> <target_profile_filename>, targeting a filename he'd deliberately deleted from the device -- CONFIRMED via on-device verification: NewFiles correctly recreated the deleted profile. This is the stronger of the two related confirmations logged today, since it's the literal restore-a-deleted-profile path, not just an analogous one -- the backend mechanics this GUI feature would wrap are now fully proven end to end; only the GUI entry-point gap itself remains unbuilt. Prior entry (v0.16.10): Doc-only, no code change (2026-08-11): Clone Profile (v0.16.0, ClonePanel) has been CONFIRMED via real hardware -- Doug reported this after the fact, it just hadn't been logged yet. At least two clones deployed and working correctly through NewFiles under brand-new filenames not previously present on the device: Clonebox (from Sandbox) and CloneRoad (from Road). This also resolves a question that had been open since v0.16.0: whether NewFiles correctly accepts a genuinely NEW filename via the same pathway used to replace an existing one, rather than just the latter -- confirmed yes. Directly relevant to the newly scoped "restore a profile no longer on the device" enhancement (see PROJECT_NOTES.md Open Items), which shares this exact mechanism and had been carrying this as its single biggest open risk; that risk is now cleared. README.md and PROJECT_NOTES.md corrected to match (both had carried a stale "not yet tested through the actual GUI on real hardware" note against Clone Profile). Prior entry (v0.16.9): Real fix, pre-Windows-support housekeeping (2026-08-11): DEFAULT_WORKING_DIR was hardcoded to "/Volumes/UserDCbu/dougcurtis/GarminBackups" -- Doug's own actual Mac path, harmless as long as only Doug ran this, but a real problem for anyone else (wrong user, and outright broken on Windows where /Volumes/... isn't a thing at all). Now os.path.join(os.path.expanduser("~"), "GarminBackups") -- resolves sanely on any OS/user. Also, working_dir was NEVER persisted across app restarts even after being changed via ProfileListPanel's "Change..." button -- every launch reset to the default, forcing a re-browse for anyone using a custom location. Added load_saved_working_dir()/save_working_dir(), a small JSON sidecar at ~/.garmin_screen_editor_config.json: MainFrame.__init__ now seeds working_dir from the saved value if one exists (falling back to DEFAULT_WORKING_DIR only on a true first-ever launch), and on_change_working_dir() saves immediately whenever the user picks a new directory. Both are best-effort/never-raise (missing file, corrupt JSON, read-only home dir all just fall back to in-memory-only behavior for that session) so a config-file problem can never block using the app. User-confirmed design choice (2026-08-11) over two simpler alternatives (plain default with no persistence; first-use-only prompt) -- this one needed the persistence layer either way, so it solves it for good rather than just changing what the default looks like. Compiled clean. Prior entry (v0.16.8): New "About" button on DetectPanel (part of the same pre-publish pass as v0.16.7's rename) -- opens AboutDialog, a short modal summary (app name/version, "not affiliated with Garmin" trademark disclaimer, a one-paragraph note that the undocumented data_screen format was reverse-engineered via black-box observation of real files rather than reverse-engineering Garmin's own SDK/software, and an MIT license mention pointing to LICENSE/README.md for the full text) -- deliberately a SHORT summary, not an attempt to embed the full legal text verbatim, so this dialog's wording never has to track README.md's disclaimer word-for-word. New module-level ABOUT_TEXT template string, formatted with __version__ at dialog-open time. Body uses a read-only word-wrapped wx.TextCtrl rather than wx.StaticText -- not because of the v0.16.2/v0.16.3/v0.16.6 best-size bug class (this is a modal wx.Dialog with its own fixed size, not embedded in MainFrame's resizable sizer tree, so it can't reproduce that regardless), just because wrapping is the right call for a paragraph this long either way. Headless-verified the string's backslash-continuation formatting collapses to clean single-line paragraphs with real paragraph breaks (evaluated the literal directly, not via regex extraction, to actually exercise Python's string-literal line-continuation parsing). Compiled clean. Prior entry (v0.16.7): Cosmetic rename ahead of a possible public GitHub release: window title changed from "Garmin Edge Screen Editor" to "Activity Profile Screen Editor for Garmin Edge" -- this is an independent, unofficial project, not a Garmin product, and the old title read too much like one. "For Garmin Edge" is the standard nominative-fair-use pattern (naming the compatible device without claiming official status), user-confirmed choice over two safer/more-Garmin-referencing alternatives. No functional change. See LICENSE and the README disclaimer draft (README_DISCLAIMER_DRAFT.md, pending review) for the rest of the pre-publish housekeeping this is part of. Prior entry (v0.16.6): Real reported bug fix, corrects a wrong fix (2026-08-10): v0.16.3's 460px ceiling on the Fields column stopped the frame from growing, but silently broke something else -- wx.ListCtrl clips a cell's text to its column's pixel width with NO wrap/ellipsis, and the control's own horizontal scrollbar only engages when the SUM of ALL column widths exceeds the control's rendered area, which a single capped column mostly never triggers. Net effect: text silently truncated mid-character instead of the window growing -- confirmed on a real 10-field screen with several of the new longer field names (only 6-7 visible, no way to see the rest). The v0.16.3 comment's "content past the ceiling relies on the ListCtrl's own native horizontal scroll" claim was simply wrong -- the SECOND unverified assumption about this exact widget's real behavior in three days (see PROJECT_NOTES.md "Corrections and lessons learned"). Correct fix: stop trying to control the FRAME's size by capping the COLUMN -- decouple them instead. New ScreensListCtrl(wx.ListCtrl) subclass overrides DoGetBestSize() to cap only the WIDTH the sizer system sees (height still comes from the normal calculation, preserving v0.11.0's grow-taller-for-more-rows behavior); ViewScreensPanel.screens_list and RestorePanel.history_list (same exposure, proactively fixed too -- it had never even gotten the v0.16.3 ceiling) both now use it instead of a plain wx.ListCtrl. With the frame's size no longer tied to column content at all, the Fields column is safe to auto-size to its FULL real content again (reverted to floor-only 280px, no ceiling) -- and when that's genuinely wider than the space available, the ListCtrl's real native horizontal scrollbar engages for real this time, since assigned-area-smaller-than-content is now the true state of affairs rather than being masked by a frame that always grows to match. Compiled clean; AST-confirmed ScreensListCtrl is defined and both call sites use it. Prior entry (v0.16.5): Cosmetic doc-only fix: FieldPickerDialog's docstring said "87 confirmed entries" -- stale after fit_dump.py v2.4.4 added 18 confirmed field IDs (2026-08-10 batch), bringing FIELD_ID_NAMES to 105. No functional/behavioral change. Prior entry (v0.16.4): Readability fix, real reported feedback with a side-by-side screenshot: LayoutDiagramPanel's cell-label text (9pt) was noticeably smaller than the rest of the window's controls, hard to read. Bumped to 13pt (10pt for the italic B-layout note and the "(no layout to show)" placeholder), and bumped SetMinSize() from (280,220) to (340,280) to give the bigger font more room in the smallest cells (8-10 field layouts have the most rows/cells). Confirmed via code review that this has NO width/height side effect of the kind fixed in v0.16.2/v0.16.3: unlike wx.ListBox/wx.ListCtrl, LayoutDiagramPanel is custom-painted (on_paint(), wx.EVT_PAINT) with an explicit per-cell wx.DC clipping region -- its reported size is only ever the fixed SetMinSize() value, never derived from font size or label content, so there was no risk of this reproducing the same window-growth bug. One flagged (not yet acted on) readability trade-off: a longer known field name in a busy 8-10 field layout is now somewhat more likely to get silently clipped (DrawLabel() has no ellipsis) at the bigger font than it was at 9pt -- worth watching for during testing on dense screens. Prior entry (v0.16.3): Same-day follow-up to v0.16.2 -- that fix only covered EditScreenPanel/AddScreenPanel's wx.ListBox; a real reported regression showed the identical root cause ALSO hits ViewScreensPanel's "Fields" ListCtrl column: a real profile with 9 of 10 fields unresolved on two different screens still widened the window from "View Screens." The v0.11.1 fix's assumption -- that a wx.ListCtrl in report mode never grows the FRAME from column content, relying instead on the control's own native horizontal scrollbar -- turned out not to hold for large enough overflow (confirmed via real testing, not just theory this time). Fixed two ways together: (1) the Fields column now uses field_name(fid, terse=True) same as the v0.16.2 fix, and so do the Conditional/Removed screen summary lines feeding self.other_text (a plain wx.StaticText with NO scrollbar at all -- actually MORE exposed to this bug shape than the ListCtrl was, just not yet reported); (2) SetColumnWidth(6, wx.LIST_AUTOSIZE)'s result is now capped on BOTH ends -- the existing 280px floor (v0.11.1, unchanged) plus a NEW 460px ceiling -- with content past the ceiling relying on the ListCtrl's own native horizontal scroll, not a frame resize. wx.ListCtrl in report mode has no built-in per-cell text wrap (that's a wx.grid.Grid feature, not applied here -- a wider widget swap than this warranted), so capping the column width and shortening the unknown-ID text together is the practical equivalent of "wrap," without the heavier refactor. Prior entry (v0.16.2): Real reported bug fix (2026-08-07): editing a screen with an unresolved/unknown field ID pushed the whole window off the left edge of the screen, with a large empty gap between the field list and the diagram, and the diagram column stretched wider than needed too. Root cause: wx.ListBox reports its own best-size based on the full pixel width of its longest item string; field_name() in its default (non-terse) mode returns long descriptive strings for unknown IDs (e.g. "UNKNOWN (id=58, NEW - not seen before)", ~39 chars) versus normal field names (~10-20 chars). That inflated best-size propagates up through EditScreenPanel's/AddScreenPanel's body_row sizer (both columns share equal HORIZONTAL proportion, which is why the diagram column stretched too, not just the field list), and because MainFrame._relayout() only ever GROWS the window (v0.11.0, deliberately, so a manually-enlarged window wouldn't snap back down on every refresh), the inflated size stuck permanently across every subsequent panel -- exactly matching the reported "expanded screen is retained when I go back." Fixed at the source: fields_list.Set() and the diagram's label-building both now call field_name(fid, terse=True) in EditScreenPanel AND AddScreenPanel (short forms like "id58?" instead of the full descriptive sentence -- AddScreenPanel can't actually hit this today since Add Field/Change Type are FieldPickerDialog-only over the known catalog, fixed there anyway for consistency and as cheap insurance). Also hardened _relayout() itself as defense-in-depth: growth is now clamped to the current display's usable work area (via wx.Display.GetFromWindow(), falling back to the primary display if the frame isn't fully within one), so no FUTURE content-driven best-size spike -- from this bug's category, not just this specific instance -- can ever push the window off-screen/unusable again; at worst some content would be tight/scrolled instead, a recoverable degradation rather than a lockout requiring an app restart. Headless-verified: field_name(58, terse=True) returns "id58?" (5 chars) vs the old ~39-46 char forms; compiled clean. Prior entry (v0.16.1): Two minor UX fixes, no behavioral change. (1) DetectPanel's not-connected message said "Connect your Edge 530 via USB" -- genericized to "Connect your Garmin Edge device via USB" now that Clone/Restore/detection are all already model-agnostic (structure-based detection, no Edge-530-specific logic anywhere in the connection layer) and the toolkit's own analysis (this session) concluded the data_screen mechanism -- field-count + A/B flag only, no stored geometry -- likely generalizes to other Edge models even though the actual caps/LAYOUT_GRIDS would need per-model confirmation before being trusted. (2) MainFrame's window title now includes the running version (f"Garmin Edge Screen Editor v{__version__}") -- previously only visible by opening this file, no in-app way to tell which build was running. Prior entry (v0.16.0): ClonePanel -- "Clone..." on ProfileListPanel, a sibling action to Stage/Restore: patches sport_mesgs[0].name via fit_clone_profile.py's patch_profile_name() (a completely different message than data_screen -- CONFIRMED full-fidelity on real hardware already at the CLI level, see MVP_SCOPE.md "Clone-and-retarget"). Live filename-collision validation against frame.known_profiles (kept fresh by ProfileListPanel.on_refresh() every visit) blocks "Create Clone" until the chosen filename is guaranteed to not match anything currently on the device -- deploying under an existing filename would silently OVERWRITE that profile instead of creating a new one, per fit_clone_profile.py's own docstring warning. Auto-suggests a filename from the display name (alnum-only, matching Garmin's own plain filenames) but never overwrites a filename the user has actually typed into directly. Sources from the selected profile's just-taken backup, never the live device file, same discipline as Stage/Restore. Hands off straight to DeployPanel (steps 9-10) exactly like Restore does -- no staged-vs-editing diff applies to a clone either -- with frame.profile_filename set to the NEW filename (the deploy target) rather than the source's. frame.deploy_return_panel gains a third value ("clone") alongside "review"/"restore", handled identically by DeployPanel's existing context-aware Back button/label and by the same belt-and-suspenders editing_path cleanup pattern RestorePanel already uses. Headless-verified against a real backup file: filename validation (missing extension, path separators, case-insensitive collision) all behave correctly; patch_profile_name() produces a byte-for-byte-structurally-identical clone (same file size, same screens/fields/order, only the name field bytes differ) with the source file itself completely untouched; describe_screen_changes() confirms zero screen differences between source and clone, matching the confirmed real-hardware result. This closes out the GUI's full feature backlog -- see PROJECT_NOTES.md Open Items. Prior entry (v0.15.2): cosmetic doc-only fix: FieldPickerDialog's docstring said "86 confirmed entries" -- stale after fit_dump.py v2.4.3 added field 58 (Lap Timer), bringing FIELD_ID_NAMES to 87. No functional/behavioral change. Prior entry (v0.15.1): fix real bug found via testing (2026-08-06): frame.editing_path was only ever cleared by DeployPanel.on_done(), so backing out of a Restore attempt without completing it (RestorePanel's/DeployPanel's "Back" buttons) left editing_path pointed at the abandoned restore's backup file. Since get_working_path() prefers editing_path over staged_path, a subsequent normal Stage on a profile then silently showed/would-have-edited that stale leftover instead of what was just staged -- reported symptom: "View Screens shows the backup I was about to restore, not what I just staged," which happened to look plausible in PreflightPanel's diff by coincidence (a stale backup vs. current-device-state diff can look like real intended changes) rather than because anything was actually correct. Fixed in two places: ProfileListPanel.on_stage() now unconditionally discards any prior session's editing_path before staging (the real fix -- a fresh Stage should always start clean, covering this case AND the same latent risk when switching to a different profile mid-session); RestorePanel.on_back() also proactively discards when frame.deploy_return_panel == "restore" (the only site that ever sets it to that), cleaning up immediately rather than leaving it to the next Stage. Prior entry (v0.15.0): RestorePanel -- "Restore from Backup..." on ProfileListPanel now goes somewhere: lists every backup of the selected profile (garmin_device.list_backup_history(), NEW in garmin_device.py v0.11.0, newest first, de-duplicated for identical-content runs) with a quick per-candidate screen-type summary, then hands off straight to DeployPanel (skipping PreflightPanel entirely -- there's no staged-vs-editing diff to review for a restore, the user already picked a specific known backup). DeployPanel/describe_screen_changes() work completely unchanged, since both only care that frame.editing_path points at real .fit bytes, not how it got set -- the backup file is used directly, never copied. DeployPanel's "Back" button is context-aware (frame.deploy_return_panel) so it returns to wherever Deploy was actually reached from ("review" or "restore") instead of always assuming the normal edit flow. Prior entry (v0.14.0): post-write verification (step 10) -- DeployPanel.on_check() now re-pulls the LIVE profile from the device's Sports/ folder the moment reconnect is confirmed, and compares it against editing_path (what was actually sent) via a new module-level describe_screen_changes() -- factored out of PreflightPanel's former _describe_changes() so both panels share one implementation. User-confirmed design (2026-08-06): compare visible/active screens only, no Removed-list bookkeeping -- Garmin's own editor has no un-remove option and neither does this GUI, so the device's known Removed-list wipe on NewFiles import isn't something to report on; describe_screen_changes() already does this for free, since it only ever reports slots ACTIVE (field 1==1) on at least one side, so Removed/Unconfigured-only transitions are invisible to it by construction, no special-casing needed. Runs automatically on reconnect (not a separate manual step) since the device is already confirmed connected at that point. Prior entry (v0.13.0): DeployPanel (step 9) -- write the CRC-verified working copy to NewFiles/, then walk the user through eject and reconnect. User-confirmed design (2026-08-06): no background polling/threading for the remount wait (this app's first would-be background thread, a new failure-mode class) -- reconnect detection is a manual "Check for Reconnected Device" button, one non-blocking find_garmin_root() call per click. Eject is a wx.MessageBox-confirmed diskutil call (garmin_device.py's own eject_device(auto_eject=True) uses a terminal input() prompt, which would hang a GUI handler), reusing garmin_device._volume_mount_point() for the real ejectable target; "I Ejected It Myself" is the always-available fallback. Prior entry (v0.12.0): replace PreflightPanel's raw fit_dump.py-diff-style unified diff with a plain-English, per-screen change summary (_describe_changes()) -- user feedback: the byte-level diff was too technical for the GUI's actual audience (a rider, not a developer); hardcore users who want that level of detail can still use the CLI tools directly. See PreflightPanel's docstring for the full reasoning. Prior entry (v0.11.1): fix ViewScreensPanel's "Fields" column being a fixed 280px width, which silently CLIPPED (not wrapped) any screen's field list wider than ~3-4 short names -- reported bug: a 10-field screen only showed 3 fields + part of the 4th. on_refresh() now calls SetColumnWidth(6, wx.LIST_AUTOSIZE) after populating rows, so the column sizes to its actual widest content (never below the original 280px floor); overflow beyond the window's own width falls to the ListCtrl's native horizontal scrollbar instead of clipping. Prior entry (v0.11.0): fix MainFrame._relayout() to only GROW the window (max of best-size vs current size), never shrink it. Reported bug: manually enlarging the window (e.g. to see more than ~6 rows of the screens list) snapped back to the smaller size the moment any button triggered a refresh, since nearly every handler ends with self.frame._relayout(), which called self.Fit() unconditionally -- Fit() resizes to the sizer's ideal size in BOTH directions, including shrinking. The anti-overlap behavior Fit() was added for in v0.1.1 (growing when content needs more room) is preserved via GetBestSize(); the unwanted shrink is gone. No call sites needed to change -- _relayout() keeps its bare no-arg signature.
+__version__ = "0.19.20"  # Doc-only/naming, Doug's go-ahead (2026-08-25): project rename extended past the GUI window title (which was already "Activity Profile Screen Editor for Garmin Edge" since v0.16.7). Doug clarified the canonical public name is "Activity Profile Editor for Garmin Edge" -- no "Screen" (matches the GitHub repo name "Activity-Profile-Editor" and his own Release titles "Activity Profile Editor for Garmin Edge Devices" (2026-08-25): the editor targets any Edge device generically, and even though screens are what actually get edited, backups/restores/deploys all operate at the Activity Profile level, so "Activity Profile" is the right noun to lead with, not "Screen"). Also drops the leading "Garmin Edge 530" pattern seen elsewhere (README.md/PROJECT_NOTES.md's old H1) -- deliberately not leading with "Garmin" at all, to avoid implying this is a Garmin product, and not device-specific despite the 530 being the only Edge model actually tested against so far. Three spots updated in this file: MainFrame's window title (super().__init__'s title= argument), the module docstring's own opening line, and ABOUT_TEXT (the About dialog shown via DetectPanel's About button) -- all three now read "Activity Profile Editor for Garmin Edge" with no "Screen"/"530". No behavior change anywhere, text-only. See README.md/PROJECT_NOTES.md/MVP_SCOPE.md/FIT_PATCH.md's own changelog entries for the matching doc-side renames -- MEMORY_LOG.md and the RELEASE_NOTES_v1.1.x.md files are deliberately LEFT UNCHANGED, since both are point-in-time historical records (an explicitly archived project log, and notes already published as GitHub Releases under Doug's own chosen title) rather than live documentation -- same reasoning this project already applies to not rewriting old changelog/Doc-rev entries.
 """
-gui_app.py -- Garmin Edge 530 Screen Editor GUI.
+gui_app.py -- Activity Profile Editor for Garmin Edge, GUI.
 
 Covers steps 1-10 of the agreed high-level flow (PROJECT_NOTES.md /
 "GUI scoping and implementation"), plus Restore-from-Backup, Clone
@@ -116,6 +116,7 @@ not needed for this slice).
 import json
 import os
 import platform
+import re
 import shutil
 import struct
 import subprocess
@@ -211,6 +212,72 @@ def save_working_dir(path):
     try:
         with open(CONFIG_PATH, "w") as f:
             json.dump({"working_dir": path}, f, indent=2)
+    except OSError:
+        pass
+
+
+# Favorite Screen (2026-08-24, Doug's go-ahead) -- a SINGLE favorite
+# slot, not a named list, per Doug's own design decision (2026-08-15,
+# see PROJECT_NOTES.md Open Items "Favorite Screen"): no management UI
+# needed as a result, since there's nothing to browse/rename/delete,
+# just one slot that gets overwritten on every new "Save as Favorite".
+# Same small-JSON-sidecar pattern as CONFIG_PATH above, deliberately a
+# SEPARATE file rather than a new key in that one -- different
+# lifecycle/purpose, no reason to couple them.
+FAVORITE_PATH = os.path.join(os.path.expanduser("~"), ".garmin_screen_editor_favorite.json")
+
+
+def load_saved_favorite():
+    """
+    Return the saved favorite as {"field_ids": [...], "layout_variant":
+    0 or 1, "source_profile": "<filename>"} or None if there's no
+    favorite saved yet, or the file can't be read/parsed. Never raises.
+    source_profile is the filename the favorite was captured FROM --
+    used only for a WARN-ONLY cross-profile note when loading (Doug's
+    call, 2026-08-15: guide, don't block, matching this toolkit's
+    general policy for uncertain-but-not-dangerous situations -- a
+    field valid on one sport type's screen isn't guaranteed valid on a
+    DIFFERENT sport type it gets applied to, but this toolkit has no
+    per-sport-type field validity data to actually enforce that, only
+    enough to flag "this came from somewhere else, worth a look").
+    """
+    try:
+        with open(FAVORITE_PATH) as f:
+            favorite = json.load(f)
+    except (OSError, ValueError):
+        return None
+    field_ids = favorite.get("field_ids")
+    if not isinstance(field_ids, list) or not field_ids:
+        return None
+    if not all(isinstance(fid, int) for fid in field_ids):
+        return None
+    layout_variant = favorite.get("layout_variant")
+    if layout_variant not in (0, 1):
+        layout_variant = 0
+    source_profile = favorite.get("source_profile")
+    if not isinstance(source_profile, str):
+        source_profile = None
+    return {
+        "field_ids": field_ids,
+        "layout_variant": layout_variant,
+        "source_profile": source_profile,
+    }
+
+
+def save_favorite(field_ids, layout_variant, source_profile):
+    """
+    Overwrite the single saved favorite. Best-effort, never raises --
+    a write failure here (e.g. read-only home directory) shouldn't
+    block using the app, just means the save silently didn't stick
+    (same posture as save_working_dir()).
+    """
+    try:
+        with open(FAVORITE_PATH, "w") as f:
+            json.dump({
+                "field_ids": list(field_ids),
+                "layout_variant": layout_variant,
+                "source_profile": source_profile,
+            }, f, indent=2)
     except OSError:
         pass
 
@@ -335,6 +402,23 @@ def graph_bars_warnings(field_ids, layout_variant):
 GRAPH_WARNING_WRAP_WIDTH = 42
 
 
+def _wrap_status_paragraphs(*paragraphs):
+    """
+    Hard-wraps each paragraph individually (GRAPH_WARNING_WRAP_WIDTH),
+    then rejoins with blank lines -- same textwrap.fill()/wx.StaticText
+    pattern as graph_bars_warning_text() above, generalized for any
+    multi-paragraph status label. Deliberately wraps paragraph-by-paragraph
+    rather than the whole joined string in one textwrap.fill() call --
+    textwrap.fill() collapses ALL whitespace by default, including
+    intentional "\\n\\n" paragraph breaks, which would silently destroy
+    them. v0.19.18 fix -- see DeployPanel._refresh()'s and
+    ViewScreensPanel.on_refresh()'s changelog notes for the real bug this
+    closes (window forced near-full-screen-width by an unwrapped long
+    filename/path in one of these labels).
+    """
+    return "\n\n".join(textwrap.fill(p, GRAPH_WARNING_WRAP_WIDTH) for p in paragraphs)
+
+
 def graph_bars_warning_text(field_ids, layout_variant):
     """
     Ready-to-display, HARD-WRAPPED version of graph_bars_warnings() --
@@ -377,7 +461,7 @@ def field_edit_uncertain_warning_text(f10):
     return textwrap.fill(warning, GRAPH_WARNING_WRAP_WIDTH)
 
 
-ABOUT_TEXT = """Activity Profile Screen Editor for Garmin Edge
+ABOUT_TEXT = """Activity Profile Editor for Garmin Edge
 Version {version}
 
 An independent, unofficial toolkit for viewing and editing Garmin Edge \
@@ -643,6 +727,13 @@ class ProfileListPanel(wx.Panel):
         change_wd_btn = wx.Button(self, label="Change...")
         change_wd_btn.Bind(wx.EVT_BUTTON, self.on_change_working_dir)
         wd_row.Add(change_wd_btn, 0, wx.LEFT, 6)
+        # Backup retention/pruning (2026-08-25, Doug's go-ahead) -- lives
+        # here rather than in the main button_row below since it's a
+        # working_dir-level maintenance action, not tied to any profile
+        # selection (same reasoning as "Change..." right next to it).
+        cleanup_btn = wx.Button(self, label="Clean Up Old Backups...")
+        cleanup_btn.Bind(wx.EVT_BUTTON, self.on_cleanup_backups)
+        wd_row.Add(cleanup_btn, 0, wx.LEFT, 6)
         outer.Add(wd_row, 0, wx.ALL | wx.EXPAND, 12)
 
         self.status_text = wx.StaticText(self, label="")
@@ -698,6 +789,16 @@ class ProfileListPanel(wx.Panel):
         self.clone_btn.Bind(wx.EVT_BUTTON, self.on_clone)
         button_row.Add(self.clone_btn, 0, wx.RIGHT, 8)
 
+        # Import an external profile (2026-08-24, Doug's go-ahead) --
+        # unlike every other button on this panel, deliberately does
+        # NOT need a list selection first (there's nothing to select --
+        # the source is a file picked via wx.FileDialog, not anything
+        # this toolkit already knows about), so it's always enabled.
+        # See ImportPanel's own docstring for the full feature writeup.
+        import_btn = wx.Button(self, label="Import Profile...")
+        import_btn.Bind(wx.EVT_BUTTON, self.on_import_profile)
+        button_row.Add(import_btn, 0, wx.RIGHT, 8)
+
         self.next_btn = wx.Button(self, label="View Screens →")
         self.next_btn.Disable()
         self.next_btn.Bind(wx.EVT_BUTTON, self.on_next)
@@ -721,6 +822,11 @@ class ProfileListPanel(wx.Panel):
             save_working_dir(self.frame.working_dir)
             self.wd_text.SetLabel(self.frame.working_dir)
             self.frame._relayout()
+        dlg.Destroy()
+
+    def on_cleanup_backups(self, event):
+        dlg = BackupCleanupDialog(self, self.frame)
+        dlg.ShowModal()
         dlg.Destroy()
 
     def on_refresh(self, event):
@@ -907,6 +1013,25 @@ class ProfileListPanel(wx.Panel):
         self.frame.clone_source_filename = profile_filename
         self.frame.clone_source_backup_path = backup_path
         self.frame.show_panel("clone")
+
+    def on_import_profile(self, event):
+        """
+        Import an external profile (2026-08-24, Doug's go-ahead) -- see
+        ImportPanel's own docstring for the full feature writeup. This
+        handler's only job is picking the file; ImportPanel handles
+        everything from "what filename should this deploy as" onward.
+        """
+        dlg = wx.FileDialog(
+            self, "Choose a .fit profile to import",
+            wildcard="FIT files (*.fit)|*.fit|All files (*.*)|*.*",
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        )
+        if dlg.ShowModal() == wx.ID_OK:
+            self.frame.import_source_path = dlg.GetPath()
+            dlg.Destroy()
+            self.frame.show_panel("import")
+        else:
+            dlg.Destroy()
 
     def on_back(self, event):
         self.frame.show_panel("detect")
@@ -1171,7 +1296,20 @@ class ViewScreensPanel(wx.Panel):
         self.edit_btn = wx.Button(self, label="Edit Selected Screen →")
         self.edit_btn.Disable()
         self.edit_btn.Bind(wx.EVT_BUTTON, self.on_edit)
-        button_row2.Add(self.edit_btn, 0)
+        button_row2.Add(self.edit_btn, 0, wx.RIGHT, 8)
+
+        # Favorite Screen (2026-08-24, Doug's go-ahead) -- captures the
+        # SELECTED screen's field ID list + layout + source profile
+        # filename into the single saved-favorite slot (overwrites
+        # whatever was saved before). Same row-select-then-act pattern
+        # as Edit/Remove/Move, since it acts on whichever screen is
+        # currently selected. See load_saved_favorite()/save_favorite()
+        # above and AddScreenPanel's "Load from Favorite..." for the
+        # other half.
+        self.favorite_btn = wx.Button(self, label="Save as Favorite")
+        self.favorite_btn.Disable()
+        self.favorite_btn.Bind(wx.EVT_BUTTON, self.on_save_favorite)
+        button_row2.Add(self.favorite_btn, 0)
 
         outer.Add(button_row1, 0, wx.LEFT | wx.RIGHT | wx.TOP, 12)
         outer.Add(button_row2, 0, wx.ALL, 12)
@@ -1198,13 +1336,28 @@ class ViewScreensPanel(wx.Panel):
             self.row_slots = []
             self.edit_btn.Disable()
             self.remove_btn.Disable()
+            self.favorite_btn.Disable()
             self.move_up_btn.Disable()
             self.move_down_btn.Disable()
             self.add_screen_btn.Disable()
             self.frame._relayout()
             return
 
-        self.title_text.SetLabel(f"{self.frame.profile_filename}  —  {working_path}")
+        # v0.19.18 FIX (real bug, Doug's report 2026-08-24): working_path
+        # is the FULL absolute path to the scratch editing file -- with a
+        # long enough profile_filename/working_dir this is easily 100+
+        # characters, and a bare wx.StaticText doesn't wrap on its own
+        # (same established bug class as GRAPH_WARNING_WRAP_WIDTH's
+        # comment -- window only ever GROWS via _relayout(), never
+        # shrinks, so a long value here forces the whole app window wide
+        # for the rest of the session, well past this panel). Hard-wrapped
+        # via textwrap, same pattern already used elsewhere in this file.
+        self.title_text.SetLabel(
+            textwrap.fill(
+                f"{self.frame.profile_filename}  —  {working_path}",
+                GRAPH_WARNING_WRAP_WIDTH,
+            )
+        )
 
         if self.frame.editing_path is not None:
             self.edits_note.SetLabel(
@@ -1224,6 +1377,7 @@ class ViewScreensPanel(wx.Panel):
             self.row_slots = []
             self.edit_btn.Disable()
             self.remove_btn.Disable()
+            self.favorite_btn.Disable()
             self.move_up_btn.Disable()
             self.move_down_btn.Disable()
             self.add_screen_btn.Disable()
@@ -1303,6 +1457,7 @@ class ViewScreensPanel(wx.Panel):
 
         self.edit_btn.Disable()
         self.remove_btn.Disable()
+        self.favorite_btn.Disable()
         self.move_up_btn.Disable()
         self.move_down_btn.Disable()
         self.add_screen_btn.Enable()  # doesn't need a row selected, unlike the others
@@ -1344,11 +1499,13 @@ class ViewScreensPanel(wx.Panel):
     def on_row_selected(self, event):
         self.edit_btn.Enable()
         self.remove_btn.Enable()
+        self.favorite_btn.Enable()
         self._update_move_buttons()
 
     def on_row_deselected(self, event):
         self.edit_btn.Disable()
         self.remove_btn.Disable()
+        self.favorite_btn.Disable()
         self.move_up_btn.Disable()
         self.move_down_btn.Disable()
 
@@ -1420,10 +1577,25 @@ class ViewScreensPanel(wx.Panel):
             self.screens_list.EnsureVisible(row)
             self.edit_btn.Enable()
             self.remove_btn.Enable()
+            self.favorite_btn.Enable()
         self._update_move_buttons()
 
     def on_discard(self, event):
-        self.frame.discard_edits()
+        # v0.19.17 FIX: a plain frame.discard_edits() would also clear
+        # import_pending and null out editing_path, right back to the
+        # exact "no Deploy path reachable" state this version fixed --
+        # for an imported profile, "discard edits" should only discard
+        # screen edits made THIS session, not un-stage the import itself
+        # (there's nowhere to un-stage it TO; staged_path is the imported
+        # file, not something already on the device). Re-create the
+        # scratch copy fresh from staged_path instead, same as the first
+        # edit of any session, so Review & Deploy stays reachable.
+        if self.frame.import_pending:
+            source = self.frame.staged_path
+            self.frame.editing_path = source + ".editing.fit"
+            shutil.copy2(source, self.frame.editing_path)
+        else:
+            self.frame.discard_edits()
         self.on_refresh(None)
 
     def on_add_screen(self, event):
@@ -1453,13 +1625,31 @@ class ViewScreensPanel(wx.Panel):
             # navigated away from (see the fix's changelog note for
             # the full mechanism). Doug's own wording is more direct
             # and doesn't imply a resume path that doesn't exist.
-            answer = wx.MessageBox(
-                "You have edits from this session that haven't been "
-                "deployed to the device yet. If you go back you will "
-                "lose those edits and have to start over!\n\nGo back "
-                "anyway?",
-                "Unsaved edits", wx.YES_NO | wx.ICON_WARNING,
-            )
+            #
+            # v0.19.17 FIX: this warning is also the fix for the second
+            # gap in Doug's Import bug report -- it used to never fire
+            # for an abandoned import (editing_path was None until an
+            # edit was made, see ImportPanel.on_import()), so Back
+            # silently dropped the staged import with no warning at
+            # all. Now editing_path is set immediately on import, so
+            # this fires correctly -- just with import-accurate wording
+            # instead of talking about "edits" that were never made.
+            if self.frame.import_pending:
+                answer = wx.MessageBox(
+                    "You imported a profile that hasn't been deployed to "
+                    "the device yet. If you go back you will lose the "
+                    "staged import and have to import it again!\n\nGo "
+                    "back anyway?",
+                    "Unsaved import", wx.YES_NO | wx.ICON_WARNING,
+                )
+            else:
+                answer = wx.MessageBox(
+                    "You have edits from this session that haven't been "
+                    "deployed to the device yet. If you go back you will "
+                    "lose those edits and have to start over!\n\nGo back "
+                    "anyway?",
+                    "Unsaved edits", wx.YES_NO | wx.ICON_WARNING,
+                )
             if answer != wx.YES:
                 return
         self.frame.show_panel("profiles")
@@ -1481,6 +1671,85 @@ class ViewScreensPanel(wx.Panel):
 
         self.frame.editing_slot = slot
         self.frame.show_panel("edit_screen")
+
+    def on_save_favorite(self, event):
+        """
+        Capture the selected screen's field ID list + layout variant
+        into the single saved-favorite slot (save_favorite() above),
+        overwriting whatever was saved before -- Doug's own design
+        decision (2026-08-15, PROJECT_NOTES.md Open Items "Favorite
+        Screen"): a single slot, not a named list, so there's nothing
+        to manage/browse/delete here, just a straight capture. Reads
+        directly from the current working file (same source
+        on_refresh() already populated the row from), not from any
+        in-memory state -- this is a pure read/save, no scratch-copy
+        creation needed since nothing is being modified.
+
+        v0.19.16 real fix, Doug's report from actually using this
+        (2026-08-24): the first version let a second Save silently
+        clobber an existing favorite with zero warning. Since there's
+        only one slot by design (see above), an accidental second Save
+        loses the first favorite for good with no undo -- worth a
+        confirm, unlike most of this app's non-destructive actions.
+        Checked BEFORE reading the selected screen's own data, so
+        canceling costs nothing extra.
+        """
+        selected_row = self.screens_list.GetFirstSelected()
+        if selected_row == -1:
+            return
+        slot = self.row_slots[selected_row]
+
+        existing = load_saved_favorite()
+        if existing is not None:
+            source = existing["source_profile"] or "an earlier screen"
+            answer = wx.MessageBox(
+                f"You already have a favorite saved -- {len(existing['field_ids'])} "
+                f"field(s), captured from \"{source}\". There's only one favorite "
+                f"slot, so saving this screen will permanently replace it.\n\n"
+                f"Save over the existing favorite?",
+                "Favorite already saved", wx.YES_NO | wx.ICON_WARNING,
+            )
+            if answer != wx.YES:
+                return
+
+        working_path = self.frame.get_working_path()
+        if working_path is None:
+            return
+
+        messages = decode_file(working_path)
+        data = classify_screens(messages)
+        match = None
+        for _f9, idx, m in data["orderable"]:
+            if idx == slot:
+                match = m
+                break
+        if match is None:
+            wx.MessageBox(
+                "Couldn't find the selected screen in the current file -- "
+                "try Re-read File and select it again.",
+                "Can't save favorite", wx.OK | wx.ICON_ERROR,
+            )
+            return
+
+        field_count = match.get(3) or 0
+        field_ids = active_field_ids(match, field_count)
+        if not field_ids:
+            wx.MessageBox(
+                "This screen has no fields to save (0-field screens like "
+                "Map/Compass aren't meaningful as a favorite).",
+                "Can't save favorite", wx.OK | wx.ICON_WARNING,
+            )
+            return
+        layout_variant = match.get(8) or 0
+
+        save_favorite(field_ids, layout_variant, self.frame.profile_filename)
+        wx.MessageBox(
+            f"Saved as favorite: {len(field_ids)} field(s) from this screen. "
+            f"Use \"Load from Favorite...\" on Add New Screen to reuse it on "
+            f"another profile -- this overwrites whatever was saved before, "
+            f"there's only one favorite slot.",
+            "Favorite saved", wx.OK | wx.ICON_INFORMATION,
+        )
 
     def on_remove(self, event):
         """
@@ -2300,7 +2569,17 @@ class AddScreenPanel(wx.Panel):
         field_btn_row2.Add(self.remove_field_btn, 0, wx.RIGHT, 6)
         self.change_type_btn = wx.Button(self, label="Change Type...")
         self.change_type_btn.Bind(wx.EVT_BUTTON, self.on_change_type)
-        field_btn_row2.Add(self.change_type_btn, 0)
+        field_btn_row2.Add(self.change_type_btn, 0, wx.RIGHT, 6)
+        # Favorite Screen (2026-08-24, Doug's go-ahead) -- pre-fills
+        # self.field_ids/self.layout_variant from the single saved
+        # favorite (ViewScreensPanel's "Save as Favorite"), then falls
+        # straight through the SAME already-confirmed-working
+        # add-screen path below (auto f9/f10, cap checks, deploy) --
+        # no new patch-layer logic needed, this only ever touches the
+        # in-memory list before Create Screen is clicked.
+        self.load_favorite_btn = wx.Button(self, label="Load from Favorite...")
+        self.load_favorite_btn.Bind(wx.EVT_BUTTON, self.on_load_favorite)
+        field_btn_row2.Add(self.load_favorite_btn, 0)
         left_col.Add(field_btn_row2, 0, wx.BOTTOM, 8)
 
         layout_row = wx.BoxSizer(wx.HORIZONTAL)
@@ -2489,6 +2768,53 @@ class AddScreenPanel(wx.Panel):
             self._refresh_widgets()
             self.fields_list.SetSelection(sel)
         dlg.Destroy()
+
+    def on_load_favorite(self, event):
+        """
+        Pre-fill self.field_ids/self.layout_variant from the single
+        saved favorite (load_saved_favorite() above), REPLACING
+        whatever's currently in the field list -- same "start over"
+        semantics as this panel's own on_show() reset, not a merge.
+        WARN ONLY (not blocked) if the favorite was captured from a
+        different profile than the one currently staged -- Doug's own
+        design decision (2026-08-15): this toolkit has no per-sport-
+        type field validity data to actually enforce cross-sport-type
+        correctness, only enough to flag "this came from somewhere
+        else, worth a look" and let the user decide.
+        """
+        favorite = load_saved_favorite()
+        if favorite is None:
+            wx.MessageBox(
+                "No favorite saved yet -- go to an existing screen's "
+                "\"Save as Favorite\" (on the Screens view) first.",
+                "No favorite", wx.OK | wx.ICON_INFORMATION,
+            )
+            return
+
+        field_ids = favorite["field_ids"]
+        layout_variant = favorite["layout_variant"]
+        if layout_variant == 1 and len(field_ids) not in COUNTS_WITH_B_VARIANT:
+            layout_variant = 0  # not valid for this field count, fall back to A
+
+        self.field_ids = list(field_ids)
+        self.layout_variant = layout_variant
+        self._refresh_widgets()
+
+        source = favorite["source_profile"]
+        if source and source != self.frame.profile_filename:
+            wx.MessageBox(
+                f"Loaded {len(field_ids)} field(s) from your saved favorite, "
+                f"originally captured from a different profile ({source}). "
+                f"If that profile is a different sport type than this one, "
+                f"these fields haven't been confirmed to work here -- worth "
+                f"a look before deploying.",
+                "Favorite loaded", wx.OK | wx.ICON_INFORMATION,
+            )
+        else:
+            wx.MessageBox(
+                f"Loaded {len(field_ids)} field(s) from your saved favorite.",
+                "Favorite loaded", wx.OK | wx.ICON_INFORMATION,
+            )
 
     def on_layout_choice(self, event):
         new_layout = 1 if self.layout_b_radio.GetValue() else 0
@@ -2810,11 +3136,29 @@ class PreflightPanel(wx.Panel):
                 "valid to deploy."
             ]
 
+        # v0.19.17 FIX (real bug reported by Doug, 2026-08-24): bytes_changed
+        # alone used to decide deployability, which is correct for the
+        # normal edit flow (staged_path already matches the device, so
+        # identical bytes really do mean "nothing to deploy") but wrong for
+        # an Import (staged_path is content the device has never had at
+        # all -- identical bytes there just mean "no screens edited yet,"
+        # and deploying the untouched import is exactly what's supposed to
+        # happen). frame.import_pending (set by ImportPanel.on_import(),
+        # cleared by frame.discard_edits()) distinguishes the two cases.
+        deployable = bytes_changed or self.frame.import_pending
+
         if bytes_changed:
             self.summary_text.SetLabel(
                 f"{len(summary_lines)} screen(s) changed since you started editing."
             )
             self.diff_text.SetValue("\n\n".join(summary_lines))
+        elif self.frame.import_pending:
+            self.summary_text.SetLabel(
+                "Freshly imported profile -- no screens edited yet, but this "
+                "is new content the device doesn't have. Ready to deploy "
+                "as-is, or go back and edit screens first."
+            )
+            self.diff_text.SetValue("(no edits made -- deploying the imported file as-is)")
         else:
             self.summary_text.SetLabel(
                 "No differences from the staged file -- nothing to deploy."
@@ -2828,7 +3172,7 @@ class PreflightPanel(wx.Panel):
         computed = fit_crc(body)
         if computed == expected:
             self.crc_text.SetLabel(f"CRC check: PASS (0x{expected:04x})")
-            self.deploy_btn.Enable(bytes_changed)
+            self.deploy_btn.Enable(deployable)
         else:
             self.crc_text.SetLabel(
                 f"CRC check: FAIL -- expected 0x{expected:04x}, computed 0x{computed:04x}. "
@@ -2980,11 +3324,11 @@ class DeployPanel(wx.Panel):
         is_macos = platform.system() == "Darwin"
 
         if self.stage == "ready":
-            self.status_text.SetLabel(
+            self.status_text.SetLabel(_wrap_status_paragraphs(
                 f"Ready to write the reviewed working copy to the device as "
-                f"\"{profile}\".\n\nMake sure the device is still connected "
-                f"before continuing."
-            )
+                f"\"{profile}\".",
+                "Make sure the device is still connected before continuing.",
+            ))
             self.write_btn.Enable(working_path is not None)
             self.eject_auto_btn.Disable()
             self.eject_manual_btn.Disable()
@@ -2993,16 +3337,16 @@ class DeployPanel(wx.Panel):
             self.verify_text.SetValue("")
 
         elif self.stage == "written":
-            self.status_text.SetLabel(
+            self.status_text.SetLabel(_wrap_status_paragraphs(
                 "Write complete and verified byte-for-byte. It is now safe "
-                "to eject the Garmin.\n\nThe device will restart "
-                "automatically once ejected -- that's when the NewFiles "
-                "import actually happens.\n\n"
+                "to eject the Garmin.",
+                "The device will restart automatically once ejected -- "
+                "that's when the NewFiles import actually happens.",
                 ">>> Once the automatic restart finishes, the device will "
                 "NOT remount on its own -- press the power button ONCE to "
                 "bring it back into mass-storage mode. Without that press "
-                "it settles into charging mode instead."
-            )
+                "it settles into charging mode instead.",
+            ))
             self.write_btn.Disable()
             self.eject_auto_btn.Enable(is_macos)
             self.eject_manual_btn.Enable()
@@ -3011,12 +3355,12 @@ class DeployPanel(wx.Panel):
             self.verify_text.SetValue("")
 
         elif self.stage == "waiting":
-            self.status_text.SetLabel(
-                "Waiting for the device to reconnect.\n\nOnce its automatic "
-                "restart finishes, press the power button ONCE to bring it "
-                "back into mass-storage mode, then click Check for "
-                "Reconnected Device."
-            )
+            self.status_text.SetLabel(_wrap_status_paragraphs(
+                "Waiting for the device to reconnect.",
+                "Once its automatic restart finishes, press the power "
+                "button ONCE to bring it back into mass-storage mode, "
+                "then click Check for Reconnected Device.",
+            ))
             self.write_btn.Disable()
             self.eject_auto_btn.Disable()
             self.eject_manual_btn.Disable()
@@ -3026,27 +3370,29 @@ class DeployPanel(wx.Panel):
 
         elif self.stage == "reconnected":
             if self.verify_error is not None:
-                self.status_text.SetLabel(
+                self.status_text.SetLabel(_wrap_status_paragraphs(
                     f"Reconnected. The device has re-imported \"{profile}\" "
-                    f"from NewFiles.\n\nCouldn't automatically verify the "
-                    f"result: {self.verify_error}\n\nSpot-check manually via "
-                    f"View Screens (re-stage the profile) or "
-                    f"garmin_device.py's screens command, then click Done."
-                )
+                    f"from NewFiles.",
+                    f"Couldn't automatically verify the result: {self.verify_error}",
+                    "Spot-check manually via View Screens (re-stage the "
+                    "profile) or garmin_device.py's screens command, then "
+                    "click Done.",
+                ))
                 self.verify_text.SetValue("")
             elif self.verify_lines:
-                self.status_text.SetLabel(
+                self.status_text.SetLabel(_wrap_status_paragraphs(
                     f"Reconnected. The device has re-imported \"{profile}\" "
-                    f"from NewFiles.\n\n{len(self.verify_lines)} screen(s) on "
-                    f"the device differ from what was sent:"
-                )
+                    f"from NewFiles.",
+                    f"{len(self.verify_lines)} screen(s) on the device "
+                    f"differ from what was sent:",
+                ))
                 self.verify_text.SetValue("\n\n".join(self.verify_lines))
             else:
-                self.status_text.SetLabel(
+                self.status_text.SetLabel(_wrap_status_paragraphs(
                     f"Reconnected. The device has re-imported \"{profile}\" "
                     f"from NewFiles, and it matches what was sent -- every "
-                    f"screen on the device is exactly what you set up."
-                )
+                    f"screen on the device is exactly what you set up.",
+                ))
                 self.verify_text.SetValue("(no differences)")
             self.write_btn.Disable()
             self.eject_auto_btn.Disable()
@@ -3067,7 +3413,8 @@ class DeployPanel(wx.Panel):
             return
         try:
             garmin_device.write_to_newfiles(
-                root, self.frame.editing_path, self.frame.profile_filename
+                root, self.frame.editing_path, self.frame.profile_filename,
+                working_dir=self.frame.working_dir,
             )
         except garmin_device.GarminDeviceError as e:
             wx.MessageBox(str(e), "Write failed", wx.OK | wx.ICON_ERROR)
@@ -3167,6 +3514,140 @@ def _format_backup_timestamp(timestamp_str):
         return datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
     except ValueError:
         return timestamp_str
+
+
+class BackupCleanupDialog(wx.Dialog):
+    """
+    "Clean Up Old Backups..." (ProfileListPanel) -- backup retention/
+    pruning, Doug's go-ahead (2026-08-25, PROJECT_NOTES.md Open Items
+    "Backup retention/pruning," open since v0.11.0: "Backups accumulate
+    indefinitely right now -- nothing deletes old ones. Deliberately
+    left out of MVP."). Design chosen from three options put to Doug:
+    time-based folder deletion [THIS], keep-latest-N-per-profile
+    (rejected -- each backups/<timestamp>/ folder snapshots EVERY
+    profile together, see garmin_device.backup_profiles(), so
+    per-profile retention would mean deleting individual files out of a
+    shared folder rather than whole folders, plus awkward interaction
+    with list_backup_history()'s existing consecutive-byte-identical
+    display dedup), and keep-only-the-single-latest-backup (rejected --
+    cuts against Restore-from-Backup's whole reason for existing, and
+    Doug's own real usage numbers, ~5GB over this project's entire
+    prior history, showed disk space was never the actual constraint
+    that would justify losing all older restore points). Manual-only,
+    Doug's explicit choice -- no automatic/silent pruning on launch,
+    matching every other destructive action already in this app
+    (Restore, permanent Remove, Favorite overwrite): a real click, a
+    live preview of exactly what would be deleted and how much space
+    it'd free, then an explicit YES/NO confirm before anything is
+    actually removed. Wraps garmin_device.prune_old_backups() directly
+    -- that function owns the actual folder-selection/deletion logic
+    (time-based, using each folder's own name as its timestamp, not
+    filesystem mtime); this dialog is purely UI around it. Plain
+    wx.TextCtrl for the day count (not wx.SpinCtrl) -- consistent with
+    every other validated-text-field pattern already used elsewhere in
+    this app (ClonePanel/ImportPanel filenames), rather than introducing
+    an untested widget class into a file that can't be run in the dev
+    sandbox at all.
+    """
+
+    def __init__(self, parent, frame):
+        super().__init__(parent, title="Clean Up Old Backups", size=(480, 260))
+        self.frame = frame
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+
+        outer.Add(wx.StaticText(
+            self,
+            label="Deletes entire backups/<timestamp>/ folders older than "
+                  "the window below. Each folder is a full snapshot of "
+                  "every profile at that moment -- deleting one doesn't "
+                  "affect any other backup.",
+        ), 0, wx.ALL | wx.EXPAND, 12)
+
+        days_row = wx.BoxSizer(wx.HORIZONTAL)
+        days_row.Add(wx.StaticText(self, label="Delete backups older than:"), 0,
+                      wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
+        self.days_text = wx.TextCtrl(self, value="30", size=(60, -1))
+        self.days_text.Bind(wx.EVT_TEXT, self.on_days_changed)
+        days_row.Add(self.days_text, 0, wx.RIGHT, 6)
+        days_row.Add(wx.StaticText(self, label="day(s)"), 0, wx.ALIGN_CENTER_VERTICAL)
+        outer.Add(days_row, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
+
+        self.preview_text = wx.StaticText(self, label="")
+        outer.Add(self.preview_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
+
+        button_row = wx.BoxSizer(wx.HORIZONTAL)
+        cancel_btn = wx.Button(self, label="Cancel")
+        cancel_btn.Bind(wx.EVT_BUTTON, self.on_cancel)
+        button_row.Add(cancel_btn, 0, wx.RIGHT, 8)
+        self.clean_btn = wx.Button(self, label="Clean Up Now")
+        self.clean_btn.Bind(wx.EVT_BUTTON, self.on_clean)
+        button_row.Add(self.clean_btn, 0)
+        outer.Add(button_row, 0, wx.ALL, 12)
+
+        self.SetSizer(outer)
+        self._refresh_preview()
+
+    def _days_value(self):
+        """Parsed day count, or None if the field isn't a positive integer."""
+        raw = self.days_text.GetValue().strip()
+        if not raw.isdigit():
+            return None
+        days = int(raw)
+        return days if days > 0 else None
+
+    def on_days_changed(self, event):
+        self._refresh_preview()
+
+    def _refresh_preview(self):
+        days = self._days_value()
+        if days is None:
+            self.preview_text.SetLabel("Enter a positive whole number of days.")
+            self.clean_btn.Disable()
+            return
+
+        candidates = garmin_device.prune_old_backups(self.frame.working_dir, days, dry_run=True)
+        if not candidates:
+            self.preview_text.SetLabel(
+                f"Nothing to clean up -- no backup folders older than {days} day(s)."
+            )
+            self.clean_btn.Disable()
+        else:
+            total_bytes = sum(size for _, size in candidates)
+            self.preview_text.SetLabel(textwrap.fill(
+                f"{len(candidates)} backup folder(s) older than {days} "
+                f"day(s), {garmin_device._format_bytes(total_bytes)} total, "
+                f"would be deleted.",
+                GRAPH_WARNING_WRAP_WIDTH,
+            ))
+            self.clean_btn.Enable()
+
+    def on_cancel(self, event):
+        self.EndModal(wx.ID_CANCEL)
+
+    def on_clean(self, event):
+        days = self._days_value()
+        if days is None:
+            return  # button should be disabled in this state, but guard anyway
+        candidates = garmin_device.prune_old_backups(self.frame.working_dir, days, dry_run=True)
+        if not candidates:
+            return  # same -- button should already be disabled
+        total_bytes = sum(size for _, size in candidates)
+        answer = wx.MessageBox(
+            f"Permanently delete {len(candidates)} backup folder(s) older "
+            f"than {days} day(s), freeing {garmin_device._format_bytes(total_bytes)}?"
+            f"\n\nThis cannot be undone.",
+            "Confirm cleanup", wx.YES_NO | wx.ICON_WARNING,
+        )
+        if answer != wx.YES:
+            return
+        garmin_device.prune_old_backups(self.frame.working_dir, days, dry_run=False)
+        wx.MessageBox(
+            f"Deleted {len(candidates)} backup folder(s), freed "
+            f"{garmin_device._format_bytes(total_bytes)}.",
+            "Cleanup complete", wx.OK | wx.ICON_INFORMATION,
+        )
+        self.EndModal(wx.ID_OK)
 
 
 class RestorePanel(wx.Panel):
@@ -3380,6 +3861,78 @@ class RestorePanel(wx.Panel):
         self.frame.show_panel("profiles")
 
 
+_INTERNAL_STAGING_SUFFIX_RE = re.compile(r'_(?:staged|clone)_\d{8}_\d{6}$')
+
+
+def strip_internal_staging_suffixes(stem):
+    """
+    Repeatedly strips this toolkit's own internal timestamp-suffix
+    naming (stage_for_edit()'s "_staged_<timestamp>",
+    ClonePanel.on_create()'s "_clone_<timestamp>") off the END of a
+    filename stem, looping until no more matches. These CHAIN when a
+    file passes through more than one of this toolkit's own operations
+    (e.g. clone a profile, then later Import that clone's own staged
+    file back in) -- each pass only strips one layer, so a single
+    regex.sub() call isn't enough on its own.
+
+    Real bug found via Doug's own hardware testing (2026-08-24):
+    ImportPanel.on_show() used to suggest os.path.basename(source)
+    verbatim as the default "Deploy as filename." Picking an old file
+    already sitting in working_dir/staging/ (one of this toolkit's OWN
+    artifacts, not a genuinely external profile) as the Import source
+    carried every layer of accumulated internal suffix straight into
+    the suggested filename --
+    "CyclingRoadTClone_clone_20260823_124234_staged_20260824_182004_staged_20260824_182104.fit"
+    (92 characters) in Doug's actual case. Deployed to the device's
+    NewFiles/ under that exact name, it was CONFIRMED to sit there
+    unconsumed even after a full power cycle -- the device silently
+    declined to import it. The device's own real filename-length
+    tolerance for NewFiles import isn't independently confirmed or
+    documented anywhere (a genuinely open question -- see
+    PROJECT_NOTES.md Open Items), so rather than guess at and enforce
+    some invented hard limit, this fixes the one concrete, reproducible
+    cause actually found: don't SUGGEST a filename this bad in the
+    first place. The field stays free-text editable either way -- this
+    only fixes the default a user has to actively type over.
+    """
+    while True:
+        stripped = _INTERNAL_STAGING_SUFFIX_RE.sub('', stem)
+        if stripped == stem:
+            return stem
+        stem = stripped
+
+
+def filename_collision_problem(filename, known_profiles):
+    """
+    Returns a human-readable problem string, or None if filename is OK
+    to deploy under. Shared validation, extracted from ClonePanel's
+    original _filename_problem() (2026-08-24, backing "Import an
+    external profile" -- see PROJECT_NOTES.md Open Items) so both
+    Clone and Import enforce the exact same collision rule via one
+    implementation rather than two copies that could drift apart.
+    known_profiles is normally frame.known_profiles (filename -> latest
+    backup path, kept fresh by ProfileListPanel.on_refresh()).
+    """
+    if not filename:
+        return "Enter a filename."
+    if "/" in filename or "\\" in filename:
+        return "Filename can't contain path separators."
+    if not filename.lower().endswith(".fit"):
+        return "Filename must end in .fit"
+    # Case-insensitive: the device's filesystem (FAT/exFAT) treats
+    # filenames case-insensitively, so "sandbox.fit" and "Sandbox.FIT"
+    # collide even though they're not an exact string match.
+    known_lower = {f.lower() for f in known_profiles}
+    if filename.lower() in known_lower:
+        return (
+            f"\"{filename}\" already exists on the device -- deploying under "
+            f"an existing profile's filename OVERWRITES that profile instead "
+            f"of creating a new one. Choose a filename that doesn't match any "
+            f"profile currently on the device."
+        )
+    return None
+
+
 class ClonePanel(wx.Panel):
     """
     Clone Profile: patches sport_mesgs[0].name via
@@ -3504,26 +4057,16 @@ class ClonePanel(wx.Panel):
         self._update_validation()
 
     def _filename_problem(self, filename):
-        """Returns a human-readable problem string, or None if filename is OK to use."""
+        """
+        Returns a human-readable problem string, or None if filename is
+        OK to use. As of 2026-08-24, a thin wrapper around the shared
+        filename_collision_problem() (above) -- the actual rule is
+        shared with ImportPanel, kept here only for the "for the new
+        profile" wording specific to Clone's empty-field message.
+        """
         if not filename:
             return "Enter a filename for the new profile."
-        if "/" in filename or "\\" in filename:
-            return "Filename can't contain path separators."
-        if not filename.lower().endswith(".fit"):
-            return "Filename must end in .fit"
-        # Case-insensitive: the device's filesystem (FAT/exFAT) treats
-        # filenames case-insensitively, so "sandbox.fit" and
-        # "Sandbox.FIT" collide even though they're not an exact
-        # string match.
-        known_lower = {f.lower() for f in self.frame.known_profiles}
-        if filename.lower() in known_lower:
-            return (
-                f"\"{filename}\" already exists on the device -- deploying under "
-                f"an existing profile's filename OVERWRITES that profile instead "
-                f"of creating a new one. Choose a filename that doesn't match any "
-                f"profile currently on the device."
-            )
-        return None
+        return filename_collision_problem(filename, self.frame.known_profiles)
 
     def _name_problem(self, name):
         """
@@ -3628,6 +4171,181 @@ class ClonePanel(wx.Panel):
         if self.frame.deploy_return_panel == "clone":
             self.frame.discard_edits()
             self.frame.deploy_return_panel = "review"
+        self.frame.show_panel("profiles")
+
+
+class ImportPanel(wx.Panel):
+    """
+    Import an external profile -- one that never passed through this
+    toolkit (pulled from Garmin Connect, emailed by another rider, an
+    old manual copy). New feature, Doug's go-ahead (2026-08-24) -- see
+    PROJECT_NOTES.md Open Items "Import an external profile" for the
+    original gap writeup: before this, the GUI had no wx.FileDialog
+    anywhere, every source in every panel (Stage/View, Clone, Restore)
+    was a ListBox/ListCtrl selection populated from what this toolkit
+    already knew about, so a foreign file had no entry point at all.
+
+    Reached from ProfileListPanel's "Import Profile..." button, which
+    opens the wx.FileDialog itself and sets frame.import_source_path
+    before navigating here -- this panel only asks what filename to
+    deploy the picked file under.
+
+    Filename validation reuses filename_collision_problem() (shared
+    with ClonePanel, extracted specifically for this feature so both
+    panels enforce the exact same collision rule via one
+    implementation) -- deploying under an existing profile's filename
+    would silently overwrite it, same hard block as Clone.
+
+    Unlike Clone/Restore (which both skip straight to DeployPanel, no
+    staged-vs-editing diff to review since the source is already
+    known-safe -- this toolkit's own backup or a freshly-patched
+    clone), Import's source is an UNVERIFIED external file, so this
+    hands off to the normal "screens" (ViewScreensPanel) review step
+    instead, exactly like a regular Stage-and-View -- garmin_device.
+    stage_for_edit() lands the picked file into staging/ with the same
+    lineage-sidecar treatment any other staged file gets (recording
+    the external path as its source_backup, an honest description of
+    where it actually came from), so Edit Screens/Deploy/etc. all work
+    completely unchanged from that point on. If the file isn't a valid
+    profile at all, ViewScreensPanel's existing decode_file() try/except
+    ("Failed to read file: ...") catches that the same way it already
+    would for any other corrupt staged file -- no new validation needed
+    here for that case.
+    """
+
+    def __init__(self, parent, frame):
+        super().__init__(parent)
+        self.frame = frame
+        self._filename_dirty = False
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+
+        self.title_text = wx.StaticText(self, label="Import External Profile")
+        title_font = self.title_text.GetFont()
+        title_font.PointSize += 2
+        title_font = title_font.Bold()
+        self.title_text.SetFont(title_font)
+        outer.Add(self.title_text, 0, wx.ALL | wx.EXPAND, 12)
+
+        self.source_text = wx.StaticText(self, label="")
+        outer.Add(self.source_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
+
+        filename_row = wx.BoxSizer(wx.HORIZONTAL)
+        filename_row.Add(wx.StaticText(self, label="Deploy as filename:"), 0,
+                          wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
+        self.filename_text = wx.TextCtrl(self)
+        self.filename_text.Bind(wx.EVT_TEXT, self.on_filename_text)
+        filename_row.Add(self.filename_text, 1)
+        outer.Add(filename_row, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
+
+        self.validation_text = wx.StaticText(self, label="")
+        outer.Add(self.validation_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
+
+        button_row = wx.BoxSizer(wx.HORIZONTAL)
+        back_btn = wx.Button(self, label="‹ Cancel")
+        back_btn.Bind(wx.EVT_BUTTON, self.on_back)
+        button_row.Add(back_btn, 0, wx.RIGHT, 8)
+        self.import_btn = wx.Button(self, label="Import Profile")
+        self.import_btn.Bind(wx.EVT_BUTTON, self.on_import)
+        button_row.Add(self.import_btn, 0)
+        outer.Add(button_row, 0, wx.ALL, 12)
+
+        self.SetSizer(outer)
+
+    def on_show(self):
+        source = self.frame.import_source_path
+        self.source_text.SetLabel(f"Source file: {source}" if source else "No file picked.")
+        self._filename_dirty = False
+        # v0.19.18 FIX (real bug, Doug's hardware test 2026-08-24): used to
+        # be a bare os.path.basename(source) -- fine for a genuinely
+        # external file, but if the picked source is one of THIS
+        # TOOLKIT'S OWN staging/clone artifacts, its basename already
+        # carries our own internal "_staged_<timestamp>"/"_clone_<timestamp>"
+        # suffixes, which CHAIN with every extra pass through Stage/Clone/
+        # Import. Confirmed on real hardware: a 92-character chained
+        # filename was silently never imported from NewFiles/, even after
+        # a full power cycle. strip_internal_staging_suffixes() cleans the
+        # SUGGESTED default only -- the field is still free-text, a user
+        # can always type over it either way.
+        if source:
+            base = os.path.basename(source)
+            stem, ext = os.path.splitext(base)
+            suggested = strip_internal_staging_suffixes(stem) + ext
+        else:
+            suggested = ""
+        self.filename_text.ChangeValue(suggested)  # ChangeValue: doesn't fire EVT_TEXT, matches ClonePanel's own auto-fill pattern
+        self._update_validation()
+
+    def on_filename_text(self, event):
+        self._filename_dirty = True
+        self._update_validation()
+
+    def _filename_problem(self, filename):
+        if not filename:
+            return "Enter a filename to deploy this profile under."
+        return filename_collision_problem(filename, self.frame.known_profiles)
+
+    def _update_validation(self):
+        filename = self.filename_text.GetValue().strip()
+        problem = None
+        if self.frame.import_source_path is None:
+            problem = "No source file picked -- go back and choose one first."
+        else:
+            problem = self._filename_problem(filename)
+
+        if problem:
+            self.validation_text.SetLabel(problem)
+            self.import_btn.Disable()
+        else:
+            self.validation_text.SetLabel(
+                f"Will stage this file for review as \"{filename}\" -- nothing "
+                f"is written to the device until you deploy from the Screens "
+                f"view, same as any other staged profile."
+            )
+            self.import_btn.Enable()
+
+        self.frame._relayout()
+
+    def on_import(self, event):
+        filename = self.filename_text.GetValue().strip()
+        if self.frame.import_source_path is None or self._filename_problem(filename):
+            return  # Import is disabled in this state, but guard anyway
+
+        try:
+            staged_path = garmin_device.stage_for_edit(
+                filename, self.frame.import_source_path, self.frame.working_dir
+            )
+        except OSError as e:
+            wx.MessageBox(f"Import failed: {e}", "Error", wx.OK | wx.ICON_ERROR)
+            return
+
+        self.frame.staged_path = staged_path
+        self.frame.profile_filename = filename
+        # v0.19.17 FIX (real bug reported by Doug, 2026-08-24): this used to
+        # set editing_path = None ("fresh staging -- no accumulated edits
+        # yet"), matching the normal Stage-for-Edit flow where staged_path
+        # already IS what's on the device, so nothing needs deploying until
+        # an edit happens. But an import is different -- staged_path here is
+        # content the device has NEVER had, so it needs to be deployable
+        # immediately, before any screen edit. Create the scratch working
+        # copy right away (same pattern EditScreenPanel/AddScreenPanel use
+        # for their first edit) so ViewScreensPanel's "Review & Deploy..."
+        # button (gated on editing_path is not None) enables right away, and
+        # set import_pending so PreflightPanel knows a byte-identical
+        # editing_path/staged_path pair is a valid, ready-to-deploy state
+        # here rather than "nothing to deploy."
+        self.frame.editing_path = staged_path + ".editing.fit"
+        shutil.copy2(staged_path, self.frame.editing_path)
+        self.frame.import_pending = True
+        wx.MessageBox(
+            f"Staged for review as \"{filename}\". Nothing has been written "
+            f"to the device yet -- check the screens on the next page, then "
+            f"deploy when you're ready.",
+            "Imported", wx.OK | wx.ICON_INFORMATION,
+        )
+        self.frame.show_panel("screens")
+
+    def on_back(self, event):
         self.frame.show_panel("profiles")
 
 
@@ -3995,7 +4713,7 @@ class MainFrame(wx.Frame):
     """
 
     def __init__(self):
-        super().__init__(None, title=f"Activity Profile Screen Editor for Garmin Edge v{__version__}")
+        super().__init__(None, title=f"Activity Profile Editor for Garmin Edge v{__version__}")
 
         self.garmin_root = None
         self.working_dir = load_saved_working_dir() or DEFAULT_WORKING_DIR
@@ -4007,6 +4725,8 @@ class MainFrame(wx.Frame):
         self.known_profiles = {}  # filename -> latest backup path, refreshed by ProfileListPanel.on_refresh() -- lets ClonePanel validate a new filename doesn't collide with anything currently on the device
         self.clone_source_filename = None      # set by ProfileListPanel.on_clone()
         self.clone_source_backup_path = None   # set by ProfileListPanel.on_clone()
+        self.import_source_path = None  # set by ProfileListPanel.on_import_profile() -- the external .fit file picked via wx.FileDialog, consumed by ImportPanel.on_import()
+        self.import_pending = False  # v0.19.17 FIX: True from ImportPanel.on_import() until deploy completes (DeployPanel.on_done()) or the staged import is abandoned (frame.discard_edits()) -- lets PreflightPanel treat a freshly-imported, zero-edits profile as valid to deploy (bytes identical to staged_path is the CORRECT state for an unedited import, not "nothing to deploy"), and lets ViewScreensPanel.on_discard()/on_back() give import-accurate wording instead of talking about "edits"
         self.needs_backup = True  # v0.19.1: set True whenever device state MAY have changed (DetectPanel.on_detect() confirming a connection, DeployPanel.on_check() confirming reconnect) -- ProfileListPanel._refresh_list() only does a real backup_profiles() call when this is True (or the Refresh button forces one regardless), avoiding a redundant re-backup+status-message on every ordinary re-visit to the profile list. Starts True so the very first visit always backs up.
 
         self.container = wx.Panel(self)
@@ -4027,6 +4747,7 @@ class MainFrame(wx.Frame):
             "deploy": DeployPanel(self.container, self),
             "restore": RestorePanel(self.container, self),
             "clone": ClonePanel(self.container, self),
+            "import": ImportPanel(self.container, self),
             "startup_txt": StartupTxtPanel(self.container, self),
         }
         for panel in self.panels.values():
@@ -4056,6 +4777,7 @@ class MainFrame(wx.Frame):
     def discard_edits(self):
         """Drop the scratch working copy -- back to the pristine staged file."""
         self.editing_path = None
+        self.import_pending = False
 
     def show_panel(self, name):
         for pname, panel in self.panels.items():

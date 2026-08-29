@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "0.12.6"  # CONFIRMED on real Windows 11 hardware (2026-08-19, Doug): _find_garmin_root_windows() (v0.12.5) works correctly against a real Edge 530 -- `detect` printed the same device info the Mac shows, `screens` worked from both this file and fit_dump.py, and the full GUI workflow (add a screen to the Sandbox profile, deploy, restart, NewFiles round-trip) completed cleanly, all with zero code changes -- copying the toolkit's .py files to the Windows laptop was sufficient. Doug's D:\Garmin has Sports/NewFiles flat at the drive root, so this run exercised Level 1 of the function's two-level check; the Level 2 (one-subfolder-deep) branch, kept for parity with the macOS half, is still unexercised on real hardware but has no reason to behave differently. No Linux testing has been done. Doc-only/confirmation entry -- no code changed. Prior entry (v0.12.5, 2026-08-17): New feature, Doug's go-ahead: _find_garmin_root_windows() filled in -- Windows support's single deliberately-stubbed function, per this file's own module docstring ("find_garmin_root() is the ONLY function that needs a platform-specific implementation"). Scans drive letters C: through Z: (A:/B: skipped, historically floppy drives) for the same Sports/+NewFiles/ structure check _find_garmin_root_macos() uses, at both the drive root AND one level of subfolder -- mirrors the macOS two-level check exactly, since real Edge 530 hardware nests Sports/NewFiles one folder down under the mounted volume on Doug's Mac; whether Windows exposes the same nesting or puts them flat at the drive letter was UNCONFIRMED pending real hardware testing at the time (now resolved above: flat, on Doug's test laptop). Deliberately uses plain os.path.exists()/os.listdir() drive-letter iteration rather than a Windows API (e.g. win32api.GetLogicalDriveStrings()) -- avoids adding a new dependency (pywin32) beyond what install.sh already installs. OSError from an inaccessible/empty drive (e.g. a card reader with no media) is caught and skipped per-letter, same defensive posture as the macOS half's PermissionError handling. New `string` import (ascii_uppercase for the drive-letter loop). find_garmin_root() itself needed no change -- it already dispatched to this function by platform.system(); this was purely filling in the stub. Headlessly verified via ntpath-monkeypatched fake drive trees (can't test real Windows drive letters in this dev sandbox): nested-structure case, flat-structure case, no-device-present case, and a flaky/inaccessible drive case all behave correctly; confirmed A:/B: are skipped and C: through Z: are checked in order; confirmed find_garmin_root() correctly dispatches to this function when platform.system() == "Windows". Prior entry (v0.12.4): Real bug fix, Doug's report from actually using the GUI (2026-08-16, same-day follow-up to v0.12.3): even after v0.12.3's smart-char fix, 3 literal "?" kept reappearing at the very front of startup.txt's preserved header comment line -- invisible in the GUI (which only shows the editable message text), found by Doug opening the raw file in BBEdit. Different mechanism from v0.12.3: read_startup_txt() decodes raw bytes as ASCII with errors="replace", so a leading UTF-8 BOM (3 bytes, EF BB BF, each individually invalid for ASCII) decodes to 3 U+FFFD characters, which ride through the "preserve header byte-for-byte" split/rejoin (preserved from the decoded string, not the raw bytes) and get re-encoded to 3 literal "?" bytes on every save -- self-perpetuating once a BOM is present, since the header is never regenerated, only carried forward. read_startup_txt() now strips a leading UTF-8 BOM before decoding, so it's a silent no-op instead. Matches Doug's own observation exactly: manually removing the "?" via BBEdit and re-saving (no BOM) stopped them from reappearing on the next gui_app edit. BOM's original source still unknown/unconfirmed. Headlessly verified: a fake garmin_root with a BOM-prefixed startup.txt now reads back with zero "?"/U+FFFD in the header; a file with no BOM is a byte-identical no-op (unaffected). Prior entry (v0.12.3): a routine startup.txt edit came back with three "?" characters added on one line and "..." replaced by a SINGLE "?" on another, even though Doug never typed a "?" anywhere. Root cause: write_startup_txt() has always encoded with content.encode("ascii", errors="replace"), and wx.TextCtrl on macOS is backed by Cocoa's NSTextView, which silently auto-substitutes typed text by default -- three periods become one U+2026 ellipsis character, straight quotes become curly ones, a double hyphen becomes an em dash, etc, all as you type. Each of those single Unicode characters then hit the ASCII-only encode and became exactly one "?" -- matching the reported pattern precisely (the ellipsis became ONE "?", not three, which rules out a byte-level/UTF-8 explanation and points straight at one non-ASCII CHARACTER per substitution). Not independently byte-confirmed via a hex dump of Doug's exact before/after files, but this mechanism reproduces the reported symptom pattern exactly and is directly traceable to this file's own encode call. New _SMART_CHAR_REPLACEMENTS table + _normalize_smart_chars(), applied to content inside write_startup_txt() immediately before the ascii encode -- reverses the common Cocoa smart-substitution characters (curly single/double quotes, en dash, em dash, ellipsis) back to their plain-ASCII originals, so typed text round-trips correctly regardless of which substitution macOS silently applied. Any character NOT in the table is still replaced with "?" on write, unchanged, honest fallback for a genuinely unsupported character -- the GUI's existing non-ASCII warning (StartupTxtPanel._update_warning(), gui_app.py) still flags anything that slips through. Single shared fix point -- both the GUI (StartupTxtPanel.on_save()) and the `startup-txt --write` CLI subcommand funnel through this same write_startup_txt(), so both get the fix with no gui_app.py change needed. Headlessly verified: an ellipsis, curly quotes, and an en/em dash all round-trip to their exact ASCII originals with zero "?" in the encoded output; a genuinely unmapped non-ASCII character (e.g. an accented letter) still degrades honestly to "?", confirming the fallback behavior is unchanged for anything outside the table. Prior entry (v0.12.2): New feature, Doug's go-ahead (2026-08-15): backend for "Restore a Deleted Profile" (see PROJECT_NOTES.md Open Items). New list_backed_up_profile_filenames(working_dir) -- returns every .fit filename seen across ANY working_dir/backups/<timestamp>/ folder, regardless of whether it's still on the device; the GUI/CLI subtract the currently-live profile list to find candidates. Filters to ".fit" only (list_profiles()'s own convention) specifically because write_startup_txt() (v0.12.0) backs startup.txt up into this SAME backups/ folder structure -- without the filter, a boot-message backup would get mistaken for a deleted profile. New `deleted-profiles` CLI subcommand (needs a connected device, to know what's currently live). The one real risk this feature depends on -- whether NewFiles can actually RECREATE a profile deleted from Sports/, not just replace an existing one -- was already CONFIRMED via a direct on-device test back on 2026-08-11 (garmin_device.py deploy against a deliberately-deleted profile's backup); this entry is purely the missing discovery-side function, no new write-path risk. Headlessly verified: a fake backups/ tree with two historical profiles (one still "live," one not) and a startup.txt backup mixed in correctly returns only the non-live profile, with startup.txt correctly excluded; the `deleted-profiles` CLI subcommand exercised end-to-end via a monkeypatched find_garmin_root(). Backs gui_app.py's new RestoreDeletedPanel. Prior entry (v0.12.1): Real bug fix, Doug's report from actually using the GUI (2026-08-14): StartupTxtPanel's message editor showed a blank line between every real line of Doug's own existing message, even though the same file opened with no blank lines in BBEdit and vi. read_startup_txt() now normalizes line endings ('\r\n' and lone '\r' both collapsed to plain '\n') immediately after decoding, before the content is ever split/displayed. Best-evidenced explanation (not independently byte-confirmed via a hex dump of the real file, flagged honestly): the file is likely CRLF-terminated, which BBEdit/vi both silently auto-normalize on open (so it LOOKS identical to an LF file in either), but wx.TextCtrl's SetValue() has documented bad behavior when fed a string containing embedded '\r\n' -- each '\r' can contribute its own line break on top of the following '\n', producing exactly a blank-line-per-line rendering. Normalizing at the single read entry point fixes the display regardless of which theory is exactly right, and is a safe no-op for a file that was already LF-only (headlessly verified both ways: a simulated CRLF file round-trips through parse_startup_txt()/build_startup_txt() with zero blank lines and zero stray '\r' bytes; the original all-LF round-trip test is unaffected, still byte-identical). Side effect, noted in the function's own docstring: any file edited and saved through this toolkit from now on gets its line endings normalized to LF, even if it started out CRLF -- not expected to matter to the device's own boot-message renderer (no evidence either way), but a real, deliberate behavior change from a plain byte-for-byte round-trip, worth remembering if a future report ever hinges on exact original byte content. Prior entry (v0.12.0): New feature, Doug's go-ahead (2026-08-14): startup.txt (custom boot message) read/parse/build/write support. New STARTUP_TXT_FILENAME/STARTUP_TXT_MAX_CHARS/STARTUP_TXT_MAX_LINES constants and read_startup_txt()/parse_startup_txt()/build_startup_txt()/write_startup_txt(), plus a new `startup-txt` CLI subcommand (view, or --write FILE to overwrite). CONFIRMED path (Doug's own real Edge 530, direct ls -l/cat, 2026-08-14): startup.txt sits at garmin_root itself (same level as Sports/NewFiles/Settings), not inside Sports/ -- no find_garmin_root() change needed, it already resolves there. CONFIRMED write mechanism, via the file's own on-device comment ("Allow one full power cycle after editing for your message to be updated"): a DIRECT overwrite while mounted, NOT a NewFiles import -- write_startup_txt() backs up any existing file into the SAME working_dir/backups/<timestamp>/ folder structure backup_profiles() uses (harmless overlap -- list_backup_history() only ever looks for one specific filename per folder) before overwriting. parse_startup_txt()/build_startup_txt() split/rejoin the file at the LAST '-->' in the content -- Garmin's own instructional <!-- --> comments + the <display=N> directive (header) stay byte-for-byte untouched except for a possible display-seconds substitution, while the free-form message text (message) is the only part meant to be freely edited; this split point is generic (works on any file matching Garmin's own template shape, not hardcoded to Doug's specific message content), and headlessly round-trip-tested byte-for-byte against Doug's real file. STARTUP_TXT_MAX_CHARS=256/STARTUP_TXT_MAX_LINES=6 are the developer-documented (gplama.com, via DC Rainmaker) reference limits -- explicitly NOT enforced as a hard block anywhere in this file (Doug, 2026-08-14: character-width-dependent wrapping means these are typing guidance only, not a real validation the toolkit can perform). Headlessly verified: parse/build round-trip is byte-identical on Doug's real file content; write_startup_txt() backup-then-overwrite behavior confirmed via a fake filesystem garmin_root (no real device needed, since this is plain file I/O, unlike every other write in this file); `startup-txt` CLI subcommand exercised end-to-end (view + --write) via a monkeypatched find_garmin_root(). Backs gui_app.py's new StartupTxtPanel (v0.18.0). Prior entry (v0.11.0): add list_backup_history() -- lists every backup of one profile under working_dir/backups/<timestamp>/, newest first, de-duplicating consecutive byte-identical entries (backup_profiles() runs on every visit to the GUI's profile list, not just on real changes, so an untouched profile accumulates many identical timestamped backups per session). Backs the GUI's "Restore from Backup..." picker (gui_app.py v0.15.0) and a new `backup-history` CLI subcommand. Prior entry (v0.10.0): add get_device_info() reading Device.fit -- for the GUI's initial detect screen, before profile selection. See git log once initialized
+__version__ = "0.12.8"  # New feature, Doug's go-ahead (2026-08-25): backup retention/pruning. New prune_old_backups(working_dir, older_than_days, dry_run=True) deletes (or, dry_run, just reports) entire working_dir/backups/<timestamp>/ folders older than older_than_days -- decided by the folder's OWN NAME (its "%Y%m%d_%H%M%S" timestamp), not filesystem mtime, since mtime can reset on a copy/restore of the working directory while the embedded name is always correct by construction. Design chosen from three options put to Doug: time-based folder deletion [CHOSEN, this], keep-latest-N-per-profile (rejected -- each backups/<timestamp>/ folder snapshots EVERY profile together via backup_profiles(), not one folder per profile, so per-profile retention would mean deleting individual files out of a shared folder rather than whole folders), and keep-only-the-single-latest-backup (rejected -- cuts against Restore-from-Backup's whole reason for existing, and Doug's own real usage numbers, ~1098 backed-up .fit files / ~4-5GB over this project's entire prior history, confirmed disk space was never the actual constraint that would justify losing all older restore points). Manual-only, Doug's explicit choice -- no automatic/silent pruning on launch or anywhere else; the only entry points are a deliberate user action (this module's new `prune-backups` CLI subcommand, or gui_app.py's new "Clean Up Old Backups..." dialog, v0.19.19), same posture as every other destructive action already in this toolkit. New `prune-backups <working_dir> [--older-than-days N] [--dry-run] [--yes]` CLI subcommand (default 30 days, matching the GUI dialog's own default): always previews the folder list + total size first, then -- unless --dry-run -- prompts an interactive [y/N] confirm before deleting (same style as eject_device()'s own confirm), skippable via --yes for scripting. New _format_bytes() helper (plain stdlib, no new dependency), shared by the CLI summary and gui_app.py's dialog. Any folder whose name doesn't parse as the expected timestamp format is left alone entirely, not counted, not touched -- defensive against anything unexpected ever ending up in backups/. Headlessly verified: a fake working_dir with folders at several ages (90/45/31/10/0 days) plus one non-timestamp junk folder correctly identifies only the >=30-day folders for both dry-run preview and real deletion, leaves recent/today/junk untouched, and a second run against an already-pruned tree correctly reports nothing left to prune; the CLI subcommand exercised end-to-end (dry-run, --yes deletion, re-run confirms empty) against a real temp directory. Prior entry (v0.12.7): Real safety fix, Doug's go-ahead (2026-08-24): write_to_newfiles() gained an optional working_dir parameter -- if given, and a profile currently exists on the device under target_profile_filename, it's backed up to working_dir/backups/<timestamp>/ (same naming convention as backup_profiles(), so it's immediately browsable via the normal Restore-from-Backup picker) BEFORE being overwritten. Closes a real gap flagged while scoping "Import an external profile" (see PROJECT_NOTES.md Open Items): every GUI-driven write already gets this protection for free, since visiting the profile list always runs backup_profiles() first -- but a bare CLI `deploy` call bypassed that entirely, meaning `garmin_device.py deploy <patched> <existing_filename>` with no prior `backup` call would overwrite a live profile with zero safety net. Deliberately NOT a hard block or an interactive confirm -- overwriting the target filename is the normal, intended outcome of every deploy (that's how an edit gets written back), so blocking or prompting would break the core workflow for no benefit; the fix is a silent, automatic backup instead, same posture as every other write path in this toolkit. working_dir stays optional (not required) so existing callers/scripts that don't pass one keep working exactly as before -- omitting it just means no backup is attempted, matching the old behavior precisely. CLI `deploy` subcommand gained a new optional `--working-dir DIR` flag wired straight through; omitting it now prints a one-line NOTE to stderr explaining the profile will be overwritten with no backup, rather than staying silent about the gap. gui_app.py's DeployPanel (the single GUI call site for write_to_newfiles(), covering every write path -- edit, Clone, Restore, and the planned Import) now passes frame.working_dir too, for defense-in-depth on top of the profile-list backup it already gets. Headlessly verified: a fake garmin_root with an existing target profile correctly gets backed up before overwrite (byte-identical backup, correct timestamp folder, browsable via list_backup_history()); omitting working_dir is a no-op, byte-identical to pre-fix behavior; a target filename with no existing profile on the device correctly skips the backup attempt (nothing to back up). Prior entry (v0.12.6): CONFIRMED on real Windows 11 hardware (2026-08-19, Doug): _find_garmin_root_windows() (v0.12.5) works correctly against a real Edge 530 -- `detect` printed the same device info the Mac shows, `screens` worked from both this file and fit_dump.py, and the full GUI workflow (add a screen to the Sandbox profile, deploy, restart, NewFiles round-trip) completed cleanly, all with zero code changes -- copying the toolkit's .py files to the Windows laptop was sufficient. Doug's D:\Garmin has Sports/NewFiles flat at the drive root, so this run exercised Level 1 of the function's two-level check; the Level 2 (one-subfolder-deep) branch, kept for parity with the macOS half, is still unexercised on real hardware but has no reason to behave differently. No Linux testing has been done. Doc-only/confirmation entry -- no code changed. Prior entry (v0.12.5, 2026-08-17): New feature, Doug's go-ahead: _find_garmin_root_windows() filled in -- Windows support's single deliberately-stubbed function, per this file's own module docstring ("find_garmin_root() is the ONLY function that needs a platform-specific implementation"). Scans drive letters C: through Z: (A:/B: skipped, historically floppy drives) for the same Sports/+NewFiles/ structure check _find_garmin_root_macos() uses, at both the drive root AND one level of subfolder -- mirrors the macOS two-level check exactly, since real Edge 530 hardware nests Sports/NewFiles one folder down under the mounted volume on Doug's Mac; whether Windows exposes the same nesting or puts them flat at the drive letter was UNCONFIRMED pending real hardware testing at the time (now resolved above: flat, on Doug's test laptop). Deliberately uses plain os.path.exists()/os.listdir() drive-letter iteration rather than a Windows API (e.g. win32api.GetLogicalDriveStrings()) -- avoids adding a new dependency (pywin32) beyond what install.sh already installs. OSError from an inaccessible/empty drive (e.g. a card reader with no media) is caught and skipped per-letter, same defensive posture as the macOS half's PermissionError handling. New `string` import (ascii_uppercase for the drive-letter loop). find_garmin_root() itself needed no change -- it already dispatched to this function by platform.system(); this was purely filling in the stub. Headlessly verified via ntpath-monkeypatched fake drive trees (can't test real Windows drive letters in this dev sandbox): nested-structure case, flat-structure case, no-device-present case, and a flaky/inaccessible drive case all behave correctly; confirmed A:/B: are skipped and C: through Z: are checked in order; confirmed find_garmin_root() correctly dispatches to this function when platform.system() == "Windows". Prior entry (v0.12.4): Real bug fix, Doug's report from actually using the GUI (2026-08-16, same-day follow-up to v0.12.3): even after v0.12.3's smart-char fix, 3 literal "?" kept reappearing at the very front of startup.txt's preserved header comment line -- invisible in the GUI (which only shows the editable message text), found by Doug opening the raw file in BBEdit. Different mechanism from v0.12.3: read_startup_txt() decodes raw bytes as ASCII with errors="replace", so a leading UTF-8 BOM (3 bytes, EF BB BF, each individually invalid for ASCII) decodes to 3 U+FFFD characters, which ride through the "preserve header byte-for-byte" split/rejoin (preserved from the decoded string, not the raw bytes) and get re-encoded to 3 literal "?" bytes on every save -- self-perpetuating once a BOM is present, since the header is never regenerated, only carried forward. read_startup_txt() now strips a leading UTF-8 BOM before decoding, so it's a silent no-op instead. Matches Doug's own observation exactly: manually removing the "?" via BBEdit and re-saving (no BOM) stopped them from reappearing on the next gui_app edit. BOM's original source still unknown/unconfirmed. Headlessly verified: a fake garmin_root with a BOM-prefixed startup.txt now reads back with zero "?"/U+FFFD in the header; a file with no BOM is a byte-identical no-op (unaffected). Prior entry (v0.12.3): a routine startup.txt edit came back with three "?" characters added on one line and "..." replaced by a SINGLE "?" on another, even though Doug never typed a "?" anywhere. Root cause: write_startup_txt() has always encoded with content.encode("ascii", errors="replace"), and wx.TextCtrl on macOS is backed by Cocoa's NSTextView, which silently auto-substitutes typed text by default -- three periods become one U+2026 ellipsis character, straight quotes become curly ones, a double hyphen becomes an em dash, etc, all as you type. Each of those single Unicode characters then hit the ASCII-only encode and became exactly one "?" -- matching the reported pattern precisely (the ellipsis became ONE "?", not three, which rules out a byte-level/UTF-8 explanation and points straight at one non-ASCII CHARACTER per substitution). Not independently byte-confirmed via a hex dump of Doug's exact before/after files, but this mechanism reproduces the reported symptom pattern exactly and is directly traceable to this file's own encode call. New _SMART_CHAR_REPLACEMENTS table + _normalize_smart_chars(), applied to content inside write_startup_txt() immediately before the ascii encode -- reverses the common Cocoa smart-substitution characters (curly single/double quotes, en dash, em dash, ellipsis) back to their plain-ASCII originals, so typed text round-trips correctly regardless of which substitution macOS silently applied. Any character NOT in the table is still replaced with "?" on write, unchanged, honest fallback for a genuinely unsupported character -- the GUI's existing non-ASCII warning (StartupTxtPanel._update_warning(), gui_app.py) still flags anything that slips through. Single shared fix point -- both the GUI (StartupTxtPanel.on_save()) and the `startup-txt --write` CLI subcommand funnel through this same write_startup_txt(), so both get the fix with no gui_app.py change needed. Headlessly verified: an ellipsis, curly quotes, and an en/em dash all round-trip to their exact ASCII originals with zero "?" in the encoded output; a genuinely unmapped non-ASCII character (e.g. an accented letter) still degrades honestly to "?", confirming the fallback behavior is unchanged for anything outside the table. Prior entry (v0.12.2): New feature, Doug's go-ahead (2026-08-15): backend for "Restore a Deleted Profile" (see PROJECT_NOTES.md Open Items). New list_backed_up_profile_filenames(working_dir) -- returns every .fit filename seen across ANY working_dir/backups/<timestamp>/ folder, regardless of whether it's still on the device; the GUI/CLI subtract the currently-live profile list to find candidates. Filters to ".fit" only (list_profiles()'s own convention) specifically because write_startup_txt() (v0.12.0) backs startup.txt up into this SAME backups/ folder structure -- without the filter, a boot-message backup would get mistaken for a deleted profile. New `deleted-profiles` CLI subcommand (needs a connected device, to know what's currently live). The one real risk this feature depends on -- whether NewFiles can actually RECREATE a profile deleted from Sports/, not just replace an existing one -- was already CONFIRMED via a direct on-device test back on 2026-08-11 (garmin_device.py deploy against a deliberately-deleted profile's backup); this entry is purely the missing discovery-side function, no new write-path risk. Headlessly verified: a fake backups/ tree with two historical profiles (one still "live," one not) and a startup.txt backup mixed in correctly returns only the non-live profile, with startup.txt correctly excluded; the `deleted-profiles` CLI subcommand exercised end-to-end via a monkeypatched find_garmin_root(). Backs gui_app.py's new RestoreDeletedPanel. Prior entry (v0.12.1): Real bug fix, Doug's report from actually using the GUI (2026-08-14): StartupTxtPanel's message editor showed a blank line between every real line of Doug's own existing message, even though the same file opened with no blank lines in BBEdit and vi. read_startup_txt() now normalizes line endings ('\r\n' and lone '\r' both collapsed to plain '\n') immediately after decoding, before the content is ever split/displayed. Best-evidenced explanation (not independently byte-confirmed via a hex dump of the real file, flagged honestly): the file is likely CRLF-terminated, which BBEdit/vi both silently auto-normalize on open (so it LOOKS identical to an LF file in either), but wx.TextCtrl's SetValue() has documented bad behavior when fed a string containing embedded '\r\n' -- each '\r' can contribute its own line break on top of the following '\n', producing exactly a blank-line-per-line rendering. Normalizing at the single read entry point fixes the display regardless of which theory is exactly right, and is a safe no-op for a file that was already LF-only (headlessly verified both ways: a simulated CRLF file round-trips through parse_startup_txt()/build_startup_txt() with zero blank lines and zero stray '\r' bytes; the original all-LF round-trip test is unaffected, still byte-identical). Side effect, noted in the function's own docstring: any file edited and saved through this toolkit from now on gets its line endings normalized to LF, even if it started out CRLF -- not expected to matter to the device's own boot-message renderer (no evidence either way), but a real, deliberate behavior change from a plain byte-for-byte round-trip, worth remembering if a future report ever hinges on exact original byte content. Prior entry (v0.12.0): New feature, Doug's go-ahead (2026-08-14): startup.txt (custom boot message) read/parse/build/write support. New STARTUP_TXT_FILENAME/STARTUP_TXT_MAX_CHARS/STARTUP_TXT_MAX_LINES constants and read_startup_txt()/parse_startup_txt()/build_startup_txt()/write_startup_txt(), plus a new `startup-txt` CLI subcommand (view, or --write FILE to overwrite). CONFIRMED path (Doug's own real Edge 530, direct ls -l/cat, 2026-08-14): startup.txt sits at garmin_root itself (same level as Sports/NewFiles/Settings), not inside Sports/ -- no find_garmin_root() change needed, it already resolves there. CONFIRMED write mechanism, via the file's own on-device comment ("Allow one full power cycle after editing for your message to be updated"): a DIRECT overwrite while mounted, NOT a NewFiles import -- write_startup_txt() backs up any existing file into the SAME working_dir/backups/<timestamp>/ folder structure backup_profiles() uses (harmless overlap -- list_backup_history() only ever looks for one specific filename per folder) before overwriting. parse_startup_txt()/build_startup_txt() split/rejoin the file at the LAST '-->' in the content -- Garmin's own instructional <!-- --> comments + the <display=N> directive (header) stay byte-for-byte untouched except for a possible display-seconds substitution, while the free-form message text (message) is the only part meant to be freely edited; this split point is generic (works on any file matching Garmin's own template shape, not hardcoded to Doug's specific message content), and headlessly round-trip-tested byte-for-byte against Doug's real file. STARTUP_TXT_MAX_CHARS=256/STARTUP_TXT_MAX_LINES=6 are the developer-documented (gplama.com, via DC Rainmaker) reference limits -- explicitly NOT enforced as a hard block anywhere in this file (Doug, 2026-08-14: character-width-dependent wrapping means these are typing guidance only, not a real validation the toolkit can perform). Headlessly verified: parse/build round-trip is byte-identical on Doug's real file content; write_startup_txt() backup-then-overwrite behavior confirmed via a fake filesystem garmin_root (no real device needed, since this is plain file I/O, unlike every other write in this file); `startup-txt` CLI subcommand exercised end-to-end (view + --write) via a monkeypatched find_garmin_root(). Backs gui_app.py's new StartupTxtPanel (v0.18.0). Prior entry (v0.11.0): add list_backup_history() -- lists every backup of one profile under working_dir/backups/<timestamp>/, newest first, de-duplicating consecutive byte-identical entries (backup_profiles() runs on every visit to the GUI's profile list, not just on real changes, so an untouched profile accumulates many identical timestamped backups per session). Backs the GUI's "Restore from Backup..." picker (gui_app.py v0.15.0) and a new `backup-history` CLI subcommand. Prior entry (v0.10.0): add get_device_info() reading Device.fit -- for the GUI's initial detect screen, before profile selection. See git log once initialized
 """
 garmin_device.py -- detect a mounted Garmin Edge, back up its Activity
 Profiles, stage an edit, and push a patched profile back via NewFiles.
@@ -49,7 +49,7 @@ import json
 import string
 import platform
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 
 SPORTS_SUBDIR = "Sports"
 NEWFILES_SUBDIR = "NewFiles"
@@ -604,6 +604,96 @@ def list_backed_up_profile_filenames(working_dir):
     return names
 
 
+def _format_bytes(n):
+    """Plain human-readable byte count (e.g. "12.3 MB") -- no dependency, used by
+    both the CLI's prune-backups summary and gui_app.py's cleanup dialog."""
+    size = float(n)
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if size < 1024 or unit == "TB":
+            return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} {unit}"
+        size /= 1024
+
+
+def prune_old_backups(working_dir, older_than_days, dry_run=True):
+    """
+    Delete (or, if dry_run, just report) every working_dir/backups/
+    <timestamp>/ folder whose OWN timestamp -- parsed from its folder
+    name, not filesystem mtime -- is older than older_than_days from
+    now. Backup retention/pruning, Doug's go-ahead (2026-08-25):
+    backups accumulate indefinitely with nothing to clean them up (see
+    PROJECT_NOTES.md Open Items "Backup retention/pruning" -- flagged
+    since v0.11.0, deliberately deferred out of MVP). Doug's own real
+    usage numbers (~1098 backed-up .fit files, ~4-5GB, over this
+    project's entire prior history) confirmed disk footprint was never
+    the real problem -- staleness/tidiness over a long project lifetime
+    is. Design chosen from three options put to Doug: (1) time-based
+    folder deletion [CHOSEN], (2) keep-latest-N-per-profile, (3)
+    keep-only-the-single-latest-backup. (2) was rejected as needlessly
+    complex -- each backups/<timestamp>/ folder is a full snapshot
+    across EVERY profile present at that moment (see backup_profiles()),
+    not one folder per profile, so per-profile retention would mean
+    deleting individual files out of a shared folder rather than whole
+    folders, plus awkward interaction with list_backup_history()'s
+    existing consecutive-byte-identical display dedup. (3) was rejected
+    as cutting against this toolkit's whole safety-net design --
+    Restore-from-Backup exists specifically to go back further than
+    "the most recent one," and Doug's own numbers showed disk space
+    was never the actual constraint that would justify it. Deliberately
+    NOT automatic -- Doug's choice: manual-only, triggered by a real
+    user action (gui_app.py's "Clean Up Old Backups..." button, or this
+    module's own `prune-backups` CLI subcommand), same posture as every
+    other destructive action in this toolkit (Restore, permanent Remove,
+    Favorite overwrite) -- no silent background deletion of backup
+    history, ever.
+
+    Uses the folder's NAME (backup_profiles()'s own "%Y%m%d_%H%M%S"
+    convention) rather than filesystem mtime to decide age -- more
+    robust, since mtime can be reset by anything that copies/restores
+    the working directory (a fresh git checkout, a Time Machine
+    restore, etc.), while the embedded timestamp is always correct by
+    construction. Any folder whose name DOESN'T parse as that format is
+    left alone entirely -- skipped, not counted, not touched --
+    defensive against anything unexpected ever ending up in this
+    directory.
+
+    Returns a list of (folder_name, size_bytes) tuples for every folder
+    that was (dry_run=False) or would be (dry_run=True, the default)
+    removed, oldest first. Each folder is deleted as a single atomic
+    unit (shutil.rmtree) -- it's a self-contained point-in-time
+    snapshot, so there's no partial-folder bookkeeping to get wrong.
+    """
+    backups_root = os.path.join(working_dir, "backups")
+    if not os.path.isdir(backups_root):
+        return []
+
+    cutoff = datetime.now() - timedelta(days=older_than_days)
+    candidates = []
+    for entry in os.listdir(backups_root):
+        path = os.path.join(backups_root, entry)
+        if not os.path.isdir(path):
+            continue
+        try:
+            folder_time = datetime.strptime(entry, "%Y%m%d_%H%M%S")
+        except ValueError:
+            continue  # not one of ours -- skip, don't touch
+        if folder_time >= cutoff:
+            continue  # not old enough yet
+        size = sum(
+            os.path.getsize(os.path.join(dirpath, f))
+            for dirpath, _, filenames in os.walk(path)
+            for f in filenames
+        )
+        candidates.append((entry, size))
+
+    candidates.sort(key=lambda t: t[0])  # oldest first
+
+    if not dry_run:
+        for entry, _ in candidates:
+            shutil.rmtree(os.path.join(backups_root, entry))
+
+    return candidates
+
+
 # --- Staging for edit (with lineage tracking) ---------------------------
 
 def stage_for_edit(profile_filename, backup_path, working_dir):
@@ -656,7 +746,8 @@ def check_lineage(patched_path, expected_source_backup):
 
 # --- Write to device via NewFiles ---------------------------------------
 
-def write_to_newfiles(garmin_root, patched_path, target_profile_filename):
+def write_to_newfiles(garmin_root, patched_path, target_profile_filename,
+                       working_dir=None):
     """
     Copy patched_path into the device's NewFiles/ folder, using the
     EXACT filename of the profile being replaced (this matters -- the
@@ -665,6 +756,21 @@ def write_to_newfiles(garmin_root, patched_path, target_profile_filename):
     what was written, to catch USB/filesystem corruption before it
     ever reaches the device's own import logic. Raises GarminDeviceError
     on any mismatch or if the device disconnects mid-write.
+
+    Safety net (working_dir, optional): if a profile currently exists
+    on the device under target_profile_filename, it is backed up to
+    working_dir/backups/<timestamp>/ BEFORE being overwritten -- same
+    folder-naming convention backup_profiles() uses, so this backup is
+    immediately browsable via the normal Restore-from-Backup picker,
+    not a separate parallel mechanism. Every GUI-driven write already
+    gets this protection for free (visiting the profile list always
+    runs backup_profiles() first), but a bare CLI `deploy` call bypasses
+    that -- this closes the one real gap: deploying straight to an
+    existing filename with no prior `backup` call would otherwise
+    overwrite that profile with no safety net at all. If working_dir is
+    omitted, behavior is unchanged from before (no backup attempted) --
+    kept optional rather than required so existing scripts/callers
+    don't break.
     """
     if find_garmin_root() != garmin_root:
         raise GarminDeviceError(
@@ -674,6 +780,18 @@ def write_to_newfiles(garmin_root, patched_path, target_profile_filename):
 
     newfiles_dir = os.path.join(garmin_root, NEWFILES_SUBDIR)
     dest_path = os.path.join(newfiles_dir, target_profile_filename)
+
+    if working_dir is not None:
+        sports_dir = os.path.join(garmin_root, SPORTS_SUBDIR)
+        current_path = os.path.join(sports_dir, target_profile_filename)
+        if os.path.isfile(current_path):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_dir = os.path.join(working_dir, "backups", timestamp)
+            os.makedirs(backup_dir, exist_ok=True)
+            backup_path = os.path.join(backup_dir, target_profile_filename)
+            shutil.copy2(current_path, backup_path)
+            print(f"Backed up existing {target_profile_filename} before "
+                  f"overwrite -> {backup_path}", file=sys.stderr)
 
     with open(patched_path, "rb") as f:
         intended_bytes = f.read()
@@ -802,6 +920,12 @@ def _cli():
     p_deploy = sub.add_parser("deploy", help="Write a patched profile to NewFiles and prompt eject")
     p_deploy.add_argument("patched_path")
     p_deploy.add_argument("target_profile_filename")
+    p_deploy.add_argument("--working-dir", default=None,
+                           help="If given, back up whatever profile currently "
+                                "exists under target_profile_filename to "
+                                "working_dir/backups/<timestamp>/ before "
+                                "overwriting it. Omit to skip this safety net "
+                                "(e.g. if you already ran a manual `backup`).")
     p_deploy.add_argument("--auto-eject", action="store_true",
                            help="Offer to eject automatically (still asks for confirmation)")
 
@@ -830,6 +954,16 @@ def _cli():
                                                            "before but no longer present on "
                                                            "the connected device")
     p_deleted.add_argument("working_dir")
+
+    p_prune = sub.add_parser("prune-backups", help="Delete backups/<timestamp>/ folders "
+                                                      "older than a given number of days")
+    p_prune.add_argument("working_dir")
+    p_prune.add_argument("--older-than-days", type=int, default=30,
+                          help="Delete backup folders older than this many days (default: 30)")
+    p_prune.add_argument("--dry-run", action="store_true",
+                          help="Report what would be deleted without deleting anything")
+    p_prune.add_argument("--yes", action="store_true",
+                          help="Skip the interactive confirmation prompt")
 
     args = parser.parse_args()
 
@@ -874,7 +1008,14 @@ def _cli():
         if not root:
             print("No Garmin device currently connected.", file=sys.stderr)
             sys.exit(1)
-        write_to_newfiles(root, args.patched_path, args.target_profile_filename)
+        if args.working_dir is None:
+            print("NOTE: no --working-dir given -- if a profile already "
+                  "exists on the device under this filename, it will be "
+                  "overwritten with NO automatic backup. Pass --working-dir "
+                  "(or run `backup` yourself first) to get the same safety "
+                  "net every GUI-driven write already has.", file=sys.stderr)
+        write_to_newfiles(root, args.patched_path, args.target_profile_filename,
+                           working_dir=args.working_dir)
         eject_device(root, auto_eject=args.auto_eject)
 
     elif args.command == "screens":
@@ -943,6 +1084,31 @@ def _cli():
             print("No backed-up profiles found that are missing from the device.", file=sys.stderr)
         for name in deleted:
             print(name)
+
+    elif args.command == "prune-backups":
+        candidates = prune_old_backups(args.working_dir, args.older_than_days, dry_run=True)
+        if not candidates:
+            print(f"Nothing to prune -- no backups/<timestamp>/ folders older "
+                  f"than {args.older_than_days} day(s).")
+        else:
+            total_bytes = sum(size for _, size in candidates)
+            print(f"{len(candidates)} backup folder(s) older than "
+                  f"{args.older_than_days} day(s), {_format_bytes(total_bytes)} total:")
+            for entry, size in candidates:
+                print(f"  {entry}  ({_format_bytes(size)})")
+            if args.dry_run:
+                print("\n(--dry-run: nothing deleted)")
+            else:
+                if not args.yes:
+                    answer = input(
+                        f"\nDelete these {len(candidates)} folder(s), freeing "
+                        f"{_format_bytes(total_bytes)}? [y/N] "
+                    ).strip().lower()
+                    if answer != "y":
+                        print("Not deleting -- no changes made.")
+                        sys.exit(0)
+                prune_old_backups(args.working_dir, args.older_than_days, dry_run=False)
+                print(f"\nDeleted {len(candidates)} folder(s), freed {_format_bytes(total_bytes)}.")
 
 
 if __name__ == "__main__":

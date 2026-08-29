@@ -1,4 +1,29 @@
-# MVP Scope — Garmin Edge 530 Screen Editor GUI
+# MVP Scope — Activity Profile Editor for Garmin Edge
+
+*Doc rev 18 — refreshed 2026-08-25.* **Doc-only: heading renamed to
+match the project's canonical name.** Was "MVP Scope — Garmin Edge 530
+Screen Editor GUI" -- Doug clarified the canonical public name is
+"Activity Profile Editor for Garmin Edge" (no "Screen," no "530,"
+matching his GitHub repo name and Release titles; see
+PROJECT_NOTES.md Doc rev 83 for the full writeup). No content change,
+heading only.
+
+*Doc rev 17 — refreshed 2026-08-24.* **"Delete an entire Activity
+Profile" added to Explicitly Excluded, Doug's own investigation
+closes it out.** Doug ran two clean black-box tests directly on his
+device: deleted the `Sandbox` profile's `.fit` file from `Sports/`
+only, power-cycled -- the profile came back. Deleted it from BOTH
+`Sports/` and `Sports/Backups/` this time, power-cycled again -- still
+came back. Whatever actually governs a profile's existence on-device
+isn't simply "a `.fit` file present in `Sports/`," ruling out the
+working hypothesis that `Sports/Backups/` was the restore source.
+Since this toolkit's entire method is black-box manipulation of files
+exposed over USB mass storage, and whole-profile deletion demonstrably
+isn't achievable that way, Doug's call: log it as explicitly out of
+scope for this tool's goals at this time, not a "not yet built" gap to
+revisit -- there's nothing left to scope until/unless someone finds
+where the real record lives. See `PROJECT_NOTES.md` Open Items for the
+full two-test writeup. Prior rev (16, 2026-08-15) follows.*
 
 *Doc rev 16 — refreshed 2026-08-15. **"Reduce redundant profile
 backups" BUILT, Doug's go-ahead (low priority).** `ProfileListPanel`
@@ -214,6 +239,7 @@ rather than leaving that as a manual afterthought.
 | **Toggling Segments/ClimbPro/other profile-wide settings** | `mesg_num=13` is only ~1/40 mapped (just the Segments toggle so far; ClimbPro's toggle turned out to live in a different message, `training_settings_mesgs`). Not enough understood to expose safely yet. |
 | **Multi-device / Garmin Connect sync** | What the forum posters actually *want* long-term, but far out of scope — this project works against a single mounted device's files directly. |
 | **Automatic backup retention/pruning** | Backups will accumulate indefinitely with no cleanup. Not a real problem yet at these file sizes, but a future age-based cutoff (e.g. auto-delete backups older than 30 days) is worth adding once real usage patterns are clear. Manual cleanup works fine for MVP. |
+| **Delete an entire Activity Profile** (not just a screen within one) | Investigated directly by Doug (2026-08-22/24): deleting the profile's `.fit` file from `Sports/` alone, then from BOTH `Sports/` and `Sports/Backups/`, and power-cycling after each test -- the profile (`Sandbox`) survived both times. Whatever actually defines a profile's existence on-device is NOT simply "a `.fit` file present in `Sports/`" the way this toolkit's whole reverse-engineered `data_screen`/screen-editing model assumes -- likely an internal database/index outside anything USB mass storage exposes, or a minimum-profile-count floor Garmin enforces per activity type, neither confirmed. This toolkit's entire approach is black-box file manipulation against what's mounted over USB; since whole-profile deletion demonstrably isn't achievable that way, it's out of scope for this tool at this time, not a "not yet built" gap. See `PROJECT_NOTES.md` Open Items for the full investigation writeup. |
 
 ---
 
