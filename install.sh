@@ -40,6 +40,19 @@
 
 set -euo pipefail
 
+# 1.0.3 -- new feature, Doug's go-ahead (2026-08-30): builds/confirms
+# launch_gui.command (macOS's answer to Windows' double-click-gui_app.py
+# convenience, since macOS has no equivalent file association to hijack
+# -- see PROJECT_NOTES.md "macOS double-click launcher"). This script
+# now chmod's it executable as its last step, defensively, in case
+# whatever download method a user got the toolkit through (a zip
+# download rather than a git clone, an editor that stripped the bit,
+# etc.) didn't preserve it -- costs nothing to reassert on every run.
+# "Next steps" output also mentions it as the no-Terminal-needed
+# alternative to the two commands already listed. No change to the
+# actual dependency-install logic above. Prior entry (1.0.2):
+SCRIPT_VERSION="1.0.3"
+
 # 1.0.2 -- real bug fix (2026-08-13): once past the Xcode CLT/python3
 # checks on a real Mac (Homebrew python3 3.14, freshly installed),
 # "Installing garmin-fit-sdk..." died with "PIP_EXTRA[@]: unbound
@@ -60,7 +73,6 @@ set -euo pipefail
 # python3 is touched at all, plus defense-in-depth error handling
 # around the version-check invocation itself. Prior entry (1.0.0):
 # initial version.
-SCRIPT_VERSION="1.0.2"
 
 # ---- config ---------------------------------------------------------------
 MIN_PYTHON_MAJOR=3
@@ -218,6 +230,14 @@ except Exception as e:
 sys.exit(0 if ok else 1)
 PYEOF
 
+# ---- 10. make the double-click GUI launcher executable ------------------
+# Defensive, not conditional on anything -- costs nothing to reassert this
+# every run, and covers a launch_gui.command that arrived via a download
+# method (zip rather than git clone, etc.) that didn't preserve the bit.
+if [[ -f "launch_gui.command" ]]; then
+    chmod +x "launch_gui.command"
+fi
+
 info "Setup complete."
 cat <<EOF
 
@@ -225,6 +245,11 @@ Next steps:
   source $VENV_DIR/bin/activate
   python3 garmin_device.py detect      # CLI: confirm the device is seen
   python3 gui_app.py                   # GUI
+
+Or, no Terminal needed from here on: double-click launch_gui.command in
+Finder to launch the GUI directly (first double-click may need a
+right-click > Open instead, for macOS's usual unidentified-developer
+prompt -- normal for any downloaded script, only needed once).
 
 (Run 'deactivate' to leave the virtual environment when you're done.
 Re-run this script any time -- it's safe to run repeatedly.)

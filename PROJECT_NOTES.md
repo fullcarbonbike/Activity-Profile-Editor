@@ -1,5 +1,119 @@
 # Activity Profile Editor for Garmin Edge
 
+*Doc rev 92 — refreshed 2026-08-31.* **`launch_gui.command` CONFIRMED
+on real hardware -- the one thing Doc rev 91 flagged as untestable from
+the dev sandbox.** Doug ran `./install.sh` fresh, then double-clicked
+`launch_gui.command` in Finder -- worked. Closes out the last open
+question on this feature; no longer just headlessly verified. Committed
+and tagged as `v1.2.1` (`bb88e0e`) -- a patch bump, one new feature file
+plus its `install.sh`/README support, no other changes bundled in. Prior
+rev (91, 2026-08-30) follows.*
+
+*Doc rev 91 — refreshed 2026-08-30.* **macOS double-click launcher for
+`gui_app.py` -- BUILT, Doug's go-ahead.** Closes the gap first noted at
+Doc rev 76 (2026-08-22, deliberately left untracked pending Doug's
+confirmation he wanted it): Windows' `python.org` installer associates
+`.py` files with the SAME `python` `pip install` puts packages into, so
+double-clicking `gui_app.py` in File Explorer just works there (no venv
+in that install path, by design -- `install_windows.bat`'s own v1.0.0
+entry). macOS has no equivalent -- `install.sh` deliberately uses an
+isolated `.venv` (so nothing touches system/Homebrew Python), and even
+if macOS's old Python Launcher app handled a bare `.py` double-click at
+all, it would invoke whatever `python3` it resolves by default, not
+that `.venv` -- the exact mismatch Doug hit and worked around by hand
+during the Windows-confirmation testing session two weeks prior. Since
+a shared venv-vs-no-venv trade-off applies identically to both
+platforms (isolation vs. double-click-ability), and Windows already
+made its choice (no venv, for double-click), the macOS equivalent isn't
+"remove the venv" (would undo the whole reason `install.sh` uses one)
+-- it's a small separate launcher, which is what got built:
+
+New `launch_gui.command` v1.0.0 -- a `.command` file (Finder's actual
+native double-clickable-script mechanism on macOS, distinct from `.py`
+file-association tricks): resolves its own folder via `$(dirname "$0")`
+(same pattern `install.sh`'s `SCRIPT_DIR` uses), checks `.venv/bin/
+python3` exists and is executable (if not: clear message pointing at
+`./install.sh`, paused via `read` so the Terminal window doesn't close
+before it's readable, exit 1), then launches `gui_app.py` directly via
+that exact venv's `python3` -- not `source .venv/bin/activate` in a
+subshell, functionally identical but one less moving part. On a normal
+clean exit (GUI closed by the user) it exits immediately, no pause; on
+ANY non-zero exit (missing venv, `gui_app.py` itself crashing/failing
+to import `wx`) it prints the exit status and pauses for a keypress
+first, so a real error is actually readable before whatever Terminal
+does with a finished script. `install.sh` is now v1.0.3 -- adds a new
+defensive step 10, `chmod +x launch_gui.command` unconditionally on
+every run (covers a download method, e.g. a zip rather than `git
+clone`, that might not preserve the executable bit), and its own
+"Next steps" output now mentions the launcher as the no-Terminal
+alternative to the two commands already listed.
+
+Headlessly verified, all three real branches, via a simulated
+`.venv/bin/python3` stand-in (a tiny script that just exits 0 or 1,
+standing in for real `wx`/`gui_app.py` since wxPython can't be
+installed in this dev sandbox): missing `.venv` -- correct error
+message, exit 1; venv present, simulated clean exit -- no pause, exit
+0; venv present, simulated crash -- error message printed, paused,
+correct exit 1 propagated. `install.sh`'s own syntax reverified clean
+(`bash -n`) after the edit, and the file's `SCRIPT_VERSION` bump
+confirmed as the only such assignment left in the file (the edit
+replaced an in-place comment block that used to sit directly above the
+old `SCRIPT_VERSION="1.0.2"` line, so that had to be removed by hand
+rather than just prepending new text above it, same care as always
+taken with this file's changelog-in-comments style). Real Finder
+double-click and Gatekeeper first-launch behavior (documented in both
+the script's own header comment and README.md's Setup section, but
+genuinely can't be exercised from this sandbox) still need Doug's own
+run. README.md's Setup section and Tools table updated to match (see
+Doc rev 71 there); also corrected a stale line there claiming Windows
+"doesn't have [a setup script] yet," left over from before
+`install_windows.bat` existed. Prior rev (90, 2026-08-30) follows.*
+
+*Doc rev 90 — refreshed 2026-08-30.* **Real motivating use case
+surfaced for Clone Profile, drafting the r/Garmin post below --
+doc-only, no code changed.** Doug recalled a complaint from an Edge 530
+review's comment section around launch: creating a new profile
+on-device doesn't inherit any of the OTHER settings you'd already tuned
+on an existing one -- navigation, alerts, sensor pairing, and whatever
+else lives in the file outside the data screens -- so every new profile
+means redoing all of that by hand. Clone Profile already solves this,
+and not as a side effect discovered after the fact -- it's a direct
+consequence of how `fit_clone_profile.py`'s `patch_profile_name()` has
+always worked (Doc rev/table entry, `fit_clone_profile.py` v1.0.0):
+read the ENTIRE input file into a `bytearray`, overwrite ONLY the
+32-byte name field's byte range, recompute the trailing CRC, write
+everything else untouched -- so every setting outside the name field,
+including all the non-screen configuration this toolkit has never even
+needed to understand, rides along automatically. This reframes Clone
+Profile's value: it isn't just "rename a profile," it's "start a new
+profile without losing everything you already configured on an
+existing one" -- a real, previously-articulated pain point, not a
+guessed-at selling point. Folded into two places: the drafted r/Garmin
+post (see the workspace file `reddit_post_draft.md`) and `README.md`'s
+opening "What it does" section (Doc rev 70 there), so a new reader sees
+WHY cloning matters, not just that it exists. No functional change --
+this is purely making an existing, unchanged behavior's value explicit
+in the user-facing docs. Prior rev (89, 2026-08-30) follows.*
+
+*Doc rev 89 — refreshed 2026-08-30.* **Second cosmetic-only startup
+quirk found on the same 32-bit-only club laptop (Doc rev 88) -- a
+console message, not a code bug, no fix needed.** Double-clicking
+`gui_app.py` opens a console window (normal on Windows) showing `Error:
+Unable to set default locale: 'unsupported locale setting'` before the
+GUI itself appears; the GUI still starts and works fine afterward
+(same session where Doug confirmed detect/edit/deploy all working --
+see Doc rev 88). This message comes from wxWidgets' own C++
+initialization (`wx.App()` construction, before any of this project's
+code runs) trying to set a default locale and finding the one Windows
+reports unsupported by the underlying C runtime -- confirmed via
+research a known, widely-reported wxPython/wxWidgets behavior on
+Windows (other unrelated wx-based apps hit the identical message and
+wording), not something introduced by this toolkit or specific to this
+machine's age. `gui_app.py` has no locale-related code at all (checked
+directly, nothing to fix on this project's side). Harmless and
+cosmetic -- logged so it's not mistaken for a new bug if seen again on
+this or another Windows machine. Prior rev (88, 2026-08-29) follows.*
+
 *Doc rev 88 — refreshed 2026-08-29.* **New hardware floor confirmed:
 genuinely 32-bit-only hardware, via a donated bike-club laptop --
 Windows 10 32-bit on an Intel Atom N270 (2008, no 64-bit extensions at
@@ -480,8 +594,10 @@ that would `cd` into the toolkit folder, activate `install.sh`'s
 `.venv`, and launch `gui_app.py`, working around the Python Launcher/
 venv mismatch documented at Doc rev 68. NOT scoped or built yet, and
 deliberately not added to Open Items below until Doug confirms he
-wants it tracked -- noted here only so the idea isn't lost. Prior rev
-(75, 2026-08-21) follows.*
+wants it tracked -- noted here only so the idea isn't lost.
+**BUILT (2026-08-30, Doug's go-ahead) -- see Doc rev 91 at the top of
+this document for the full writeup.** Prior rev (75, 2026-08-21)
+follows.*
 
 *Doc rev 75 — refreshed 2026-08-21.* **README.md restructured, Doug's
 request.** Two changes: (1) a new "What it does" section now opens the
@@ -3966,6 +4082,21 @@ Kept deliberately, for pattern-recognition on future work:
   product pages online, pending confirmation from a beta tester with
   different hardware, rather than needing a live device in hand purely
   to get started.
+  **Supporting evidence, not a confirmation (2026-08-30, Doug's own
+  research, no device in hand):** a demo video of on-device screen
+  editing on the Edge 850/1050 (current touchscreen models) showed the
+  same 10-field-per-screen cap and the same screen layouts already
+  confirmed on the 530 -- just rendered on a larger touchscreen, not a
+  different structure. Doug also noted the touchscreen models have a
+  nicer on-device editing UX, but it's still purely on-device (same
+  category this toolkit works around, not a new interface this toolkit
+  would need to integrate with), and that Garmin Connect's phone app can
+  also edit profiles, but Doug found that path "a little tedious" in
+  his own look at it. This is real supporting evidence for the
+  count-driven layout theory above, but explicitly secondhand (a video,
+  not a real device this toolkit has touched) -- still logged as NOT
+  built/NOT confirmed the way this project requires before trusting a
+  number, same standard as everything else here.
 
 ---
 
