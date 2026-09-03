@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "0.19.20"  # Doc-only/naming, Doug's go-ahead (2026-08-25): project rename extended past the GUI window title (which was already "Activity Profile Screen Editor for Garmin Edge" since v0.16.7). Doug clarified the canonical public name is "Activity Profile Editor for Garmin Edge" -- no "Screen" (matches the GitHub repo name "Activity-Profile-Editor" and his own Release titles "Activity Profile Editor for Garmin Edge Devices" (2026-08-25): the editor targets any Edge device generically, and even though screens are what actually get edited, backups/restores/deploys all operate at the Activity Profile level, so "Activity Profile" is the right noun to lead with, not "Screen"). Also drops the leading "Garmin Edge 530" pattern seen elsewhere (README.md/PROJECT_NOTES.md's old H1) -- deliberately not leading with "Garmin" at all, to avoid implying this is a Garmin product, and not device-specific despite the 530 being the only Edge model actually tested against so far. Three spots updated in this file: MainFrame's window title (super().__init__'s title= argument), the module docstring's own opening line, and ABOUT_TEXT (the About dialog shown via DetectPanel's About button) -- all three now read "Activity Profile Editor for Garmin Edge" with no "Screen"/"530". No behavior change anywhere, text-only. See README.md/PROJECT_NOTES.md/MVP_SCOPE.md/FIT_PATCH.md's own changelog entries for the matching doc-side renames -- MEMORY_LOG.md and the RELEASE_NOTES_v1.1.x.md files are deliberately LEFT UNCHANGED, since both are point-in-time historical records (an explicitly archived project log, and notes already published as GitHub Releases under Doug's own chosen title) rather than live documentation -- same reasoning this project already applies to not rewriting old changelog/Doc-rev entries.
+__version__ = "0.20.0"  # Device-dependent Connect IQ field guard, real-hardware-driven bug fixes -- see PROJECT_NOTES.md Doc rev 95-99, and fit_patch.py v1.15.0's changelog for the matching backend writeup. FieldPickerDialog (2026-09-02) now always excludes fit_dump.py's new DEVICE_DEPENDENT_CIQ_IDS (currently {216}) from its selectable Add/Change Field list, unioned on top of each call's own exclude_ids -- a single fix covering all 4 call sites, since every one of them constructs this same dialog. New _ciq_guard_block() (2026-09-03), added after Doug's own real-hardware test exposed a real gap: this GUI's actual write path (_apply_field_list()/_swap_fields()/on_layout_choice(), which all call patch_screen() DIRECTLY) never went through fit_patch.py's CLI at all, so its guard never ran here -- a screen that already had a working CIQ field broke exactly like a fresh introduction the moment ordinary fields were added/removed/reordered around it, with no warning shown. _ciq_guard_block() checks the slot's CURRENT on-disk content via fit_patch.py's screen_has_device_dependent_ciq_field() and hard-refuses (no override, OK-only MessageBox) before any screen-shape edit -- wired into all six real call sites: _apply_field_list, _swap_fields, on_add_field, on_remove_field, on_change_type, on_layout_choice (the last three call it eagerly, before opening a picker dialog, purely so the user isn't sent through a modal only to be told no afterward -- _apply_field_list/_swap_fields are the actual enforcement points). _swap_fields() now returns True/False so on_move_up/on_move_down only update the list selection when a swap actually happened. Doc-only/naming, Doug's go-ahead (2026-08-25): project rename extended past the GUI window title (which was already "Activity Profile Screen Editor for Garmin Edge" since v0.16.7). Doug clarified the canonical public name is "Activity Profile Editor for Garmin Edge" -- no "Screen" (matches the GitHub repo name "Activity-Profile-Editor" and his own Release titles "Activity Profile Editor for Garmin Edge Devices" (2026-08-25): the editor targets any Edge device generically, and even though screens are what actually get edited, backups/restores/deploys all operate at the Activity Profile level, so "Activity Profile" is the right noun to lead with, not "Screen"). Also drops the leading "Garmin Edge 530" pattern seen elsewhere (README.md/PROJECT_NOTES.md's old H1) -- deliberately not leading with "Garmin" at all, to avoid implying this is a Garmin product, and not device-specific despite the 530 being the only Edge model actually tested against so far. Three spots updated in this file: MainFrame's window title (super().__init__'s title= argument), the module docstring's own opening line, and ABOUT_TEXT (the About dialog shown via DetectPanel's About button) -- all three now read "Activity Profile Editor for Garmin Edge" with no "Screen"/"530". No behavior change anywhere, text-only. See README.md/PROJECT_NOTES.md/MVP_SCOPE.md/FIT_PATCH.md's own changelog entries for the matching doc-side renames -- MEMORY_LOG.md and the RELEASE_NOTES_v1.1.x.md files are deliberately LEFT UNCHANGED, since both are point-in-time historical records (an explicitly archived project log, and notes already published as GitHub Releases under Doug's own chosen title) rather than live documentation -- same reasoning this project already applies to not rewriting old changelog/Doc-rev entries.
 """
 gui_app.py -- Activity Profile Editor for Garmin Edge, GUI.
 
@@ -132,6 +132,7 @@ from fit_dump import (
     field_name,
     active_field_ids,
     FIELD_ID_NAMES,
+    DEVICE_DEPENDENT_CIQ_IDS,
     screen_type_name,
     NAMED_SCREEN_TYPES,
     GRAPH_OR_BARS_FIELD_IDS,
@@ -152,6 +153,7 @@ from fit_patch import (
     check_system_screen_guard,
     would_hide_last_visible_screen,
     hide_unsupported_screen_type,
+    screen_has_device_dependent_ciq_field,
     remove_screen,
     swap_display_order,
     next_available_field9,
@@ -1953,13 +1955,28 @@ class FieldPickerDialog(wx.Dialog):
     NOT free-text entry, so a user can't accidentally queue an
     unresolved or mistyped field ID (see the "Editing UX decision"
     note at the top of this file).
+
+    Always excludes DEVICE_DEPENDENT_CIQ_IDS (fit_dump.py) on top of
+    whatever per-call exclude_ids the caller passes -- CONFIRMED via
+    real-hardware testing (PROJECT_NOTES.md Doc rev 95-97) that this
+    toolkit cannot introduce or relocate one of these fields into a
+    fresh slot (it silently renders as "Timer" on-device), so there's
+    no reason to ever offer one here. Same hard-refuse posture as
+    fit_patch.py's --fields CLI guard, just enforced by omission
+    instead of an error message -- this dialog has no free-text path
+    for a user to type the ID around the exclusion anyway. Read-only
+    display of an already-configured CIQ field (fit_dump.py screens
+    output, ViewScreensPanel, EditScreenPanel's current-field list)
+    is UNAFFECTED -- those all read FIELD_ID_NAMES directly and never
+    go through this dialog.
     """
 
     def __init__(self, parent, exclude_ids):
         super().__init__(parent, title="Add Field", size=(360, 420))
         self.selected_id = None
+        excluded = set(exclude_ids) | DEVICE_DEPENDENT_CIQ_IDS
         self._all_choices = sorted(
-            ((name, fid) for fid, name in FIELD_ID_NAMES.items() if fid not in exclude_ids),
+            ((name, fid) for fid, name in FIELD_ID_NAMES.items() if fid not in excluded),
             key=lambda t: t[0].lower(),
         )
         self._filtered = []
@@ -2327,6 +2344,55 @@ class EditScreenPanel(wx.Panel):
         )
         return answer == wx.YES
 
+    def _ciq_guard_block(self):
+        """
+        Returns True (and shows a HARD, OK-only block -- no override,
+        unlike _confirm_guard() above) if this slot currently holds a
+        device-dependent Connect IQ field (fit_dump.py's
+        DEVICE_DEPENDENT_CIQ_IDS), False if it's safe to proceed.
+
+        CORRECTION (2026-09-03, Doug, real on-device test): originally
+        this toolkit only refused to let you SELECT one of these ids
+        via FieldPickerDialog (v1 of this guard, 2026-09-02). That
+        missed a real failure mode -- Doug added two ordinary fields to
+        a screen that already had a working Edge 3270 CIQ field
+        (rearranging it from 1 field to 3, CIQ field kept in the
+        middle), and the write went through with no warning at all,
+        because _apply_field_list()/`_swap_fields()`/on_layout_choice()
+        below call patch_screen() DIRECTLY -- they never went through
+        fit_patch.py's CLI at all, so that guard never even ran. On
+        deploy the CIQ field broke exactly like a fresh introduction
+        does, even though its own id/position was never itself being
+        changed -- only the fields AROUND it were. See
+        screen_has_device_dependent_ciq_field() in fit_patch.py (the
+        shared, single-source-of-truth check both this and the CLI's
+        own equivalent guard now call) for the full evidence writeup.
+
+        No Yes/No override, matching fit_patch.py's posture for this
+        same check -- this isn't a "did you mean to?" pause, it's a
+        byte pattern this toolkit cannot make work at all once a
+        device-dependent CIQ field already occupies the screen.
+        """
+        present = screen_has_device_dependent_ciq_field(self.frame.editing_path, self.slot)
+        if not present:
+            return False
+        wx.MessageBox(
+            f"This screen currently has a device-dependent Connect IQ "
+            f"data field on it (ID {present}). CONFIRMED on real "
+            f"hardware that changing this screen's field count, field "
+            f"list, or layout -- even just adding/removing/reordering "
+            f"OTHER, ordinary fields around it -- breaks that field's "
+            f"on-device linkage, exactly like trying to add one fresh "
+            f"does. It renders as \"Timer\" afterward, regardless of "
+            f"what this file/GUI shows.\n\n"
+            f"This toolkit can't safely make ANY change to this "
+            f"screen's layout -- only Garmin's own on-device editor "
+            f"can restructure a screen that already has one of these.",
+            "Can't edit -- Connect IQ field present",
+            wx.OK | wx.ICON_ERROR,
+        )
+        return True
+
     def on_show_toggle(self, event):
         new_enabled = self.show_checkbox.GetValue()  # True = show, False = hide
         if not new_enabled:
@@ -2400,24 +2466,30 @@ class EditScreenPanel(wx.Panel):
         sel = self.fields_list.GetSelection()
         if sel == wx.NOT_FOUND or sel == 0:
             return
-        self._swap_fields(sel - 1, sel)
-        self.fields_list.SetSelection(sel - 1)
+        if self._swap_fields(sel - 1, sel):
+            self.fields_list.SetSelection(sel - 1)
 
     def on_move_down(self, event):
         sel = self.fields_list.GetSelection()
         if sel == wx.NOT_FOUND or sel >= len(self.field_ids) - 1:
             return
-        self._swap_fields(sel, sel + 1)
-        self.fields_list.SetSelection(sel + 1)
+        if self._swap_fields(sel, sel + 1):
+            self.fields_list.SetSelection(sel + 1)
 
     def _swap_fields(self, pos_a, pos_b):
+        """Returns True if the swap was actually applied, False if blocked."""
+        if self._ciq_guard_block():
+            return False
         current_array = read_current_field_array(self.frame.editing_path, self.slot)
         current_array[pos_a], current_array[pos_b] = current_array[pos_b], current_array[pos_a]
         changes = {7: struct.pack('<10H', *current_array)}
         patch_screen(self.frame.editing_path, self.frame.editing_path, self.slot, changes)
         self.refresh_from_file()
+        return True
 
     def _apply_field_list(self, new_ids):
+        if self._ciq_guard_block():
+            return
         if not self._confirm_guard():
             return
         changes = {
@@ -2436,6 +2508,12 @@ class EditScreenPanel(wx.Panel):
         self.refresh_from_file()
 
     def on_add_field(self, event):
+        # Fail fast, before opening the picker -- _apply_field_list()
+        # below re-checks this anyway (it's the real enforcement point,
+        # this is purely a UX nicety so the user isn't sent through a
+        # whole picker dialog only to be told no afterward).
+        if self._ciq_guard_block():
+            return
         if len(self.field_ids) >= MAX_FIELDS_PER_SCREEN:
             wx.MessageBox(f"A screen can have at most {MAX_FIELDS_PER_SCREEN} fields.",
                            "Can't add", wx.OK | wx.ICON_WARNING)
@@ -2448,6 +2526,8 @@ class EditScreenPanel(wx.Panel):
     def on_remove_field(self, event):
         sel = self.fields_list.GetSelection()
         if sel == wx.NOT_FOUND:
+            return
+        if self._ciq_guard_block():
             return
         if len(self.field_ids) <= 1:
             wx.MessageBox("A screen needs at least 1 field.", "Can't remove",
@@ -2470,6 +2550,8 @@ class EditScreenPanel(wx.Panel):
         sel = self.fields_list.GetSelection()
         if sel == wx.NOT_FOUND:
             return
+        if self._ciq_guard_block():
+            return
         # Exclude every OTHER field currently on the screen (no
         # duplicates), but leave the field being replaced itself
         # selectable -- picking the same ID back is a harmless no-op,
@@ -2485,6 +2567,10 @@ class EditScreenPanel(wx.Panel):
     def on_layout_choice(self, event):
         new_layout = 1 if self.layout_b_radio.GetValue() else 0
         if new_layout == self.layout_variant:
+            return
+        if self._ciq_guard_block():
+            self.layout_a_radio.SetValue(self.layout_variant == 0)
+            self.layout_b_radio.SetValue(self.layout_variant == 1)
             return
         count = len(self.field_ids)
         if new_layout == 1 and count not in COUNTS_WITH_B_VARIANT:

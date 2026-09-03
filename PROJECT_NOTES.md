@@ -1,5 +1,458 @@
 # Activity Profile Editor for Garmin Edge
 
+*Doc rev 99 — refreshed 2026-09-02.* **CONFIRMED: screen DISPLAY ORDER
+is safe for a screen holding a device-dependent Connect IQ field --
+only that screen's OWN count/array/layout is fragile.** Doug tested
+this directly, on real hardware, as the last check before pushing the
+CIQ guard fix as a release: moved a screen containing a working
+WindField placement to a different position in the on-device screen
+carousel (i.e. `swap_display_order()`/`--swap-order`, which swaps only
+field 9 -- the creation-order stamp -- between two already-configured
+screens) and it kept rendering correctly afterward. This is consistent
+with, and narrows, the Doc rev 98 finding: the fragile state lives in
+the screen's OWN field-array shape (f3 count / f7 field array / f8
+layout), not in field 9 (display position) or the screen's
+message_index/slot identity itself -- reordering which position a
+screen appears in the on-device list never touches any of those three
+fields, so it was never expected to be at risk, and now it's directly
+confirmed rather than just inferred by omission. Practical note: this
+also confirms the CIQ guard shipped in Doc rev 98 is scoped correctly
+as-is -- `screen_has_device_dependent_ciq_field()` is only checked when
+a write touches {3, 7, 8}, and `--swap-order` never goes through that
+code path at all (it's a completely separate f9-only function), so it
+was never blocked and didn't need to be. Prior rev (98, 2026-09-03)
+follows.*
+
+*Doc rev 98 — refreshed 2026-09-03.* **CORRECTION to Doc rev 97 + real
+guard gap found and fixed, both via Doug's own real-hardware testing.**
+Doc rev 97 stated this toolkit "can (via `patch_screen()`'s in-place
+edits) MOVE [a Connect IQ field] to a different slot" -- that claim does
+NOT hold up and should be read as superseded by this entry. Doug added
+two ordinary fields (Cadence, %FTP) to a Clonebox screen that already
+had a working Edge 3270 CIQ field (going from a 1-field to a 3-field
+layout, CIQ field kept in the middle position, ID/value never itself
+requested or changed) via the GUI's Add Field. On deploy, Edge 3270
+rendered as Timer -- broken exactly like every failed fresh-introduction
+attempt earlier in this investigation. In hindsight this is consistent
+with, not contradicted by, evidence that predates Doc rev 97 itself:
+the ROAD Screen 3 "value-only swap" test (Doc rev 95-96) had already
+failed under the same toolkit-write mechanism. Doc rev 97's "can move
+it" line was an overstatement not actually backed by a passing test --
+flagged here rather than silently edited, per this file's own no-
+rewrite discipline.
+
+**Refined finding:** the real rule isn't "does this write's REQUESTED
+field ids include a device-dependent CIQ id" (2026-09-02's guard, see
+`DEVICE_DEPENDENT_CIQ_IDS` in `fit_dump.py`) -- it's "does this SLOT
+CURRENTLY hold one, period." Any toolkit rewrite of that screen's
+count (f3), field array (f7), or layout (f8) breaks the on-device
+linkage, even when the CIQ field's own id/byte value/position isn't
+what's changing, only OTHER fields around it are. Whatever actually
+resolves this linkage on-device appears to get invalidated by any
+toolkit-originated restructuring of the screen at all, not specifically
+by touching the CIQ field's own bytes.
+
+**Real gap found and fixed:** the 2026-09-02 guard only covered two
+things -- `fit_patch.py --fields` refusing when a CIQ id was explicitly
+REQUESTED, and `FieldPickerDialog` excluding CIQ ids from fresh
+selection. Neither one protected the path Doug actually hit: the GUI's
+`_apply_field_list()`/`_swap_fields()`/`on_layout_choice()` call
+`patch_screen()` DIRECTLY and never route through `fit_patch.py`'s CLI
+at all, so that guard simply never ran for Add/Remove Field, Move Up/
+Down, Replace Field, or Layout A/B in the GUI -- only the CLI's
+`--fields` had any protection, and only for the narrow "you typed 216
+yourself" case. Fixed (2026-09-03) with a new, shared, single-source-
+of-truth check -- `screen_has_device_dependent_ciq_field()` in
+`fit_patch.py` -- that reads the slot's CURRENT on-disk field array
+before any edit and hard-refuses (no override) if a device-dependent
+CIQ id is already present, whenever the write would touch f3/f7/f8.
+Wired into both `fit_patch.py`'s CLI (`--fields`, `--swap-fields`,
+`--layout`, alongside the original request-side check, which still
+catches the complementary "trying to freshly introduce one" case) and
+directly into all six GUI call sites (`_apply_field_list`,
+`_swap_fields`, `on_add_field`, `on_remove_field`, `on_change_type`,
+`on_layout_choice`) -- the GUI checks are the ones that actually matter
+here, since that's the path with no CLI guard behind it at all.
+
+Practical upshot: once a screen has a device-dependent CIQ field on it
+(currently just `{216}`), this toolkit now refuses to touch that
+screen's field count, field list, or layout in any way, full stop --
+not just refuses to introduce a fresh one. The GitHub Show and tell
+post already published about this (2026-09-02) claimed toolkit
+relocation works within a profile -- that line needs a follow-up
+correction; not yet posted as of this entry. Prior rev (97,
+2026-09-02) follows.*
+
+*Doc rev 97 — refreshed 2026-09-02.* **WindField/Connect IQ investigation
+(Doc rev 95-96) -- final refinement and toolkit code change shipped.**
+Following Doc rev 96, Scott Beam (WindField's author) replied directly
+and confirmed two things independently: the numeric field ID (216) is
+"not anything I set in the code at all" (i.e., Garmin/firmware-assigned,
+not app-author-controlled), and Garmin's on-device "Timer" fallback
+(observed throughout this investigation whenever a toolkit-written CIQ
+placement failed) is, in his words, "the default field that just shows
+up whenever you uninstall any connectiq field" -- matching this
+project's own independently-derived behavioral theory exactly. Doug
+then ran the most direct test yet: installed a second, completely FREE
+Connect IQ app ("Edge 3270," via the on-device editor, no license/
+subscription involved) onto the same real device already running the
+paid, currently-licensed WindField. Result: Edge 3270 shows up as a
+new CONNECTIQ menu entry with its own distinct mesg_num=170 UUID
+(`a2b59c28649c480294771978b38bdf9`, vs. WindField's own constant
+`c7c508c824a44bcca2886f928a81b9c0`) -- but the SAME numeric field ID,
+216, that previously meant WindField. This is the clearest evidence
+yet that 216 is a device-local, install-order-dependent SLOT number,
+not a stable per-app identity, and -- because a totally free app shows
+the identical mechanism as a paid/licensed one -- it also rules out
+the "licensing/anti-piracy" framing floated earlier: this is general
+Connect IQ app-to-slot linking architecture, not licensing-specific.
+
+A direct cross-file UUID survey (every WindField-active file this
+project has on hand, every screen/position/layout it's ever occupied)
+independently confirmed the mesg_num=170 UUID is CONSTANT per app,
+with zero positional variation ever observed -- ruling out any
+per-placement encoding this toolkit could exploit. Doug also raised a
+legitimate methodological challenge, drawing a direct parallel to this
+project's own earlier f10/screen-type mystery (once suspected to be a
+firmware limitation before the real answer turned up in overlooked raw
+bytes): was something in the file still being dismissed too early,
+given that a toolkit-built CLONE (a file "Garmin has never seen") CAN
+carry over a working CIQ field? Investigated seriously rather than
+waved off -- but the proposed next rigorous test (an exact-byte
+UUID/mesg170 transplant) turned out to be redundant with a test already
+run and already failed (the ROAD Screen 3 value-only swap, which used
+100% native, unapproximated mesg170 data). No new file-level lever was
+found. Conclusion stands, now on firmer footing: this toolkit can
+reliably PRESERVE an existing CIQ field placement through a whole-
+profile Clone, and can (via `patch_screen()`'s in-place edits) MOVE one
+to a different slot the same profile already has it in via the
+on-device editor's own prior write -- but cannot ORIGINATE one in a
+slot that has never held it, because whatever actually gates this
+happens against device-side state (Garmin's own local record of
+installed CIQ apps, checked at render time), not anything reconstructable
+purely from file bytes. This remains an inference from consistent
+behavioral testing across ~10+ independent attempts, not a decompiled
+or firmware-documented mechanism.
+
+**Toolkit code change shipped as a direct result (2026-09-02, Doug's
+explicit request):** field IDs in this category get special, generic
+handling instead of a specific (and now confirmed occasionally WRONG)
+app name. `fit_dump.py` adds a new, deliberately growable
+`DEVICE_DEPENDENT_CIQ_IDS` set (currently `{216}`) and renames that
+entry's display name from "WindField Widget" to "CIQ Data Field" --
+this is a read-only-display change only, `FIELD_ID_NAMES` itself and
+everywhere that reads it directly (this file's own `screens` dump
+output, the GUI's ViewScreensPanel/EditScreenPanel) are unaffected, so
+an already-configured CIQ field keeps displaying correctly with its
+new generic name. Two write paths now hard-refuse (no `--force`
+override, same posture as `NO_SHOW_TOGGLE_TYPES`) rather than silently
+producing a file that looks right but doesn't work on-device:
+`fit_patch.py`'s `--fields` CLI errors out immediately if asked to
+write one of these IDs into a screen, and `gui_app.py`'s
+`FieldPickerDialog` (the single choke point behind all 4 Add/Change
+Field call sites) unconditionally excludes them from its selectable
+list, unioned on top of whatever per-call `exclude_ids` was already
+passed. README caveat update (from "licensing/entitlement" framing to
+the more accurate general-architecture framing) drafted but not yet
+committed to `README.md` as of this entry. Prior rev (96, 2026-09-02)
+follows.*
+
+*Doc rev 96 — refreshed 2026-09-02.* **WindField Widget investigation
+(Doc rev 95) -- CONCLUDED, cross-checked against a second, independent
+investigation with a larger file set. Root cause identified with high
+confidence: WindField is a paid Connect IQ data field, and this
+toolkit's `--fields`/`patch_screen()` write path cannot create whatever
+device-side reference a Connect IQ field needs -- only Garmin's own
+on-device editor can.** Doug ran the same problem, independently, through
+a separate long-running session dedicated to this project's field-ID
+census (which has access to many more of his real, long-lived profiles
+than this thread ever saw -- including two not previously known to have
+WindField configured: GRAVEL and a profile called "Tourtst"). That
+session did real, careful work and found WindField is confirmed to be a
+purchased/subscribed third-party Connect IQ app (~$15/year, via
+WebSearch), not a native Garmin field -- consistent with, and the
+likely ultimate explanation for, everything found in this thread. It
+also found a real, previously-unnoticed structural fact: a global
+message type 170 (16-byte value + a small second field) appears
+alongside every WindField-active screen it checked, and initially
+concluded -- based on a clean correlation across the 28 files it had
+access to (present in all 4 WindField-active files it knew of, absent
+from all 24 others) -- that mesg 170 was a Connect-IQ-app "link record"
+`--fields` fails to create.
+
+**That specific theory does not survive contact with this thread's own
+evidence, and the two threads' findings needed to be reconciled rather
+than taken at face value from either side alone.** This thread's very
+first successful fix -- `CyclingRoadClonebox_padding_test.fit`, deployed
+as `CyclingRoadClonebox.fit` and confirmed by Doug on real hardware to
+show WindField correctly on Screens 2 and 3 -- has NO message 170 at
+all (re-verified directly, 138 messages, `mesg_num=170` absent). That
+file was never uploaded to the other session, so its 28-file survey
+never had the counter-example on hand. Re-integrated: message 170 most
+likely correlates with "this specific file has been saved via the
+on-device editor at some point in its life" in general (true of GRAVEL/
+ROAD/Tourtst, all real profiles Doug has configured over time on-device;
+false of freshly toolkit-built test files) -- a shared cause behind both
+message 170 and a working WindField, not message 170 causing it. This
+matches what this thread had already found independently (ROAD.fit and
+the on-device-edited WindTest2A both carry message 170; the padding-only
+fix works without it).
+
+**The pattern that has held without a single exception, across every
+test either thread has run (this thread's WindTest2A/4B/9A, the
+Clonebox Screen 4 test, the message-170 injection test, Favorite Screen,
+the ROAD Screen 3 value-only swap; the other thread's parallel tests on
+the same files): every toolkit-written introduction or relocation of
+field 216 into a screen slot has failed (falls back to Timer); every
+Garmin-software-written one -- on-device edit, or a whole-file Clone
+Profile copy that merely preserves an already-working placement -- has
+worked.** This is consistent with (though not independently proven to
+the level of, e.g., decompiling firmware) a legitimate Connect IQ
+entitlement/anti-tampering check: the device likely only trusts a
+WindField placement its own software created, and silently substitutes
+Timer -- its apparent universal "always resolvable, zero-configuration"
+default field -- for anything it doesn't trust, rather than failing
+loudly. No clean bit/offset relationship exists between field 216 and
+field 56 (checked independently by both threads, same negative result)
+-- ruling out a numeric-confusion explanation.
+
+**Practical conclusion, Doug's call pending final review: this is very
+likely NOT fixable by this toolkit.** If a Connect IQ field genuinely
+requires a device-side, purchase/install-linked reference this toolkit
+has no way to construct or discover (and two independent, fairly
+thorough investigations have not found a constructible file-level
+substitute), the correct scope for this project is a documented
+limitation, not a continued fix attempt: purchased/third-party Connect
+IQ data fields can be read and displayed correctly by this toolkit, and
+an EXISTING placement can be relocated or have its surrounding screen
+edited safely (padding-only fixes, whole-profile clones), but a NEW
+placement of a Connect IQ field cannot be created via `--fields`/the
+GUI's field picker -- only via the device's own on-device editor.
+README caveat drafted but not yet added (pending Doug's final go-ahead).
+Prior rev (95, 2026-09-01) follows.*
+
+*Doc rev 95 — refreshed 2026-09-01.* **WindField Widget (field 216) bug
+investigation -- major real-hardware finding, session paused mid-
+investigation, picking up tomorrow.** Doug found this by hand: editing
+`Clonebox`'s Screen 2 (single field) and Screen 3 (7-field B, position 3)
+to WindField Widget via the GUI showed correctly in the GUI's own
+read-back, but the physical device rendered Timer (field 56) in both
+positions instead. Full investigation, in order:
+
+1. **Padding sentinel bug -- real, CONFIRMED, and fixed for the cases it
+   applies to.** Byte-diffed the broken toolkit-written file against a
+   copy Doug fixed by hand on-device: the ONLY difference was that
+   unused trailing slots in the screen's 10-slot field-ID array (FIT
+   mesg_num=14, field 7) were `0xFFFF` in the broken file vs a real
+   field ID (48/Speed) in the working one. Built an isolated test file
+   changing ONLY the padding (nothing else) and Doug confirmed it fixed
+   both Screens 2 and 3. Root cause: `fit_patch.py`'s
+   `pack_field_id_array()` pads unused slots with `0xFFFF`, and this
+   device's firmware appears to choke on that specifically for WindField
+   (ordinary fields and Graph/Bars-type fields tolerate `0xFFFF` padding
+   fine -- confirmed via Screen 1's Power/HR Graphs and Screen 3's own
+   Speed Bars/HR Bars, all sitting in the same padded arrays without
+   issue). **This fix only ever worked for FULL-WIDTH placements.**
+
+2. **Non-full-width WindField placement -- toolkit writes fail
+   regardless of padding.** Built 3 fresh test profiles (WindTest2A,
+   WindTest4B, WindTest9A) placing WindField at various field counts,
+   all with CORRECT padding from the start, two of them deliberately
+   non-full-width (paired/half-width slots). All 3 failed identically
+   (Timer shown instead) -- including WindTest2A, which is full-width
+   and STILL failed, correcting an earlier assumption that full-width
+   toolkit writes reliably work. Re-tested WindField non-full-width on
+   Screen 4 of the REAL, already-active Clonebox profile (not a fresh
+   clone) with a Graph/Bars field (Speed Bars) in the adjacent paired
+   slot as a control -- Speed Bars rendered correctly, WindField still
+   showed Timer. Rules out "new profile" and "message_index 7 specifically"
+   as explanations; confirms the failure is WindField-specific, not
+   shared by Graph/Bars-type fields.
+
+3. **Message 170 -- a real structural difference, but NOT sufficient on
+   its own.** Diffing Doug's on-device-edited "fixed" file against the
+   toolkit-written broken one (both for the original Screens 2/3 fix AND
+   later for WindTest2A's on-device edit) found a message type never
+   seen before (mesg_num=170: a 16-byte ID + a small incrementing
+   counter) appended by the on-device editor whenever ANY change is
+   saved through it, plus a separate incrementing counter in `file_id`
+   itself (field 5, 3->4). These look like generic "this file was
+   touched by the on-device editor" revision bookkeeping, not anything
+   WindField-specific. Built a test appending a verbatim copy of this
+   block (plus the file_id counter bump) onto a known-failing
+   non-full-width WindField placement -- still failed. **Caught and
+   fixed a real bug in that test's construction along the way**: adding
+   bytes changes the file's total length, which means the file
+   header's OWN internal CRC (bytes 12-13, separate from the trailing
+   file CRC, protects `data_size` among other header fields) also needs
+   recomputing -- missed this the first pass, which likely explained an
+   even worse result (NO screen rendered correctly, not just WindField)
+   on that specific attempt. Verified after the fix: header CRC,
+   trailing CRC, and file length all correct. Re-tested -- still failed
+   even with everything structurally clean. Also verified, importantly:
+   this header-CRC gap does NOT affect any other file in this
+   investigation or the toolkit's normal edit path in general --
+   `patch_screen()` only ever does same-length in-place byte
+   replacement, never touches `data_size`, so this was specific to the
+   one test that appended new bytes.
+
+4. **Working theory (not yet fully proven): WindField needs a one-time,
+   on-device "first use" registration that only Garmin's own editor can
+   perform, invisible to file content.** Every toolkit-written
+   PLACEMENT of WindField into a slot that never had it before has
+   failed, regardless of padding, full-width-ness, message 170, or
+   which profile/message_index. Every case where WindField ended up
+   correctly rendering was either an on-device edit, or a byte-for-byte
+   copy (via Clone Profile, which duplicates the whole file) of a
+   profile that ALREADY had a working WindField placement somewhere in
+   its history -- confirmed again this session: Doug cloned ROAD (has a
+   working WindField on Screen 1) to a brand-new profile name
+   ("NewRoadClone") via the GUI's normal Clone Profile feature, and it
+   rendered correctly there too, consistent with the theory (whole-file
+   byte copy carries forward whatever makes it work, independent of
+   profile name/identity). Tested whether the Favorite Screen feature
+   could transplant a working WindField placement into an unrelated
+   profile -- checked the code first: Favorite Screen does NOT do a
+   raw byte copy of the screen record, it only remembers `field_ids` +
+   `layout_variant` as plain values and rebuilds via the same generic
+   `pack_field_id_array()`/`patch_screen()` path as every other failed
+   test. Predicted it would fail for that reason before Doug tried it --
+   confirmed, same Timer fallback. Checked whether 216 (WindField) and
+   56 (Timer) have some numeric/bit-level relationship that might
+   explain why the fallback is consistently Timer specifically (not
+   blank, not some other field) -- no clean single-bit or mask pattern
+   between `0xD8` and `0x38`; more likely Timer is just this firmware's
+   generic default fallback field, unrelated to WindField's specific ID.
+
+**NOT YET TESTED, flagged for tomorrow:** whether the on-device editor
+can add WindField to a screen/profile that has GENUINELY NEVER had it
+anywhere in its history (every on-device-editor success so far has been
+MOVING an already-present instance, e.g. within Clonebox's Screen 3, or
+cloning a profile that already had one -- never a true from-scratch add
+via the device's own menu to a profile/screen with zero WindField
+history). This is the cleanest possible test of the "first-use
+registration" theory and doesn't require anything from this toolkit --
+just Doug trying the on-device field picker on a profile like MOUNTAIN
+or GRAVEL that's never had WindField configured.
+
+**Practical implication if this holds up:** WindField Widget (and
+possibly other Connect IQ/"widget"-class fields not yet identified) may
+belong to a real, distinct category this toolkit cannot freely write --
+unlike every other of the ~150 confirmed field IDs, which have all
+worked via ordinary byte-patching throughout this project's history
+without incident. If unresolved, Doug's fallback plan is a README note
+documenting this as a known special-case limitation rather than
+continuing to chase a fix. Prior rev (94, 2026-09-01) follows.*
+
+*Doc rev 94 — refreshed 2026-09-01.* **Odometer/`Totals.fit` Open Item
+-- back-burnered, Doug's call, no personal data logged here by design.**
+Closing out today's extended investigation (Doc rev 93 above, plus
+research into sourcing an accurate target figure from Strava/Garmin
+Connect lifetime stats and a real 2020 `Totals.fit` backup Doug supplied
+for comparison -- none of those specific figures are recorded in this
+document, deliberately: they're Doug's personal ride history, and this
+file lives in a public repo. The mechanism-level findings from that
+comparison ARE worth keeping: renaming a profile doesn't touch its
+`Totals.fit` entry -- confirmed again by a real slot that carried a
+different name years apart while its totals kept accumulating
+continuously underneath; and the leftover zeroed slots 5-10 were
+genuinely blank in the 2020 file, which cross-confirms Doc rev 86/87's
+attribution of today's slot 5-6 name remnants to this project's own
+2026 test-profile work, not older pre-existing history.
+
+Doug's conclusion: **back-burnered unless someone specifically asks for
+this feature** -- a firmer deprioritization than "low priority, under
+consideration" (Doc rev 86's original framing), though not closed
+outright. His reasoning: a SET (not RESET-to-zero) operation is only
+actually useful/reliable if `timer_time`, `calories`, and `sessions` are
+ALSO populated sensibly alongside the new `distance` -- otherwise it
+reproduces the exact internally-inconsistent, looks-broken-on-device
+problem this whole thread has been circling (Doc rev 93's design
+answer: scale time/calories proportionally, leave sessions alone -- but
+that still requires the user to have or estimate that supporting data,
+not just one number). Doug's framing: this is genuinely more involved
+than the classic "re-enter your odometer miles after a battery change"
+expectation people bring from plain bicycle computers, which only ever
+tracked (and needed) the one number. A `totals_mesgs` row is a small
+reconciled record, not a single counter -- so even a "just set my
+mileage" request carries more real design weight than it looks like at
+first glance. Mechanically de-risked since Doc rev 86 (real Edge 530
+forum evidence the `NewFiles/` write path works, Doc rev 93), but the
+data-sourcing burden on the user turned out to be the more practical
+blocker. Task tracker: stays `[pending]`, not promoted -- no go-ahead
+given. Prior rev (93, 2026-08-31) follows.*
+
+*Doc rev 93 — refreshed 2026-08-31.* **Odometer/`Totals.fit` Open Item
+(Doc rev 86/87) revisited, doc-only -- Doug's proportional-scaling design
+question answered, PLUS real-world forum evidence found that meaningfully
+de-risks the item's open concern (2).** Doug asked how a future Set/Reset
+Odometer feature should handle `timer_time`/`calories`/`sessions` when
+SETTING (not resetting to zero) a profile's distance, since leaving them
+untouched would produce an internally-inconsistent record. Design
+answer: scale `timer_time` and `calories` proportionally to the
+distance-change ratio (continuous, effort-linked quantities -- keeps
+average speed/pace and calories-per-mile looking plausible, the
+least-fabricated way to avoid an obviously-broken-looking record); leave
+`sessions` untouched by default (a discrete count of rides that actually
+happened, not something that should be scaled to a fractional/rounded
+synthetic number) unless the user separately, explicitly edits it; any
+future UI/docs should be explicit that scaled values are "best-effort,
+keeps the record internally consistent," not a claim of literal
+historical accuracy.
+
+Also asked whether more research in Garmin's forums was worth doing, or
+whether that could be looked into directly -- searched, and found
+several long-running community threads on exactly this topic across
+many Edge generations (1040, 1030, 840, 520/520 Plus, 820, Explore 2,
+the old Edge 25), plus two established third-party tools (Fit File
+Repair Tool, BigCatOS's "Edit Edge Data") -- confirming this is a
+well-known, recurring want, not a niche one. One thread is directly
+on-point: **"Ride Profile Details Resetting After Editing Totals.fit,"
+Edge 530 forum (Doug's own model)**,
+<https://forums.garmin.com/sports-fitness/cycling/f/edge-530/411994/ride-profile-details-resetting-after-editing-totals-fit>.
+Read in full. Summary: a user with the near-identical goal (transferring
+an odometer total from an old bike computer) edited `Totals.fit` (FIT
+SDK's `.fit`->CSV->`.fit` roundtrip) and dropped it in `NewFiles/`. Some
+values updated as expected, but their target profile's own row (`Road`)
+kept reverting to 0 on reboot. Root cause, found by another forum member
+inspecting the file: **the `message_index` 0 aggregate row must equal
+the sum of all profile rows** -- the OP's edited file had the aggregate
+row set to the target total but every individual profile row (including
+`Road`) still at 0, so the mismatched aggregate showed up as an "all
+time / no profile" total while the specific profile row that didn't
+reconcile got dropped back to 0. This is real, on-model evidence
+directly bearing on this Open Item's concern (2) below (`message_index`
+0's behavior after an external edit was "unknown/untested" as of Doc rev
+86) -- it's no longer fully unknown: the device (or its next-boot
+reconciliation) appears to care that aggregate == sum(profiles), and an
+inconsistent file produces exactly the "profile value silently reverts
+to 0" symptom, not a clean accept-or-reject. The fix that actually
+worked, confirmed by the OP ("I tried your file and it worked!"): another
+member edited BOTH the aggregate row AND the `Road` row to matching
+values, deliberately did NOT change the file's structure, and filled in
+a plausible `timer_time` by assuming an average pace (24 km/h) for the
+added distance rather than leaving it inconsistent with the new
+distance -- i.e., real independent validation of the same
+keep-it-internally-consistent instinct behind the proportional-scaling
+answer above, applied by hand rather than by formula. Also notable: the
+OP's own FIT-SDK CSV roundtrip introduced structural corruption ("hex
+mess" in some cells) that likely explains some of their earlier failed
+attempts -- a concrete data point in favor of this toolkit's existing
+plan (Doc rev 86: direct byte-patch-in-place plus CRC recompute, same
+pattern as `fit_clone_profile.py`) over any convert-to-CSV-and-back
+approach.
+
+Net effect on this Open Item: still NOT building (no go-ahead given,
+stays low-priority/under consideration), but the picture is more
+encouraging than before -- the `NewFiles/`-based write path for
+`Totals.fit` demonstrably works on a real Edge 530 when done carefully,
+it isn't a dead end or an unreliable no-op. Any future implementation
+now has a concrete, evidence-backed requirement to add to its design:
+when SETTING a profile's distance (not resetting to zero), the
+aggregate row's `distance` must be adjusted by the same delta in
+lockstep, not just the target profile's own row -- addendum added to
+the Open Item below. Prior rev (92, 2026-08-31) follows.*
+
 *Doc rev 92 — refreshed 2026-08-31.* **`launch_gui.command` CONFIRMED
 on real hardware -- the one thing Doc rev 91 flagged as untestable from
 the dev sandbox.** Doug ran `./install.sh` fresh, then double-clicked
@@ -3947,6 +4400,41 @@ Kept deliberately, for pattern-recognition on future work:
   alongside any pending profile `.fit` -- reusing the existing staged-
   edit/Apply/Deploy pattern rather than a new mechanism. Still not
   scoped further or built -- logged for a later revisit.
+  **ADDENDUM (2026-08-31) -- risk (2) downgraded from "unknown" to
+  "known and addressable," plus a design answer for a SET (not just
+  RESET) operation. See Doc rev 93 at the top of this document for the
+  full writeup.** Short version: a real Edge 530 forum thread (Doug's
+  own model) confirms the `message_index` 0 aggregate row must equal the
+  sum of all profile rows -- editing a profile's own row without also
+  adjusting the aggregate by the same delta produces exactly this Open
+  Item's worst-case symptom, the edited profile's value silently
+  reverting to 0 on reboot, even though the write itself "succeeded."
+  So: any future SET (not RESET-to-zero) implementation must patch BOTH
+  the target profile's row and the `message_index` 0 aggregate row's
+  `distance` by the same delta, not just the one row. Design answer to
+  Doug's separate question (how to handle `timer_time`/`calories`/
+  `sessions` when SETTING a distance): scale `timer_time` and `calories`
+  proportionally to the distance-change ratio; leave `sessions`
+  untouched by default (a real ride count, not a quantity that should be
+  fabricated/rounded); be explicit in any future UI/docs that scaled
+  values are best-effort/consistency-preserving, not literal history.
+  Real-world confirmation the `NewFiles/`-based write path itself works
+  on this exact model when the aggregate/profile rows are kept
+  consistent and the file's structure is otherwise left untouched
+  (matches this toolkit's existing byte-patch-plus-CRC approach, not a
+  CSV-roundtrip rebuild). Still NOT SCOPED FURTHER OR BUILT -- no
+  go-ahead given, stays low-priority.
+  **BACK-BURNERED (2026-09-01, Doug's call) -- see Doc rev 94 at the top
+  of this document for the full writeup.** Short version: the write-path
+  mechanics are now reasonably de-risked, but Doug's conclusion is that
+  a SET operation only pays off if the user can also supply sensible
+  `timer_time`/`calories`/`sessions` values alongside the new distance
+  -- otherwise the proportional-scaling answer from Doc rev 93 has
+  nothing real to scale from, and the result looks as broken as leaving
+  those fields untouched. More involved than the "just re-enter your
+  mileage" model people expect from a plain bicycle computer's single
+  odometer counter. Deprioritized to "won't build unless specifically
+  requested" -- not closed, just off the active list.
 - **f10=38 "Workout" field-reading anomaly (reported 2026-08-16, Doug,
   `CyclingEbike.fit` -- RESOLVED, real data confirmed AND a real,
   citable explanation of what this screen actually is; edit-warning

@@ -326,6 +326,36 @@ OPTIONS
               below) and refuses to proceed if it matches, unless
               --force is given.
 
+              HARD refusal, NO --force override, if any requested ID
+              is in DEVICE_DEPENDENT_CIQ_IDS (fit_dump.py; currently
+              {216}) -- confirmed via extensive real-hardware testing
+              that this toolkit cannot introduce or relocate a
+              Connect IQ third-party data field (e.g. WindField) into
+              a fresh slot; the write silently renders as "Timer" on
+              the device regardless of what the file/GUI shows. This
+              is a different check from the system-screen guard above
+              and doesn't overlap it: it fires on the REQUESTED field
+              IDs, not the slot's current content, and applies even to
+              slots that pass the system-screen check cleanly.
+
+              SECOND, independent HARD refusal (added 2026-09-03, also
+              no --force): fires whenever this call touches the
+              screen's count/array/layout (f3/f7/f8) AT ALL if the
+              slot's CURRENT on-disk content (via
+              screen_has_device_dependent_ciq_field(), checked right
+              before the final patch_screen() call) already contains a
+              device-dependent CIQ id -- regardless of what's actually
+              being requested. CONFIRMED on real hardware that adding/
+              removing/reordering OTHER, ordinary fields around an
+              already-placed CIQ field breaks its linkage exactly like
+              a fresh introduction does, even when the CIQ field's own
+              ID/position was never itself part of the request. This
+              also applies to --swap-fields and a bare --layout change
+              (no --fields at all), not just --fields. See
+              PROJECT_NOTES.md Doc rev 95-98 for the full investigation,
+              including why the first (request-side) check alone
+              wasn't enough.
+
        --force
               Proceed with --fields even if check_system_screen_guard()
               (v1.10.0, importable directly -- see RELATED TOOLS)

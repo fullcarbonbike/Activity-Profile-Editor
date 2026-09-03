@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "1.14.2"  # Doc-only, no functional change, Doug's decision (2026-08-15): comments referencing the f10=32 Conditional runtime record as "GroupTrack"/"the GroupTrack Conditional record" updated to describe it as "Reserved" (display name change lives in fit_dump.py v2.4.12's NAMED_SCREEN_TYPES -- this file has no code path of its own that special-cases f10=32, only prose describing it) -- read_current_state()'s docstring and NO_SHOW_TOGGLE_TYPES' comment block updated to match, both now note the record's real purpose was never actually confirmed rather than asserting a GroupTrack identity. count_shown_active_screens()'s docstring updated the same way. f10=57 "GroupTrack List" is untouched by this pass -- that one remains correctly, confirmedly GroupTrack-specific. No behavior change anywhere in this file. Prior entry (1.14.1): Doc-only, no functional change (2026-08-14): --remove is now CONFIRMED via a real on-device round-trip test (Doug) -- the target screen was correctly removed from the on-device Data Screens order, matching a real Remove button press, and (as expected, matching the retired --un-remove's own history and Doug's stated reasoning for retiring it) the removed screen does NOT survive as a recoverable Removed-state slot after the deploy -- NewFiles wipes it, same as every other Removed-state slot on any NewFiles deploy. Updated remove_screen()'s docstring and --remove's argparse help text from "NOT YET VERIFIED ON REAL HARDWARE" to CONFIRMED. This closes step 2 of the two-phase build plan (backend + headless verification, then a real device test) -- the GUI wrapper (ViewScreensPanel, per Doug's placement decision) is now the one remaining, unblocked step; still not built until Doug asks for it, per this project's established discipline of not building ahead of an explicit go-ahead. Prior entry (1.14.0): New feature, first half of "Delete Screen" (2026-08-14): added --remove and its backend primitive remove_screen() -- transitions an Active screen slot to the Removed state (f1=0, f9/f10 cleared to sentinel, f3/f7 content left untouched, matching the confirmed on-device Removed-state model). Mirrors --new-slot's activation in reverse, same spirit as the now-retired --un-remove but going the other direction. Reuses hide_unsupported_screen_type() and would_hide_last_visible_screen() directly as --remove's two hard guards (no --force override for either) -- CONFIRMED (2026-08-13, Doug, directly on-device) that NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) bounds Remove availability identically to Show/Hide, and the last-visible-user-screen floor rule is documented as already covering Remove too, so no new guard logic was needed, only reuse. ONE-WAY by design -- no --un-remove exists anymore (retired v1.13.0); Restore-from-Backup is the only real undo path, matching Garmin's own editor (Hide is reversible, Remove is permanent, same as Add New). Headless-verified only so far, against a real profile copy (CyclingRoadSandbox): remove_screen() correctly transitions the target slot to 'removed' (read_current_state()), leaves f3/f7 byte-identical to before, and leaves read_current_state() unchanged on every OTHER slot in the file; the CLI end-to-end path (--slot 3 --remove) wrote a file with a valid trailing CRC (fit_crc() recomputation matched the stored value exactly); both guards were exercised directly and blocked exactly as designed -- --slot 2 (Map) errored via hide_unsupported_screen_type(), and removing a profile's second-to-last then last visible user screen correctly errored via would_hide_last_visible_screen() on the second attempt. But this is NOT YET VERIFIED ON REAL HARDWARE (no on-device round-trip test yet, unlike --new-slot/--hide/--swap-order, all of which are proven live). Per the two-phase build plan recorded when "Delete Screen" was scoped (see PROJECT_NOTES.md Open Items, 2026-08-13): this backend flag is step one: a real on-device round-trip test is needed next, and ONLY THEN (not before) does a GUI wrapper (ViewScreensPanel, per Doug's placement decision) get built. Prior entry (1.13.2): doc-only, no functional change (2026-08-13): corrected a self-inflicted gap from the previous entry -- Doug clarified that "GroupTrack" in his confirmed-active-Remove list meant the on-device editor's actual label "GroupTrack List" (f10=57), which was already covered, not a separate untested type. The genuinely separate f10=32 GroupTrack Conditional runtime record never appears as a row in the on-device Data Screens editor at all (no real f9), so it has no Remove-button status to check and is already structurally out of reach of the future --remove flag regardless. Also recorded, for pattern-recognition: an early, already-removed SYSTEM_SLOT_HINTS hardcode once claimed "slot 10 = GroupTrack" by message_index -- confirmed wrong on the Indoor profile (slot 10 there is a genuine Cadence screen); slot numbers were never reliable for identifying GroupTrack or anything else, only f10 is. NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) is now documented as the COMPLETE confirmed Remove-block set for common named types, no remaining gap. No code/behavior change -- comment only. Prior entry (1.13.1): doc-only, no functional change (2026-08-13): Doug confirmed directly on-device that NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) also bounds Remove availability, not just the Show/Hide toggle it already guards -- every other common named type (Elevation, GroupTrack, Cycling Dynamics, Lap Summary, Virtual Partner, Compass, Segment) has an active Remove option. Added a comment documenting this at the constant's definition, directly relevant to the still-scoped, not-yet-built --remove flag (its future type-check guard can reuse this exact set). No code/behavior change -- comment only. Prior entry (1.13.0): RETIRED --un-remove entirely, Doug's decision (2026-08-13): Restore-from-Backup already covers the real recovery use case (a whole-profile undo, already CONFIRMED on real hardware), and --un-remove itself was never a clean win -- it had a CONFIRMED real device-side data-loss hazard pre-v1.12.0 (root-caused to the same f10=0 collision --new-slot had, see BUGS in FIT_PATCH.md), was never re-tested live after that fix (still "unverified-but-plausibly-fixed" as of v1.12.0), and Garmin's own on-device editor doesn't expose an un-remove workflow at all -- Hide (temporary) and Remove + Add New (permanent) are the only two lifecycle actions it offers, matching this project's own "Product note on --un-remove" which had left the final call deferred. Removed the --un-remove argparse flag, its --new-slot mutual-exclusion check, its Removed-state validation block, and simplified every `args.new_slot or args.un_remove` conditional down to just `args.new_slot` (the f1 configured-flag set, and the f9/f10 auto-fill safety net) -- confirmed via grep that zero `un_remove` references remain in this file outside this changelog line and the retirement note left in its place. No behavior change to --new-slot itself. This also removes a layer of unverified risk that would otherwise sit underneath any future --remove (Delete Screen) flag -- see PROJECT_NOTES.md Open Items. Prior entry (1.12.0): add next_available_field10() and wire it into --new-slot/--un-remove's auto-default, replacing the old hardcoded f10=0 -- ROOT-CAUSES the long-standing "Add New Screen via NewFiles always fails" limitation as an f10 IDENTITY COLLISION (0 = "Screen 1", already in use on almost every real profile), not a hard device restriction. CONFIRMED via live on-device round-trip (2026-08-05, CyclingRoadSandbox): --new-slot with a collision-free f10 survives the NewFiles restart cycle intact, verified independently by both fit_dump.py and garmin_device.py reading the live mounted device. Also fixed next_available_field9()'s f3-presence gate to match the f1-based gate used elsewhere (same Virtual-Partner-style blind spot fixed in classify_screens()/read_current_state() earlier)
+__version__ = "1.15.0"  # Device-dependent Connect IQ field guard, two passes, both real-hardware-driven bug fixes -- see PROJECT_NOTES.md Doc rev 95-99 for the full investigation. Pass 1 (2026-09-02): --fields now hard-refuses (no --force) if any REQUESTED field ID is in fit_dump.py's new DEVICE_DEPENDENT_CIQ_IDS (currently {216}) -- CONFIRMED this toolkit cannot write a Connect IQ third-party field (e.g. WindField) into a slot at all, it silently renders as "Timer" on-device regardless of what the file/GUI shows. Pass 2 (2026-09-03), added after Doug's own further real-hardware testing exposed a real gap in pass 1: the request-side check alone missed a screen that ALREADY has a device-dependent CIQ field on it having ITS OWN id/position left untouched while OTHER, ordinary fields are added/removed/reordered around it -- confirmed this breaks the CIQ field's linkage exactly like a fresh introduction does. New screen_has_device_dependent_ciq_field() checks the slot's CURRENT on-disk content (independent of what's being requested) and hard-refuses whenever a write touches the screen's shape (f3 count / f7 field array / f8 layout) -- applies to --fields, --swap-fields, and a bare --layout change alike; does not apply to --swap-order (f9 only, screen DISPLAY position, confirmed separately safe in Doc rev 99) or --enable/--disable (f12 only, no evidence either way yet). Doc-only, no functional change, Doug's decision (2026-08-15): comments referencing the f10=32 Conditional runtime record as "GroupTrack"/"the GroupTrack Conditional record" updated to describe it as "Reserved" (display name change lives in fit_dump.py v2.4.12's NAMED_SCREEN_TYPES -- this file has no code path of its own that special-cases f10=32, only prose describing it) -- read_current_state()'s docstring and NO_SHOW_TOGGLE_TYPES' comment block updated to match, both now note the record's real purpose was never actually confirmed rather than asserting a GroupTrack identity. count_shown_active_screens()'s docstring updated the same way. f10=57 "GroupTrack List" is untouched by this pass -- that one remains correctly, confirmedly GroupTrack-specific. No behavior change anywhere in this file. Prior entry (1.14.1): Doc-only, no functional change (2026-08-14): --remove is now CONFIRMED via a real on-device round-trip test (Doug) -- the target screen was correctly removed from the on-device Data Screens order, matching a real Remove button press, and (as expected, matching the retired --un-remove's own history and Doug's stated reasoning for retiring it) the removed screen does NOT survive as a recoverable Removed-state slot after the deploy -- NewFiles wipes it, same as every other Removed-state slot on any NewFiles deploy. Updated remove_screen()'s docstring and --remove's argparse help text from "NOT YET VERIFIED ON REAL HARDWARE" to CONFIRMED. This closes step 2 of the two-phase build plan (backend + headless verification, then a real device test) -- the GUI wrapper (ViewScreensPanel, per Doug's placement decision) is now the one remaining, unblocked step; still not built until Doug asks for it, per this project's established discipline of not building ahead of an explicit go-ahead. Prior entry (1.14.0): New feature, first half of "Delete Screen" (2026-08-14): added --remove and its backend primitive remove_screen() -- transitions an Active screen slot to the Removed state (f1=0, f9/f10 cleared to sentinel, f3/f7 content left untouched, matching the confirmed on-device Removed-state model). Mirrors --new-slot's activation in reverse, same spirit as the now-retired --un-remove but going the other direction. Reuses hide_unsupported_screen_type() and would_hide_last_visible_screen() directly as --remove's two hard guards (no --force override for either) -- CONFIRMED (2026-08-13, Doug, directly on-device) that NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) bounds Remove availability identically to Show/Hide, and the last-visible-user-screen floor rule is documented as already covering Remove too, so no new guard logic was needed, only reuse. ONE-WAY by design -- no --un-remove exists anymore (retired v1.13.0); Restore-from-Backup is the only real undo path, matching Garmin's own editor (Hide is reversible, Remove is permanent, same as Add New). Headless-verified only so far, against a real profile copy (CyclingRoadSandbox): remove_screen() correctly transitions the target slot to 'removed' (read_current_state()), leaves f3/f7 byte-identical to before, and leaves read_current_state() unchanged on every OTHER slot in the file; the CLI end-to-end path (--slot 3 --remove) wrote a file with a valid trailing CRC (fit_crc() recomputation matched the stored value exactly); both guards were exercised directly and blocked exactly as designed -- --slot 2 (Map) errored via hide_unsupported_screen_type(), and removing a profile's second-to-last then last visible user screen correctly errored via would_hide_last_visible_screen() on the second attempt. But this is NOT YET VERIFIED ON REAL HARDWARE (no on-device round-trip test yet, unlike --new-slot/--hide/--swap-order, all of which are proven live). Per the two-phase build plan recorded when "Delete Screen" was scoped (see PROJECT_NOTES.md Open Items, 2026-08-13): this backend flag is step one: a real on-device round-trip test is needed next, and ONLY THEN (not before) does a GUI wrapper (ViewScreensPanel, per Doug's placement decision) get built. Prior entry (1.13.2): doc-only, no functional change (2026-08-13): corrected a self-inflicted gap from the previous entry -- Doug clarified that "GroupTrack" in his confirmed-active-Remove list meant the on-device editor's actual label "GroupTrack List" (f10=57), which was already covered, not a separate untested type. The genuinely separate f10=32 GroupTrack Conditional runtime record never appears as a row in the on-device Data Screens editor at all (no real f9), so it has no Remove-button status to check and is already structurally out of reach of the future --remove flag regardless. Also recorded, for pattern-recognition: an early, already-removed SYSTEM_SLOT_HINTS hardcode once claimed "slot 10 = GroupTrack" by message_index -- confirmed wrong on the Indoor profile (slot 10 there is a genuine Cadence screen); slot numbers were never reliable for identifying GroupTrack or anything else, only f10 is. NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) is now documented as the COMPLETE confirmed Remove-block set for common named types, no remaining gap. No code/behavior change -- comment only. Prior entry (1.13.1): doc-only, no functional change (2026-08-13): Doug confirmed directly on-device that NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) also bounds Remove availability, not just the Show/Hide toggle it already guards -- every other common named type (Elevation, GroupTrack, Cycling Dynamics, Lap Summary, Virtual Partner, Compass, Segment) has an active Remove option. Added a comment documenting this at the constant's definition, directly relevant to the still-scoped, not-yet-built --remove flag (its future type-check guard can reuse this exact set). No code/behavior change -- comment only. Prior entry (1.13.0): RETIRED --un-remove entirely, Doug's decision (2026-08-13): Restore-from-Backup already covers the real recovery use case (a whole-profile undo, already CONFIRMED on real hardware), and --un-remove itself was never a clean win -- it had a CONFIRMED real device-side data-loss hazard pre-v1.12.0 (root-caused to the same f10=0 collision --new-slot had, see BUGS in FIT_PATCH.md), was never re-tested live after that fix (still "unverified-but-plausibly-fixed" as of v1.12.0), and Garmin's own on-device editor doesn't expose an un-remove workflow at all -- Hide (temporary) and Remove + Add New (permanent) are the only two lifecycle actions it offers, matching this project's own "Product note on --un-remove" which had left the final call deferred. Removed the --un-remove argparse flag, its --new-slot mutual-exclusion check, its Removed-state validation block, and simplified every `args.new_slot or args.un_remove` conditional down to just `args.new_slot` (the f1 configured-flag set, and the f9/f10 auto-fill safety net) -- confirmed via grep that zero `un_remove` references remain in this file outside this changelog line and the retirement note left in its place. No behavior change to --new-slot itself. This also removes a layer of unverified risk that would otherwise sit underneath any future --remove (Delete Screen) flag -- see PROJECT_NOTES.md Open Items. Prior entry (1.12.0): add next_available_field10() and wire it into --new-slot/--un-remove's auto-default, replacing the old hardcoded f10=0 -- ROOT-CAUSES the long-standing "Add New Screen via NewFiles always fails" limitation as an f10 IDENTITY COLLISION (0 = "Screen 1", already in use on almost every real profile), not a hard device restriction. CONFIRMED via live on-device round-trip (2026-08-05, CyclingRoadSandbox): --new-slot with a collision-free f10 survives the NewFiles restart cycle intact, verified independently by both fit_dump.py and garmin_device.py reading the live mounted device. Also fixed next_available_field9()'s f3-presence gate to match the f1-based gate used elsewhere (same Virtual-Partner-style blind spot fixed in classify_screens()/read_current_state() earlier)
 """
 fit_patch.py - Surgical patcher for Garmin Edge data_screen (mesg_num=14) messages.
 
@@ -37,7 +37,7 @@ import sys
 import struct
 from fit_raw_walk import parse_fit
 from fit_crc import fit_crc
-from fit_dump import NAMED_SCREEN_TYPES
+from fit_dump import NAMED_SCREEN_TYPES, DEVICE_DEPENDENT_CIQ_IDS
 
 DATA_SCREEN_MESG_NUM = 14
 
@@ -527,6 +527,42 @@ def would_hide_last_visible_screen(input_path, message_index):
 NO_SHOW_TOGGLE_TYPES = {25, 104}  # Map, ClimbPro
 
 
+def screen_has_device_dependent_ciq_field(input_path, message_index):
+    """
+    Returns the sorted list of DEVICE_DEPENDENT_CIQ_IDS (fit_dump.py --
+    e.g. {216}) currently present in this slot's field array right now,
+    on disk, BEFORE any edit -- or [] if none.
+
+    CORRECTION (2026-09-03, Doug, real on-device test): the original
+    --fields guard below (added 2026-09-02) only checked the NEWLY
+    REQUESTED ids against DEVICE_DEPENDENT_CIQ_IDS -- which misses a
+    real failure mode. Doug added two ordinary fields to a screen that
+    already had a working Connect IQ field (Edge 3270), rearranging it
+    from a 1-field to a 3-field layout with the CIQ field kept in the
+    middle position -- its own ID value was never "requested" or
+    changed, only fields AROUND it were. Deployed: the CIQ field broke
+    exactly the same way a fresh introduction does (renders as Timer).
+    So the real rule isn't "does this write's REQUESTED ids include a
+    CIQ id" -- it's "does this slot CURRENTLY hold one, period," in
+    which case this toolkit has no confirmed-safe way to touch that
+    slot's count (f3), field array (f7), or layout (f8) at all, even
+    when the CIQ field's own ID/position isn't the thing changing.
+    Whatever actually resolves the device-side linkage appears to get
+    invalidated by ANY toolkit rewrite of the screen's shape, not just
+    ones that touch the CIQ field's own bytes.
+
+    Used as a SECOND, independent check alongside the request-side one
+    -- this one catches "slot already has one, leave the whole screen
+    alone," the other catches "don't let me freshly introduce one that
+    isn't there yet." Both are real, both confirmed, neither implies
+    the other.
+    """
+    current_array = read_current_field_array(input_path, message_index)
+    if current_array is None:
+        return []
+    return sorted(set(current_array) & DEVICE_DEPENDENT_CIQ_IDS)
+
+
 def hide_unsupported_screen_type(input_path, message_index):
     """
     Returns the screen type name (e.g. "Map") if `message_index` is a
@@ -905,6 +941,29 @@ def _cli():
         if len(ids) > 10:
             parser.error("at most 10 fields per screen")
 
+        # Device-dependent CIQ field guard: HARD refuse, no --force
+        # override -- same posture as NO_SHOW_TOGGLE_TYPES above, not a
+        # heuristic. CONFIRMED via extensive real-hardware testing (see
+        # PROJECT_NOTES.md Doc rev 95-97, DEVICE_DEPENDENT_CIQ_IDS in
+        # fit_dump.py) that these numeric field IDs are DEVICE-local and
+        # install-order-reassigned -- writing one via this tool produces
+        # a file that looks correct in the GUI/dump but renders as
+        # "Timer" on-device, every single time this was tested. There is
+        # nothing --force could safely do here: this isn't a guess about
+        # risk, it's a byte pattern this toolkit cannot make work at all.
+        blocked = sorted(set(ids) & DEVICE_DEPENDENT_CIQ_IDS)
+        if blocked:
+            parser.error(
+                f"--fields: {blocked} {'is a' if len(blocked) == 1 else 'are'} "
+                f"device-dependent Connect IQ field ID{'s' if len(blocked) != 1 else ''} "
+                f"(see DEVICE_DEPENDENT_CIQ_IDS in fit_dump.py). CONFIRMED on real "
+                f"hardware that this toolkit cannot introduce or relocate one of "
+                f"these into a fresh slot -- it renders as \"Timer\" on-device "
+                f"regardless of what the file/GUI shows. No --force override: "
+                f"only Garmin's own on-device editor can place these, and only "
+                f"whole-profile Clone Profile preserves an existing placement."
+            )
+
         # System-screen guard: check the slot's CURRENT content (before
         # this edit) via check_system_screen_guard() -- see that
         # function's docstring. v1.10.0: answers with CERTAINTY via f10
@@ -1054,6 +1113,36 @@ def _cli():
 
     if not changes:
         parser.error("nothing to do -- specify at least one of --fields/--layout/--enable/--disable")
+
+    # Device-dependent CIQ guard, PASS 2: checks the slot's CURRENT
+    # on-disk content, independent of the request-side check above
+    # (which only catches a CIQ id being freshly REQUESTED). HARD
+    # refuse, no --force -- see screen_has_device_dependent_ciq_field()
+    # for the real-hardware evidence (2026-09-03) behind why this
+    # second check exists at all: rearranging OTHER fields around an
+    # already-placed CIQ field broke it just as completely as trying
+    # to introduce one fresh, even though its own id/bytes never
+    # changed. Only fires when this call actually touches the screen's
+    # shape (f3 count / f7 array / f8 layout) -- --enable/--disable
+    # alone (f12 only) don't go through this, since there's no
+    # confirmed evidence yet that Show/Hide alone affects the linkage.
+    if {3, 7, 8} & set(changes.keys()):
+        present = screen_has_device_dependent_ciq_field(args.input_file, args.slot)
+        if present:
+            parser.error(
+                f"slot {args.slot} currently contains device-dependent Connect "
+                f"IQ field ID(s) {present} (see DEVICE_DEPENDENT_CIQ_IDS in "
+                f"fit_dump.py). CONFIRMED on real hardware (2026-09-03) that "
+                f"rewriting this screen's count/field-array/layout AT ALL -- "
+                f"even just adding/removing/rearranging OTHER, ordinary "
+                f"fields around it -- breaks the CIQ field's on-device linkage "
+                f"exactly like trying to introduce one fresh does, and it "
+                f"renders as \"Timer\" afterward regardless of what the file/"
+                f"GUI shows. No --force override: leave this screen alone via "
+                f"this tool entirely: only Garmin's own on-device editor can "
+                f"restructure a screen that has one of these without breaking "
+                f"it."
+            )
 
     patch_screen(args.input_file, args.output_file, args.slot, changes)
     print(f"wrote {args.output_file}: slot {args.slot} patched with {sorted(changes.keys())}")

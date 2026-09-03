@@ -97,7 +97,6 @@ it:
 
 ```bash
 ./install.sh
-source .venv/bin/activate
 ```
 
 Safe to re-run any time; add `--upgrade` to update already-installed
@@ -214,6 +213,13 @@ really the 32-bit 3.9.13 build; a source build needs a full Visual
 Studio C++ toolchain and isn't a realistic path here.
 
 ## Quick start
+
+The commands below assume an active environment with both dependencies
+installed. On macOS via `install.sh`, that means running `source
+.venv/bin/activate` first (once per Terminal session — `launch_gui.command`
+handles this for you for the GUI, but these are CLI commands, run
+directly in Terminal). On Windows via the no-venv install path, no
+activation step is needed at all.
 
 Connect your Edge 530 via USB, then:
 
@@ -400,12 +406,71 @@ Full CLI reference: [`FIT_PATCH.md`](FIT_PATCH.md). (A companion
   (empty, Elevation/Grade, Cycling Dynamics) unless you pass
   `--force` — a "did you mean to?" pause, not a certain
   identification. Verify what the screen actually is on-device first.
+- **Connect IQ data fields (third-party apps like WindField) can't be
+  touched by this toolkit once they're on a screen — not just "added,"
+  ANY edit to that screen's field count, field list, or layout is
+  refused.** Confirmed via real-hardware testing: adding, removing, or
+  reordering *other, ordinary* fields on a screen that already has a
+  working Connect IQ field breaks that field's on-device linkage just
+  as completely as trying to place one fresh does — even though the
+  CIQ field's own ID never changes. Both `fit_patch.py`
+  (`--fields`/`--swap-fields`/`--layout`) and the GUI (Add/Remove
+  Field, Move Up/Down, Replace Field, Layout A/B) now refuse outright
+  the moment a target slot already has one, rather than writing
+  something that looks right but silently renders as "Timer" on the
+  device. This isn't a licensing check (confirmed with both a paid and
+  a completely free Connect IQ app showing the identical behavior) —
+  the numeric field ID Garmin assigns a Connect IQ app is device-local
+  and gets reassigned to a *different* app when you install another
+  one, so nothing in the file itself is enough to recreate or preserve
+  a placement through an edit. Cloning a whole profile untouched
+  preserves a working Connect IQ field; only Garmin's own on-device
+  editor can place one for the first time or restructure a screen that
+  already has one. See `PROJECT_NOTES.md` Doc rev 95-98 for the full
+  investigation.
 
 ## Changelog
 
 Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
+
+*Doc rev 74 — refreshed 2026-09-03.* **Connect IQ data field guard,
+real-hardware bug fix -- CONFIRMED bug, CONFIRMED fix.** Doug reported
+a WindField (third-party Connect IQ) data field set via the GUI showing
+correctly in the file and GUI but rendering as "Timer" on the actual
+device; extensive real-hardware testing (his own, across two Connect IQ
+apps -- one paid, one free) traced this to a device-local, install-
+order-reassigned numeric field ID that nothing in the file carries
+enough information to reproduce -- not a licensing check, since the
+free app failed identically. Further testing (also Doug's own, the day
+after the first fix shipped) found the first guard was too narrow: it
+only blocked FRESHLY placing one of these fields, but editing OTHER,
+ordinary fields on a screen that already had a working one broke it
+just the same, and that write path (the GUI's Add/Remove Field, Move
+Up/Down, Replace Field, Layout A/B) never went through the first
+guard's code at all. Fixed properly this time with a second check
+against the slot's CURRENT content, wired into every real write path in
+both `fit_patch.py` and the GUI. Tagged `v1.2.2`. See
+`PROJECT_NOTES.md` Doc rev 95-99 and `RELEASE_NOTES_v1.2.2.md` for the
+full investigation and fix writeup. Prior rev (73, 2026-08-31)
+follows.*
+
+*Doc rev 73 — refreshed 2026-08-31.* **Setup section clarity fix,
+Doug's question -- doc-only, no code changed.** Doug asked whether
+`source .venv/bin/activate` is now handled by `install.sh` itself,
+given `launch_gui.command`'s addition. It isn't, and can't be -- a
+script running in its own subshell can't activate a venv in the
+Terminal window that launched it, a shell limitation, not a gap;
+`install.sh`'s own "Next steps" output already prints that line as
+something the USER runs, not something it does silently, unchanged by
+the launcher's addition. What HAD gone stale: showing `source
+.venv/bin/activate` as step 2 of the primary Setup block implied it's
+required for everyone, when the GUI path via `launch_gui.command`
+doesn't need it at all anymore -- only direct CLI use does. Removed it
+from the Setup block; added a short note to Quick start instead,
+where the CLI commands actually need it. Prior rev (72, 2026-08-31)
+follows.*
 
 *Doc rev 72 — refreshed 2026-08-31.* **`launch_gui.command` CONFIRMED
 on real hardware.** Doug ran `./install.sh` fresh, then double-clicked
