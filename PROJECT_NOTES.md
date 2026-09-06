@@ -1,5 +1,687 @@
 # Activity Profile Editor for Garmin Edge
 
+*Doc rev 108 — refreshed 2026-09-06.* **CONFIRMED ON REAL HARDWARE:
+side-effect position shifts and clean removal both work. Every
+Connect IQ operation the v1.2.2/v1.2.3 guards currently refuse is now
+proven safe, PROVIDED message 170 is maintained alongside the edit.**
+Also records a real design constraint discovered while planning the
+implementation -- see the last section, it changes the obvious design.
+
+**The test, two independent changes on separate screens.** Screen 4
+(slot 7): an ordinary field was INSERTED BEFORE the Edge 3270
+placement, taking the field count 5 -> 6 and shifting that placement
+from position 0 to position 1 purely as a SIDE EFFECT of editing a
+neighbour -- the exact shape of the original Doc rev 98 Clonebox
+failure, and exactly what the GUI's Move Up/Down and Add Field
+buttons do. Its entry was updated 39 -> 71 (bit 5 -> bit 6). Screen 2
+(slot 4): the WindField placement was REMOVED -- marker replaced with
+an ordinary field and the owning entry deleted, taking that record
+from `[512, 36]` to `[512]`, with field count deliberately left
+unchanged so removal was the only variable.
+
+**Result (Doug, real Edge 530):** all three screens render correctly.
+Screen 4 shows the inserted field on top with Edge 3270 beneath it;
+Screen 2's first field is an ordinary field with **no Timer** left
+behind, confirming removal is clean and does not leave the device
+still expecting a CIQ field; Screen 1 is untouched with both apps
+side by side.
+
+**Cumulative status of toolkit-written CIQ operations, all now
+CONFIRMED on hardware:** moving a placement within a screen (Doc rev
+105); adding a placement where none existed (Doc rev 107); choosing
+which app appears, by choosing which record receives the entry (Doc
+rev 107); removing a placement cleanly (this entry); and a position
+shift arising as a side effect of a field-count change (this entry).
+**Still unproven, and now the only remaining case:** creating a
+message-170 record FROM SCRATCH in a profile that carries none --
+which is what cross-profile Favorites and "add a CIQ field to a
+profile that has never had one" both require.
+
+**DESIGN CONSTRAINT discovered while scoping the implementation, and
+it invalidates the obvious approach.** Doc rev 105 sketched
+recomputing message 170 statelessly by scanning every screen for CIQ
+markers after an edit. That CANNOT work, and Doc rev 106 is the
+reason: the marker 216 is generic, so scanning the field arrays finds
+WHERE the CIQ fields are but not WHICH APP owns each one. Ownership
+exists only in the records being rewritten. The update must therefore
+TRACK ownership through the edit rather than reconstruct it after.
+
+The sharp case: Screen 1 currently holds two different apps at
+positions 4 and 5, both stored as 216. If a user reorders that
+screen, a write path whose input is "here is the new field array"
+cannot tell which app moved where -- the two are indistinguishable in
+the array. This matters because that is precisely the shape of this
+toolkit's existing write path (`_apply_field_list()`,
+`pack_field_id_array()`), which passes bare integer lists.
+
+Three options, not yet decided: (a) express edits as OPERATIONS
+(move index i to j, insert at k, delete at k) so ownership follows
+the operation; (b) refuse only the genuinely ambiguous case, a single
+screen holding two or more CIQ markers, and handle the common
+single-marker case directly; (c) carry an ownership-annotated field
+list through edits -- entries of (field_id, owning_uuid_or_None)
+instead of bare ints. Option (c) is the most general and the most
+invasive; option (b) is the smallest safe step and would cover every
+real profile seen so far except the deliberately-constructed test one.
+
+**Guards remain correct as shipped** and should not be relaxed ahead
+of the implementation -- the released toolkit still writes no 170
+data, so every refusal it makes today is still the right call for the
+code that exists.
+
+Prior rev (107, 2026-09-06) follows.*
+
+*Doc rev 107 — refreshed 2026-09-06.* **CONFIRMED ON REAL HARDWARE:
+this toolkit can ADD a Connect IQ placement where none existed, and
+can CHOOSE WHICH APP appears when more than one is available.** Second
+successful toolkit-written CIQ operation, and it validates Doc rev
+106's attribution model directly.
+
+**The test.** From the two-app CIQTEST profile, 5 bytes were changed:
+Screen 4 (slot 7) position 0 replaced its ordinary field (Avg W/kg,
+id 83) with the CIQ marker 216; the Edge 3270 record gained one entry,
+`39` = slot 7 position 0; and the CRC was recomputed. **WindField's
+record was left byte-identical on purpose**, as an in-file control.
+Screen 4 was chosen specifically because it carries no Timer field of
+its own, so a fallback failure could not be confused with a legitimate
+Timer already on the screen.
+
+**Result (Doug, real Edge 530):** Screen 4's top field renders as
+**Edge 3270** -- the correct app, the one whose record received the
+entry, not WindField and not the Timer fallback. Screens 1 and 2 were
+unaffected, with Screen 1 still showing WindField and Edge 3270 side
+by side.
+
+**What this establishes, beyond Doc rev 105's move-an-existing-field
+result.** A placement can be created on a screen that never had one.
+The choice of WHICH message-170 record receives the entry determines
+which app renders, confirming Doc rev 106's conclusion that app
+identity lives entirely in the records and not in the field ID -- the
+marker written into the field array was the same 216 either app uses.
+And editing one record while leaving another untouched does not
+disturb the untouched app's placements.
+
+**Remaining unproven, now a short list:** creating a message-170
+record FROM SCRATCH in a profile that carries none (the case behind
+cross-profile Favorites and "add a CIQ field to a profile that has
+never had one"); cleanly REMOVING a placement; and a position shift
+occurring as a SIDE EFFECT of a field-count change rather than as a
+deliberate move.
+
+**Guards unchanged.** Still correct for the shipped toolkit, which
+writes no 170 data at all.
+
+Prior rev (106, 2026-09-06) follows.*
+
+*Doc rev 106 — refreshed 2026-09-06.* **CORRECTS a core assumption
+this project has carried since Doc rev 95: field ID 216 is NOT an app
+identity and NOT a device-local slot number. It is a generic "a
+Connect IQ data field goes here" TYPE MARKER. All app identity lives
+in message 170 and nowhere else.** Confirmed by putting two different
+Connect IQ apps on the SAME screen at once.
+
+**The test.** Doug used Garmin's own on-device editor to add a second,
+different CIQ app (Edge 3270) to Screen 1 position 5 of the CIQTEST
+profile, directly alongside WindField at position 4, then pulled the
+file. Both apps installed and active simultaneously -- not the
+sequential install/uninstall case Doc rev 97 examined.
+
+**Result.** Slot 0's field array reads `[3, 6, 48, 13, 216, 216, 56,
+146, ...]` -- **216 at BOTH position 4 and position 5**, two different
+apps sharing one numeric ID at the same time on the same screen. And
+there are now TWO message-170 records, each carrying its own UUID and
+its own placement list:
+
+    record 0  (WindField UUID)  entries [512, 36]
+                                 -> slot 0 pos 4, slot 4 pos 0
+    record 1  (Edge 3270 UUID)  entries [1024]
+                                 -> slot 0 pos 5
+
+Each record's entries decode exactly per the Doc rev 104 format, and
+every decoded (slot, position) lands on a 216 in the corresponding
+field array. The one-hot position bits operate independently across
+records, and two records referencing the SAME slot is legal.
+
+**What this corrects.** Doc rev 97 concluded 216 was "a device-local,
+install-order-dependent SLOT number, not a stable per-app identity."
+The second half stands; the first half is wrong. 216 is not a slot
+number and shows no sign of being device-local at all -- it is simply
+the marker for "this field position is a Connect IQ data field." What
+Doc rev 97 actually observed when 216 appeared to be "reassigned" from
+WindField to Edge 3270 was not the ID changing meaning, but the set of
+170 records changing around a marker that never meant either app in
+the first place. The OBSERVATIONS in Doc rev 95-97 all stand; the
+interpretation of what 216 is does not. (Caveat: this is one device.
+216 being a universal CIQ marker across all Garmin hardware is
+plausible but unconfirmed.)
+
+**Sharper statement of the Timer mechanism.** 216 tells the device
+"render a Connect IQ data field at this position." The device then
+looks for a message-170 entry claiming that exact (slot, position)
+pair. If it finds one, it resolves the UUID and runs that app. If it
+finds none -- because the toolkit moved the field without updating
+170, or wrote a 216 with no record behind it -- nothing resolves, and
+Garmin's generic "Timer" fallback renders instead. Every previously
+observed behavior across Doc rev 95-105 follows from this single rule.
+
+**Design consequence, positive.** Doc rev 105 flagged a likely need to
+refuse auto-maintenance of 170 whenever a profile held more than one
+record, because numeric-ID-to-app attribution looked unresolvable.
+That concern DISSOLVES: attribution never depended on the field ID.
+Each 170 record independently enumerates its own placements, so any
+number of apps can be attributed unambiguously by reading the records.
+No such restriction is needed.
+
+**Second design consequence, a real UX opportunity.** Because the
+records identify which app occupies which exact position, this toolkit
+can now distinguish CIQ fields in its own displays instead of showing
+every one as the same generic "CIQ Data Field" label -- two different
+apps on one screen are currently indistinguishable to the user. A
+small known-UUID-to-name table (growable exactly like the field ID
+table) would let `fit_dump.py` and the GUI name them properly.
+
+**Naming note for whenever this is built:** the constant
+`DEVICE_DEPENDENT_CIQ_IDS` in `fit_dump.py` is now misleading on both
+words -- 216 is neither device-dependent nor an app id. Something like
+`CIQ_FIELD_MARKER_IDS` describes it correctly. Not renamed yet; a code
+change should not ride along with a documentation entry.
+
+Prior rev (105, 2026-09-06) follows.*
+
+*Doc rev 105 — refreshed 2026-09-06.* **CONFIRMED ON REAL HARDWARE:
+this toolkit CAN move a Connect IQ data field, as long as it updates
+message 170 to match. The "Garmin's on-device editor only" limitation
+is not fundamental -- it was a missing write.** This is the first
+successful toolkit-written Connect IQ placement in the project's
+history, and it directly validates the Doc rev 104 decode.
+
+**The test.** A file was built from Doug's live ROAD profile changing
+exactly 15 bytes, nothing else: the profile display name (`ROAD` ->
+`CIQTEST`, so the real profile was never at risk), Screen 1's field
+array moving the CIQ field from position 1 to position 4, that
+placement's message-170 entry from `0x0040` (bit 6, position 1) to
+`0x0200` (bit 9, position 4), and the recomputed trailing CRC. Screen
+2's own CIQ placement was left exactly as the device itself had
+written it, serving as an in-file control.
+
+**Result (Doug, real Edge 530, deployed via NewFiles):** the CIQ data
+field renders CORRECTLY at its new position 4 -- as the actual
+Connect IQ field, NOT the "Timer" fallback that every previous
+toolkit-written CIQ edit produced. Screen 2's control placement was
+unaffected and also rendered correctly. Both halves of the test
+behaved as predicted.
+
+**What this establishes.** The `entry = (1 << (5 + field_position)) |
+slot_index` decode is correct, and correct not just descriptively but
+GENERATIVELY -- a value this project computed from scratch, never
+written by any Garmin software, was accepted by the device. The
+device also accepted entries ordered by ascending slot index, matching
+the convention observed in every device-written sample.
+
+**A near-miss worth recording as a process note.** The first build of
+the test file packed the two entries sorted by VALUE rather than by
+slot, which would have written slot 4's entry ahead of slot 0's --
+inverted relative to every device-written sample. It was caught before
+deployment. Had it shipped and failed, the natural conclusion would
+have been "the position decode is wrong," when the real fault would
+have been entry ordering. Worth remembering: when testing a decoded
+binary format, preserve EVERY observed convention, not just the ones
+the current hypothesis explains.
+
+**Usability finding, separate from correctness.** Doug's CIQ field
+landed in a HALF-WIDTH slot at position 4 and was accepted and
+rendered -- the device did not reject it -- but the field's content
+needs more room than a half-width cell gives. This is a rendering/
+usability constraint, not a linkage failure, and it closely parallels
+this project's existing `GRAPH_OR_BARS_FIELD_IDS` full-width guidance.
+Any future feature that lets users move a CIQ field should warn when
+the destination is a half-width slot.
+
+**What is NOT yet proven, and should not be assumed:** moving a
+placement to a DIFFERENT screen (changing the slot bits, untested);
+ADDING a placement to a screen that never had one, within a profile
+that already carries a 170 record for that app (untested, and the
+first genuinely new user-facing capability if it works); creating a
+170 record FROM SCRATCH in a profile that has none, which is what
+"put this CIQ field on a profile that doesn't have it" would require
+(untested, and the case where device-side install state and the CIQ
+datafield registry of Doc rev 100 are most likely to still bite);
+REMOVING a placement cleanly; and the multi-bit one-hot case implied
+by the format but never yet observed.
+
+**Guards stay as they are for now.** v1.2.2/v1.2.3's refusals remain
+correct for the shipped toolkit, which still does not write message
+170 at all -- a screen-shape edit through any current code path would
+still produce exactly the stale-record breakage those guards exist to
+prevent. The guards should only be relaxed alongside real 170-writing
+support, not ahead of it.
+
+Prior rev (104, 2026-09-06) follows.*
+
+*Doc rev 104 — refreshed 2026-09-06.* **Message 170 field 2 is now
+COMPLETELY decoded, and it resolves both open questions Doc rev 103
+left. The `.fit` file carries the full Connect IQ placement map --
+which app, which screen, which field position.** Doug ran the two
+isolating on-device tests in a single pass (they don't interfere,
+since each placement gets its own entry, so each still varies one
+thing).
+
+**The format, CONFIRMED against five placements across three real
+device-written files, exact reconstruction in every case:**
+
+    mesg 170:
+      field 1 -- 16 bytes, the Connect IQ app's UUID (big-endian)
+      field 2 -- 20 bytes, a packed array of 15-BIT ENTRIES,
+                 one entry per placement of that app:
+                    bits 0-4    screen SLOT index (message_index), 0-31
+                    bits 5-14   ONE-HOT field position within that
+                                screen -- bit (5 + position)
+
+    entry = (1 << (5 + field_position)) | slot_index
+
+**Evidence table** (slot, position -> entry): baseline file (0,0)->32
+and (11,0)->43; after Doug removed the CIQ field from slot 11
+on-device, (0,0)->32 alone; after he moved it to position 1 on slot 0
+AND added it at position 0 on slot 4, (0,1)->64 and (4,0)->36. Every
+one predicted exactly.
+
+**Both Doc rev 103 questions answered.** (1) The low 5 bits are the
+SLOT INDEX, not display order f9 -- slot 4 / f9 6 produced 36
+(`0x20|4`), where f9 would have given 38. (2) Field POSITION IS
+encoded, as a one-hot bit -- moving the field from position 0 to 1 on
+slot 0 took the entry from 32 to 64, i.e. bit 5 to bit 6.
+
+**Why 15 bits, which looked arbitrary in Doc rev 103:** 5 bits of
+slot (0-31, matching this file format's ~30 preallocated screen
+slots) plus 10 position bits (matching this project's own confirmed
+10-field-per-screen maximum) is exactly 15. The stride falls out of
+the structure rather than being a fitted guess -- which is itself
+corroboration of the decode.
+
+**The original bug (Doc rev 98) now has a full mechanical
+explanation.** Doug's breaking test rearranged a CIQ screen so the
+field moved from the top into the middle of a 3-field layout --
+position 0 to position 1. Correctly following that move requires
+clearing bit 5 and setting bit 6 in that placement's entry.
+`patch_screen()`, being an in-place byte editor that has never known
+about message 170, preserved an entry still asserting position 0
+while rewriting the field array to put the field at position 1. The
+record and the array disagreed, and the device fell back to "Timer."
+Every previously observed behavior follows from this: clone works
+(nothing moves), `--swap-order` works (f9 changes, slot index does
+not), removing/adding ordinary fields around a CIQ field breaks it
+(the CIQ field's position shifts and the entry does not follow).
+
+**Also worth recording:** the third-party Fit File Viewer author's
+"field bits" column was substantially CORRECT -- that is precisely
+bits 5-14 -- and Doc rev 103's characterization of his labels as a
+misparse was too dismissive. He had the right concept and split the
+byte boundaries wrong. His "screen id" column reporting 32 was the
+one real error, and only because `0x20` happens to be the low byte.
+
+**One structural implication, untested:** because position is one-hot
+rather than an integer, a single entry can in principle mark an app
+occupying MULTIPLE positions on one screen (several bits set). No
+sample yet exhibits this.
+
+**Status of the limitation.** This makes a toolkit-written CIQ
+placement plausible for the first time: computing a correct entry is
+now trivial arithmetic. It is NOT yet proven -- nothing here has been
+written by this toolkit and deployed. Device-side install state and
+the CIQ datafield registry (Doc rev 100) remain real and untouched by
+anything in the file, and the numeric field ID (216) is still
+device-local. **All v1.2.2/v1.2.3 guards stay exactly as they are**
+until a toolkit-written 170 entry is proven to render correctly on
+real hardware.
+
+Prior rev (103, 2026-09-06) follows.*
+
+*Doc rev 103 — refreshed 2026-09-06.* **MAJOR: message 170 is
+DECODED. It is the Connect IQ link record, and it carries the app's
+UUID plus a packed list of which screens that app is placed on. The
+file has been carrying the CIQ placement mapping all along.** This
+supersedes nothing in Doc rev 95-102's observations, all of which
+still hold, but it substantially revises the INTERPRETATION -- the
+long-standing "nothing in the file is enough to recreate this link"
+framing is now known to be too strong.
+
+**CORRECTS a specific earlier conclusion, and this is the important
+part.** Doc rev 97 recorded a cross-file UUID survey -- every
+WindField-active file on hand, every screen/position/layout it had
+ever occupied -- and concluded the 170 record was "CONSTANT per app,
+with zero positional variation ever observed." That is now known to
+be true of field 1 (the UUID) but FALSE of the record as a whole:
+field 2 varies directly with placement. The earlier survey appears to
+have compared the UUID and treated the rest as opaque. The finding
+here does not overturn anything Doc rev 95-97 established about 216
+being a device-local slot number -- all of that stands -- but the
+"no positional variation" line should be read as superseded.
+
+**How this came back into view.** The project already knew (Doc rev
+95-97) that 170 held a per-app UUID; what was missing was any reading
+of the record's OTHER field. Doug found a third-party tool (Fit File
+Viewer, `fitfileviewer.com`) whose author had independently labeled
+`mesg_num` 170 as "Connect IQ Field," with columns for an app id, a
+screen id, and field bits -- the "screen id" column being the prompt
+to go look at field 2 properly rather than treating the record as a
+constant blob. His column labels turned out to be partly a misparse
+(see below), matching Doug's own read that this viewer's screen/field
+identification is looser than this project's, but the prompt was the
+useful part.
+
+**CONFIRMED by direct raw-byte parse of the definition record** (not
+the SDK's type guesses, and not the viewer's labels): message 170 has
+exactly TWO fields. Field 1 is 16 bytes of `uint8` -- a well-formed
+RFC 4122 version-4 UUID, stored big-endian, which is the Connect IQ
+app's own UUID (deliberately NOT reproduced here; this repo is
+public). Field 2 is 20 bytes declared as 5 x `uint32`. There is no
+third field, so the viewer's separate "screen id = 32" column is a
+misparse -- 32 is simply `0x20`, the first byte of field 2.
+
+**A theory of this project's own was FALSIFIED along the way, worth
+recording.** The obvious hypothesis was that `patch_screen()` was
+destroying or invalidating the 170 record on every write. It is not:
+`patch_screen()` is an in-place byte editor, and message 170 comes
+through BYTE-IDENTICAL after an edit to a non-CIQ screen and after an
+edit to a CIQ-bearing screen alike. Directly tested both ways.
+
+**The decisive experiment (Doug, on real hardware, 2026-09-06).** A
+profile with the same CIQ data field placed on TWO screens (slot 0 at
+field position 0, and slot 11 at field position 0) was captured as a
+baseline. Doug then used GARMIN'S OWN on-device editor -- not this
+toolkit -- to change slot 11's single field from that CIQ field to
+Cadence, and pulled the profile back. Field 2 changed:
+
+    before (placed on slots 0 and 11):  20 80 15 00 00 ...
+    after  (placed on slot 0 only)   :  20 00 00 00 00 ...
+
+**DECODED, with exact bit-for-bit reconstruction of both files:**
+field 2 is a packed array of **15-bit entries**, one per placement,
+each entry being **`0x20 | screen_index`**. Before = `[32, 43]` =
+`[0x20|0, 0x20|11]`. After = `[32]` = `[0x20|0]`. The surviving
+placement's entry is unchanged; the removed placement's entry is
+simply gone. Rebuilding `{0x20|0, 0x20|11}` as a 15-bit little-endian
+stream reproduces `0x158020` exactly, and `{0x20|0}` reproduces
+`0x20` exactly. This is an identity, not a fitted approximation. (A
+15-bit stride is unusual enough to be worth re-testing as more
+samples arrive; 8/12/16/20-bit readings were all checked and none
+keep the surviving entry stable across the two files.)
+
+**Working hypothesis for the ORIGINAL bug, not yet confirmed.** In
+both samples the CIQ field sits at field POSITION 0, so bits 6-14 of
+each entry are zero and any position encoding would be invisible.
+Doug's original breaking test (Doc rev 98) rearranged a CIQ screen so
+the CIQ field moved from the top into the MIDDLE of a 3-field layout
+-- position 0 to position 1. If position is encoded in those upper
+bits, `patch_screen()` would have preserved a 170 entry still
+claiming position 0 while moving the field to position 1: a stale
+entry, and "Timer" on-device. This would explain the entire observed
+pattern coherently -- clone works (nothing moves), `--swap-order`
+works (f9 changes, slot does not), editing a CIQ screen's shape
+breaks it (position shifts, 170 does not follow).
+
+**Two open questions, each isolable to a single variable on-device:**
+(1) Is the low field the SLOT INDEX or the DISPLAY ORDER f9? Both
+sampled screens have slot == f9 (0 and 11), so they are
+indistinguishable so far. Placing the field at position 0 on a screen
+where the two differ -- e.g. slot 4 / f9 6 -- yields 36 if slot, 38 if
+f9. (2) Is field POSITION encoded in the upper bits? Moving the field
+within slot 0, where slot and f9 are both 0 and stay 0, changes
+position and nothing else.
+
+**Implication, stated carefully.** If position resolves, this toolkit
+could in principle write a correct 170 entry alongside an f7 change,
+and the "Garmin's on-device editor only" limitation becomes
+potentially liftable for MOVING or REARRANGING an already-installed
+app. Placing one FRESH remains doubtful on separate grounds --
+device-side install state and the CIQ datafield registry (Doc rev 100)
+are still real and unaddressed by anything in the file. **No guard is
+being relaxed on the strength of this.** v1.2.2/v1.2.3's refusals stay
+exactly as they are until a real on-device round trip proves a
+toolkit-written 170 entry renders correctly.
+
+Prior rev (102, 2026-09-06) follows.*
+
+*Doc rev 102 — refreshed 2026-09-06.* **The Doc rev 101 Favorite-path
+gap is now CONFIRMED ON REAL HARDWARE, not inferred -- and fixed at
+three points in `gui_app.py` v0.20.1.** Doug had independently run
+this exact sequence on the Edge before the fix was written: saved a
+Favorite from a screen holding a Connect IQ data field, loaded it into
+a new screen, deployed, and the field came up as **"Timer"** on the
+device. This supersedes Doc rev 101's own explicitly-hedged status
+line, which stated the code gap was confirmed by reading but the
+on-device consequence was INFERRED from the matching f3/f7/f8 write
+shape and had never actually been run on hardware. It has now. The
+inference was correct; the Favorite pipeline fails identically to
+every other route that tries to introduce one of these fields fresh.
+
+**Fixed at three points, defense in depth** (all in `gui_app.py`, no
+backend change -- `fit_patch.py`'s own two passes were already correct
+and the CLI was audited clean in Doc rev 101):
+
+1. **Capture** -- `ViewScreensPanel.on_save_favorite()` now hard-
+refuses to save a favorite from a CIQ-bearing screen at all, keeping
+the saved-favorite store clean at the source.
+2. **Load** -- `AddScreenPanel.on_load_favorite()` now STRIPS CIQ ids
+from whatever it loads and reports what it dropped. This step is
+mandatory and cannot be collapsed into point 1: the favorite is a
+single JSON file in the user's HOME directory (`FAVORITE_PATH`),
+outside the repo, and survives upgrades -- so any favorite captured
+before v0.20.1 is already on disk and armed no matter which version is
+installed. It strips rather than refusing outright, since the
+favorite's remaining fields stay perfectly valid and reusable, with a
+separate path for the degenerate case (a favorite that was nothing BUT
+CIQ fields leaves the current field list untouched rather than loading
+an empty one).
+3. **Write** -- `AddScreenPanel.on_create()` is the real enforcement
+point, hard-refusing before `patch_screen()`. Same UX-vs-enforcement
+split v0.20.0 established in `EditScreenPanel`, where the eager
+pre-picker checks are convenience and `_apply_field_list()`/
+`_swap_fields()` are what actually enforce.
+
+**Design point worth keeping, since it cost real thought:** point 3
+deliberately does NOT reuse `_ciq_guard_block()`. That helper asks
+whether the TARGET SLOT's current on-disk content already holds a CIQ
+field -- `fit_patch.py`'s pass-2 semantics -- but `AddScreenPanel`
+always targets an unconfigured, EMPTY slot, so reusing it would
+correctly find nothing every single time and never fire, producing a
+guard that looks present in a grep and does nothing in practice. What
+this path needs is the pass-1 analogue: a REQUEST-side check against
+the field list about to be written, exactly like `--fields`' own guard
+(`fit_patch.py` v1.15.0). The two passes are not interchangeable, and
+this is the case that demonstrates why the design has both.
+
+One ordering detail, verified rather than assumed: the load-side
+filter runs BEFORE the existing layout-B validity check, because
+dropping a field changes the field count that check depends on.
+Confirmed headless against the real constants -- a 3-field favorite
+with layout B that loses one field to the filter correctly falls back
+to layout A, since 2 is not in `COUNTS_WITH_B_VARIANT` ({3,4,5,6,7}).
+Field order among the surviving fields is preserved. `gui_app.py`
+passes an AST parse; as always in this project, wx is not installable
+in the analysis environment, so real GUI behavior is Doug's own
+on-device verification, not something claimed here.
+
+Prior rev (101, 2026-09-06) follows.*
+
+*Doc rev 101 — refreshed 2026-09-06.* **Coverage audit of the v1.2.2
+Connect IQ guard found a real, still-open hole: the Favorite Screen
+pipeline writes a CIQ field into a brand-new screen with no guard
+anywhere along it.** Read-only source audit, no code changed. The
+v1.2.2 guard work was verified at the time by grepping for
+`_ciq_guard_block()` and confirming all six call sites existed. That
+method proves the guard is PRESENT where it was installed; it cannot
+prove there is no seventh writer that never got one. This pass
+inverted the check -- enumerate every writer into `editing_path`
+first, then ask of each whether it is guarded -- which is the only
+form of the question that can find a missed path.
+
+**Result, every write path in `gui_app.py`:** `on_show_toggle`
+(f12 only) safe; `_swap_fields` (f7), `_apply_field_list` (f3/f7) and
+`on_layout_choice` (f8) all correctly guarded; `_swap_screen_order`
+(f9 only) safe per Doc rev 99's own on-device test; `on_remove`
+(f1 only) safe; `ImportPanel.on_import` safe (pure byte copy, rewrites
+no screen shape at all, same as Clone). One gap:
+**`AddScreenPanel.on_create()` writes f1/f3/f7/f8/f9/f10/f12 via
+`patch_screen()` with no CIQ check of any kind** -- the class contains
+zero references to `DEVICE_DEPENDENT_CIQ_IDS` or the guard anywhere.
+
+**The path in full.** `ViewScreensPanel.on_save_favorite()` reads the
+selected screen's field IDs via `active_field_ids()` and writes them
+to `~/.garmin_screen_editor_favorite.json` with no filtering.
+`AddScreenPanel.on_load_favorite()` loads that list verbatim into
+`self.field_ids`, also unfiltered. `on_create()` then writes it. So:
+Save as Favorite from a screen holding a CIQ Data Field -> Add New
+Screen -> Load from Favorite -> Create, and field 216 lands in a fresh
+slot. This is precisely the "introduce one fresh" case v1.2.2 was cut
+to refuse, reached by a route the fix never covered. Note the hole is
+narrow and well-bounded in one direction: `AddScreenPanel`'s other two
+field entry points (`on_add_field`, `on_change_type`) both go through
+`FieldPickerDialog`, which HAS excluded `DEVICE_DEPENDENT_CIQ_IDS`
+since v0.20.0 -- the Favorite path is the only way a CIQ ID reaches
+that panel at all.
+
+**Status of this finding, stated precisely.** The gap in the code is
+CONFIRMED by direct reading of the current v0.20.0 source. The
+on-device CONSEQUENCE is INFERRED, not separately hardware-tested:
+`on_create()` writes the same f3/f7/f8 shape whose corruption is
+already confirmed on real hardware (Doc rev 95-98), so there is no
+reason to expect a different outcome, but nobody has actually run this
+specific sequence on a device and watched it render as "Timer."
+
+**Latent risk worth flagging separately:** the favorite is a single
+JSON file in the user's home directory, outside the repo, and survives
+upgrades. A favorite captured from a CIQ-bearing screen at ANY point
+in this project's history is sitting on disk armed right now,
+independent of which toolkit version is installed. Any fix therefore
+has to handle already-saved favorites, not just prevent new bad ones.
+
+**Also audited and found clean, recorded so this isn't re-checked
+later:** `--seed-from-slot` copies ONLY fields 9 and 10 (screen
+identity/display order), never the f7 field array -- it was a
+plausible CLI analogue of this same bug and is not one. CLI
+`--new-slot` IS covered, because it necessarily routes through the
+`--fields` parsing branch where the v1.15.0 pass-1 request-side check
+lives. `--remove` writes f1 only, `--enable/--disable` f12 only,
+`--swap-order` f9 only. The CLI has no known gap; this is GUI-only.
+
+**Design note for whoever builds the fix.** `_ciq_guard_block()` will
+NOT transfer as-is. It asks whether the TARGET SLOT's current on-disk
+content holds a CIQ field -- pass-2 semantics -- but `AddScreenPanel`
+always targets an unconfigured, empty slot, so that check would
+correctly return nothing every single time. What is needed here is the
+pass-1 analogue: a REQUEST-side check against `self.field_ids`. The
+two guard passes are not interchangeable, and this is the case that
+demonstrates why both exist. Proposed (not built, pending Doug's
+go-ahead): block at capture in `on_save_favorite()` so nothing bad
+enters the store; filter at load in `on_load_favorite()`, which is the
+one step that cannot be skipped because of the legacy-favorites
+problem above; and enforce at the write in `on_create()` as the real
+backstop -- mirroring v0.20.0's own split, where the eager pre-picker
+checks are UX and `_apply_field_list()`/`_swap_fields()` are the
+actual enforcement. Candidate release: v1.2.3.
+
+Prior rev (100, 2026-09-04) follows.*
+
+*Doc rev 100 — refreshed 2026-09-04.* **External corroboration found
+(public web research, not device testing): this project's whole
+"device-side, not file-based" CIQ theory is independently confirmed --
+including an official Garmin Connect IQ engineer's own acknowledgment
+of the exact bug class.** Doug asked to look beyond this thread's own
+device (a single Edge 530) for outside evidence, plus a look at
+whether the Connect IQ SDK itself has anything a typical app developer
+might not think to check. Two separate lines of evidence, both real:
+
+**1. Long-standing public bug reports, independent of WindField/Edge
+3270/this project entirely.** An Edge 1030 forum thread from **over 8
+years ago** describes the exact symptom this project spent days
+reverse-engineering: "i create i new screen and selects 5 different
+Connect IQ fields and its ends up with 2 IQ datafields and 3
+timefields," alongside a "counter for Connect IQ datafields" users
+observed getting stuck/wrong -- language that lines up closely with
+this project's own device-local numeric-ID-slot theory, years before
+this thread existed. A separate fēnix 6 series thread describes the
+same failure independently, including one user reporting the watch
+"ran a data field I never assigned" -- close in spirit to this
+project's own Edge 3270 finding (a slot resolving to a DIFFERENT app
+than the one placed there). Xert's own official troubleshooting guide
+for their Connect IQ Data Fields independently instructs users to
+expect "Timer" as the on-device placeholder when removing/updating a
+Data Field from an Activity Profile -- a second, completely unrelated
+app vendor (not WindField's author) confirming the identical fallback
+behavior Scott Beam described. Net effect: this is a long-standing,
+cross-device (Edge, fēnix, Forerunner), cross-firmware-version Garmin
+platform behavior, not anything specific to WindField, Edge 3270, or
+the Edge 530.
+
+**2. Garmin's own official docs and forums confirm a real, named,
+OFFICIALLY-ACKNOWLEDGED mechanism and bug class.** The Connect IQ
+"Manifest File and Permissions" developer doc states plainly: "On
+devices with API level 5.2, data fields have a post-install flow that
+lets the user associate them with activities" -- i.e., Garmin's own
+firmware runs an explicit, documented linking step between a newly
+installed Data Field and the Activity Profiles/activities it gets
+attached to, entirely separate from anything in a `.fit` profile file.
+This flow was introduced/formalized in **Connect IQ SDK 8.3** (Garmin's
+own announcement, Sep 25, 2025) as a NEWLY EXPLICIT, user-visible step
+-- notably more recent than the 8-year-old Edge 1030 reports above,
+meaning the UNDERLYING device-side tracking almost certainly existed
+informally long before Garmin gave it a formal UI and a name. A
+Forerunner 965 user's detailed firsthand bug report (CIQ 5.2.0, SDK
+8.3) walks through this exact flow breaking: after installing a new
+Data Field and choosing which activity to associate it with, the
+device incorrectly reported "max number reached" and every
+already-working Connect IQ field on that activity started showing a
+generic unresolved-icon state -- the same class of failure as this
+project's own "Timer" fallback, just a different device generation's
+specific symptom. Most significant: an official Garmin Connect IQ
+engineer (Richard.ConnectIQ) responded directly to that bug report,
+filed as ticket **CIQQA-3576**, status Acknowledged: "A lot of work has
+been done in regards to keeping track of CIQ datafields that would on
+rare occasion get out of sync when installing and uninstalling CIQ
+datafields. These changes are included in firmware 26.00. Rebooting
+the device should get back to the proper state of CIQ datafield
+count." This is about as authoritative as evidence gets short of
+Garmin's own source code: Garmin's own team, in their own words,
+confirms an internal "CIQ datafield count" tracking system that CAN
+desync -- independently validating this project's own black-box-tested
+theory, not just Scott Beam's single hedged statement.
+
+**Caveat, stated plainly:** this doesn't prove the Edge 530 specifically
+runs the same 5.2-era post-install flow, or that firmware 26.00's fix
+(a Forerunner-generation firmware version, not necessarily the Edge
+530's own numbering) applies to Doug's device -- the Edge 530 is an
+older, lower-tier device that may run an older/simpler version of
+whatever underlying tracking this newer flow formalizes. What this DOES
+establish with real confidence: the general mechanism this project
+inferred purely from black-box byte-level testing on one device --
+Garmin firmware maintaining its own internal, file-independent record
+of which Connect IQ Data Field occupies which slot, capable of getting
+out of sync, with "Timer" (or an unresolved-icon state on newer
+devices) as the fallback -- is REAL, industry-wide, and now Garmin-
+acknowledged, not a theory unique to this project's own testing.
+
+Also checked, per Doug's specific ask about the SDK itself: the
+official Garmin FIT SDK Profile (`garmin_fit_sdk` 21.213.0, the exact
+package this toolkit depends on) was checked directly for `mesg_num`
+170 -- the unidentified global message this project has tracked since
+Doc rev 95-96 as a per-app "link record." CONFIRMED ABSENT from the
+official, published `Profile['mesg_num']` table entirely (values 163,
+166, 168, 170-173, 175-176 all have gaps in this range) -- this
+project's inability to identify message 170 via the SDK was not a
+research gap, it's genuinely undocumented in Garmin's own public FIT
+Profile, consistent with it being an internal/reserved message never
+exposed to third-party developers. Separately, the manifest docs
+confirm every Connect IQ app has TWO distinct identifiers -- a
+developer-generated "App UUID" (in `manifest.xml`) used for dev/beta
+builds, and a separate "Store UUID" issued BY GARMIN once published,
+distinct from the developer's own -- confirming Garmin's system has
+identity layers beyond anything a developer sets themselves, consistent
+with (though not a full explanation of) Scott Beam's own "not anything
+I set in the code at all" statement about the numeric field ID.
+
+Prior rev (99, 2026-09-02) follows.*
+
 *Doc rev 99 — refreshed 2026-09-02.* **CONFIRMED: screen DISPLAY ORDER
 is safe for a screen holding a device-dependent Connect IQ field --
 only that screen's OWN count/array/layout is fragile.** Doug tested

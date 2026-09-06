@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "0.20.0"  # Device-dependent Connect IQ field guard, real-hardware-driven bug fixes -- see PROJECT_NOTES.md Doc rev 95-99, and fit_patch.py v1.15.0's changelog for the matching backend writeup. FieldPickerDialog (2026-09-02) now always excludes fit_dump.py's new DEVICE_DEPENDENT_CIQ_IDS (currently {216}) from its selectable Add/Change Field list, unioned on top of each call's own exclude_ids -- a single fix covering all 4 call sites, since every one of them constructs this same dialog. New _ciq_guard_block() (2026-09-03), added after Doug's own real-hardware test exposed a real gap: this GUI's actual write path (_apply_field_list()/_swap_fields()/on_layout_choice(), which all call patch_screen() DIRECTLY) never went through fit_patch.py's CLI at all, so its guard never ran here -- a screen that already had a working CIQ field broke exactly like a fresh introduction the moment ordinary fields were added/removed/reordered around it, with no warning shown. _ciq_guard_block() checks the slot's CURRENT on-disk content via fit_patch.py's screen_has_device_dependent_ciq_field() and hard-refuses (no override, OK-only MessageBox) before any screen-shape edit -- wired into all six real call sites: _apply_field_list, _swap_fields, on_add_field, on_remove_field, on_change_type, on_layout_choice (the last three call it eagerly, before opening a picker dialog, purely so the user isn't sent through a modal only to be told no afterward -- _apply_field_list/_swap_fields are the actual enforcement points). _swap_fields() now returns True/False so on_move_up/on_move_down only update the list selection when a swap actually happened. Doc-only/naming, Doug's go-ahead (2026-08-25): project rename extended past the GUI window title (which was already "Activity Profile Screen Editor for Garmin Edge" since v0.16.7). Doug clarified the canonical public name is "Activity Profile Editor for Garmin Edge" -- no "Screen" (matches the GitHub repo name "Activity-Profile-Editor" and his own Release titles "Activity Profile Editor for Garmin Edge Devices" (2026-08-25): the editor targets any Edge device generically, and even though screens are what actually get edited, backups/restores/deploys all operate at the Activity Profile level, so "Activity Profile" is the right noun to lead with, not "Screen"). Also drops the leading "Garmin Edge 530" pattern seen elsewhere (README.md/PROJECT_NOTES.md's old H1) -- deliberately not leading with "Garmin" at all, to avoid implying this is a Garmin product, and not device-specific despite the 530 being the only Edge model actually tested against so far. Three spots updated in this file: MainFrame's window title (super().__init__'s title= argument), the module docstring's own opening line, and ABOUT_TEXT (the About dialog shown via DetectPanel's About button) -- all three now read "Activity Profile Editor for Garmin Edge" with no "Screen"/"530". No behavior change anywhere, text-only. See README.md/PROJECT_NOTES.md/MVP_SCOPE.md/FIT_PATCH.md's own changelog entries for the matching doc-side renames -- MEMORY_LOG.md and the RELEASE_NOTES_v1.1.x.md files are deliberately LEFT UNCHANGED, since both are point-in-time historical records (an explicitly archived project log, and notes already published as GitHub Releases under Doug's own chosen title) rather than live documentation -- same reasoning this project already applies to not rewriting old changelog/Doc-rev entries.
+__version__ = "0.20.1"  # Connect IQ guard COVERAGE FIX -- closes a route v0.20.0's guard never covered, found by a read-only audit of every writer into editing_path and CONFIRMED on real hardware by Doug (2026-09-06) before the fix was built: he saved a Favorite from a screen holding a CIQ data field, loaded it into a new screen, deployed, and the field rendered as "Timer" on the Edge -- the same failure mode as every other attempt to introduce one fresh. Root cause: v0.20.0 wired _ciq_guard_block() into EditScreenPanel's six call sites, but the Favorite pipeline reaches patch_screen() through AddScreenPanel.on_create() instead, which had NO CIQ check of any kind (the whole class had zero references to DEVICE_DEPENDENT_CIQ_IDS). The audit's other finding, recorded so it isn't re-checked: every OTHER writer is clean -- on_show_toggle (f12 only), _swap_screen_order (f9 only, Doc rev 99), on_remove (f1 only), ImportPanel.on_import (pure byte copy, rewrites no screen shape), and the three EditScreenPanel writers already guarded; on the CLI side --seed-from-slot copies only f9/f10 and never the f7 field array, and --new-slot is already covered because it routes through the --fields branch where fit_patch.py v1.15.0's pass-1 check lives. Fixed at three points, defense in depth: (1) on_save_favorite() hard-refuses to CAPTURE a favorite from a CIQ-bearing screen, keeping the store clean at the source; (2) on_load_favorite() STRIPS CIQ ids from whatever it loads and says so -- this one is mandatory and cannot be skipped, because the favorite is a single JSON file in the user's home dir (FAVORITE_PATH), outside the repo, surviving upgrades, so favorites captured before this version are already on disk and armed regardless of installed version; strips rather than refuses since the favorite's other fields stay perfectly valid, and filters BEFORE the layout-B validity check because dropping a field changes the count that check depends on, with a separate path for a favorite that was nothing BUT CIQ fields (leaves the current list alone rather than loading an empty one); (3) on_create() is the real ENFORCEMENT point, hard-refusing before patch_screen(). Point 3 deliberately does NOT reuse _ciq_guard_block(): that helper implements fit_patch.py's pass-2 semantics (does the TARGET SLOT's on-disk content already hold a CIQ field), but this panel always targets an unconfigured, EMPTY slot, so it would correctly find nothing every time and never fire -- what's needed is the pass-1 analogue, a REQUEST-side check against the field list about to be written, exactly like --fields' own guard. Same UX-vs-enforcement split v0.20.0 established: points 1-2 are hygiene, point 3 is what actually stands between self.field_ids and the write. See PROJECT_NOTES.md Doc rev 101-102. Prior entry (0.20.0): Device-dependent Connect IQ field guard, real-hardware-driven bug fixes -- see PROJECT_NOTES.md Doc rev 95-99, and fit_patch.py v1.15.0's changelog for the matching backend writeup. FieldPickerDialog (2026-09-02) now always excludes fit_dump.py's new DEVICE_DEPENDENT_CIQ_IDS (currently {216}) from its selectable Add/Change Field list, unioned on top of each call's own exclude_ids -- a single fix covering all 4 call sites, since every one of them constructs this same dialog. New _ciq_guard_block() (2026-09-03), added after Doug's own real-hardware test exposed a real gap: this GUI's actual write path (_apply_field_list()/_swap_fields()/on_layout_choice(), which all call patch_screen() DIRECTLY) never went through fit_patch.py's CLI at all, so its guard never ran here -- a screen that already had a working CIQ field broke exactly like a fresh introduction the moment ordinary fields were added/removed/reordered around it, with no warning shown. _ciq_guard_block() checks the slot's CURRENT on-disk content via fit_patch.py's screen_has_device_dependent_ciq_field() and hard-refuses (no override, OK-only MessageBox) before any screen-shape edit -- wired into all six real call sites: _apply_field_list, _swap_fields, on_add_field, on_remove_field, on_change_type, on_layout_choice (the last three call it eagerly, before opening a picker dialog, purely so the user isn't sent through a modal only to be told no afterward -- _apply_field_list/_swap_fields are the actual enforcement points). _swap_fields() now returns True/False so on_move_up/on_move_down only update the list selection when a swap actually happened. Doc-only/naming, Doug's go-ahead (2026-08-25): project rename extended past the GUI window title (which was already "Activity Profile Screen Editor for Garmin Edge" since v0.16.7). Doug clarified the canonical public name is "Activity Profile Editor for Garmin Edge" -- no "Screen" (matches the GitHub repo name "Activity-Profile-Editor" and his own Release titles "Activity Profile Editor for Garmin Edge Devices" (2026-08-25): the editor targets any Edge device generically, and even though screens are what actually get edited, backups/restores/deploys all operate at the Activity Profile level, so "Activity Profile" is the right noun to lead with, not "Screen"). Also drops the leading "Garmin Edge 530" pattern seen elsewhere (README.md/PROJECT_NOTES.md's old H1) -- deliberately not leading with "Garmin" at all, to avoid implying this is a Garmin product, and not device-specific despite the 530 being the only Edge model actually tested against so far. Three spots updated in this file: MainFrame's window title (super().__init__'s title= argument), the module docstring's own opening line, and ABOUT_TEXT (the About dialog shown via DetectPanel's About button) -- all three now read "Activity Profile Editor for Garmin Edge" with no "Screen"/"530". No behavior change anywhere, text-only. See README.md/PROJECT_NOTES.md/MVP_SCOPE.md/FIT_PATCH.md's own changelog entries for the matching doc-side renames -- MEMORY_LOG.md and the RELEASE_NOTES_v1.1.x.md files are deliberately LEFT UNCHANGED, since both are point-in-time historical records (an explicitly archived project log, and notes already published as GitHub Releases under Doug's own chosen title) rather than live documentation -- same reasoning this project already applies to not rewriting old changelog/Doc-rev entries.
 """
 gui_app.py -- Activity Profile Editor for Garmin Edge, GUI.
 
@@ -1742,6 +1742,36 @@ class ViewScreensPanel(wx.Panel):
                 "Can't save favorite", wx.OK | wx.ICON_WARNING,
             )
             return
+        # v0.20.1 CIQ fix, point 1 of 3 -- block at CAPTURE. CONFIRMED on
+        # real hardware (Doug, 2026-09-06): a favorite captured from a
+        # screen holding a device-dependent Connect IQ field, then loaded
+        # into a new screen via AddScreenPanel, does NOT carry the CIQ
+        # field over -- it renders as "Timer" on-device, exactly like every
+        # other attempt to introduce one of these fresh (PROJECT_NOTES.md
+        # Doc rev 95-98, 101). The v1.2.2 guard never covered this route:
+        # the Favorite pipeline reaches patch_screen() through
+        # AddScreenPanel.on_create(), not through EditScreenPanel's guarded
+        # write path. Refusing here keeps the saved-favorite store clean at
+        # the source, so the problem never enters it in the first place --
+        # but it canNOT be the only check, since favorites saved by earlier
+        # versions already exist on disk (see on_load_favorite()'s own
+        # filter, and on_create()'s enforcement backstop).
+        blocked = sorted(set(field_ids) & DEVICE_DEPENDENT_CIQ_IDS)
+        if blocked:
+            wx.MessageBox(
+                f"This screen has a device-dependent Connect IQ data field "
+                f"on it (ID {blocked}), so it can't be saved as a favorite.\n\n"
+                f"CONFIRMED on real hardware: a favorite carrying one of "
+                f"these fields does NOT reproduce it on the new screen -- the "
+                f"field renders as \"Timer\" on the device, regardless of what "
+                f"this file or the GUI shows. Only Garmin's own on-device "
+                f"editor can place a Connect IQ data field.\n\n"
+                f"A favorite saved from a screen WITHOUT one of these fields "
+                f"works normally.",
+                "Can't save favorite -- Connect IQ field present",
+                wx.OK | wx.ICON_ERROR,
+            )
+            return
         layout_variant = match.get(8) or 0
 
         save_favorite(field_ids, layout_variant, self.frame.profile_filename)
@@ -2877,14 +2907,53 @@ class AddScreenPanel(wx.Panel):
             )
             return
 
-        field_ids = favorite["field_ids"]
+        field_ids = list(favorite["field_ids"])
         layout_variant = favorite["layout_variant"]
+
+        # v0.20.1 CIQ fix, point 2 of 3 -- filter at LOAD. This is the one
+        # step that canNOT be skipped: the favorite lives in a single JSON
+        # file in the user's home directory (FAVORITE_PATH), OUTSIDE the
+        # repo, and survives toolkit upgrades. on_save_favorite()'s new
+        # capture-side block stops NEW bad favorites, but any favorite
+        # captured from a CIQ-bearing screen before v0.20.1 is already
+        # sitting on disk, armed, regardless of which version is now
+        # installed. Strip rather than refuse outright: the rest of the
+        # favorite's fields are perfectly valid and reusable, and dropping
+        # just the unusable one is closer to what the user actually wants
+        # than losing the whole favorite. Filtering happens BEFORE the
+        # layout-B validity check below, since dropping a field changes the
+        # field count that check depends on.
+        dropped = sorted(set(field_ids) & DEVICE_DEPENDENT_CIQ_IDS)
+        if dropped:
+            field_ids = [f for f in field_ids
+                         if f not in DEVICE_DEPENDENT_CIQ_IDS]
+        if not field_ids:
+            wx.MessageBox(
+                f"Your saved favorite contains nothing but device-dependent "
+                f"Connect IQ data field(s) (ID {dropped}), which can't be "
+                f"reproduced by this toolkit -- there's nothing left to load "
+                f"once those are dropped.\n\n"
+                f"The current field list has been left alone. Save a new "
+                f"favorite from a screen that has ordinary fields on it.",
+                "Nothing to load", wx.OK | wx.ICON_WARNING,
+            )
+            return
         if layout_variant == 1 and len(field_ids) not in COUNTS_WITH_B_VARIANT:
             layout_variant = 0  # not valid for this field count, fall back to A
 
         self.field_ids = list(field_ids)
         self.layout_variant = layout_variant
         self._refresh_widgets()
+
+        dropped_note = ""
+        if dropped:
+            dropped_note = (
+                f"\n\nNOTE: {len(dropped)} device-dependent Connect IQ data "
+                f"field(s) (ID {dropped}) in that favorite were DROPPED. "
+                f"CONFIRMED on real hardware that these don't carry over -- "
+                f"they render as \"Timer\" on the device. Only Garmin's own "
+                f"on-device editor can place one."
+            )
 
         source = favorite["source_profile"]
         if source and source != self.frame.profile_filename:
@@ -2893,12 +2962,13 @@ class AddScreenPanel(wx.Panel):
                 f"originally captured from a different profile ({source}). "
                 f"If that profile is a different sport type than this one, "
                 f"these fields haven't been confirmed to work here -- worth "
-                f"a look before deploying.",
+                f"a look before deploying.{dropped_note}",
                 "Favorite loaded", wx.OK | wx.ICON_INFORMATION,
             )
         else:
             wx.MessageBox(
-                f"Loaded {len(field_ids)} field(s) from your saved favorite.",
+                f"Loaded {len(field_ids)} field(s) from your saved "
+                f"favorite.{dropped_note}",
                 "Favorite loaded", wx.OK | wx.ICON_INFORMATION,
             )
 
@@ -2921,6 +2991,40 @@ class AddScreenPanel(wx.Panel):
             wx.MessageBox("Add at least one field first.", "Can't create",
                            wx.OK | wx.ICON_WARNING)
             return
+
+        # v0.20.1 CIQ fix, point 3 of 3 -- the actual ENFORCEMENT point.
+        # Mirrors v0.20.0's own split in EditScreenPanel, where the eager
+        # pre-picker checks are pure UX and _apply_field_list()/
+        # _swap_fields() are what actually enforce: the capture-side and
+        # load-side checks above are convenience/hygiene, this is the one
+        # that stands between self.field_ids and patch_screen().
+        #
+        # IMPORTANT, and the reason _ciq_guard_block() is NOT reused here:
+        # that helper asks whether the TARGET SLOT's current on-disk
+        # content holds a CIQ field (fit_patch.py's pass-2 semantics). This
+        # panel always targets an UNCONFIGURED, empty slot, so that check
+        # would correctly find nothing every single time and never fire.
+        # What's needed here is the pass-1 analogue -- a REQUEST-side check
+        # against the field list about to be written, exactly like
+        # fit_patch.py's own --fields guard (v1.15.0). The two passes are
+        # not interchangeable; this is the case that shows why both exist.
+        blocked = sorted(set(self.field_ids) & DEVICE_DEPENDENT_CIQ_IDS)
+        if blocked:
+            wx.MessageBox(
+                f"This new screen's field list contains a device-dependent "
+                f"Connect IQ data field (ID {blocked}), which this toolkit "
+                f"can't place.\n\n"
+                f"CONFIRMED on real hardware: the field renders as \"Timer\" "
+                f"on the device no matter what this file or the GUI shows. "
+                f"Only Garmin's own on-device editor can place a Connect IQ "
+                f"data field.\n\n"
+                f"Remove that field from the list above, then create the "
+                f"screen.",
+                "Can't create -- Connect IQ field present",
+                wx.OK | wx.ICON_ERROR,
+            )
+            return
+
         if self._count_user_screens() >= MAX_USER_SCREENS:
             wx.MessageBox(
                 f"This profile already has {MAX_USER_SCREENS} user-definable "
