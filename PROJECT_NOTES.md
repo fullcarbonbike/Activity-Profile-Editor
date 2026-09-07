@@ -1,5 +1,144 @@
 # Activity Profile Editor for Garmin Edge
 
+*Doc rev 110 — refreshed 2026-09-07.* **v1.3.0 CONFIRMED on real
+hardware through the actual GUI, plus two findings from surveying this
+project's own archived profiles -- including the first FILE-level
+evidence of the original Connect IQ bug.** Closes out the v1.3.0 work.
+
+**Hardware confirmations (Doug, real Edge 530, through the GUI rather
+than hand-built files).** Moving a Connect IQ field within a screen
+(ROAD profile, back to the top position) works. Adding and removing
+ordinary fields around a Connect IQ field works -- that's the
+`_apply_field_list()` path, genuinely different code from the Move
+Up/Down path, and it is the exact operation that broke in Doc rev 98.
+A profile with NO Connect IQ fields survives a full edit cycle
+unchanged, which was the most important test of the set: every shape
+edit now routes through the maintaining wrapper even when no Connect
+IQ field exists, so a regression there would have hit every ordinary
+user rather than only Connect IQ users. The two-marker refusal fires
+correctly on the deliberately-constructed CIQTEST profile.
+
+**Doug's question, answered from the archive rather than the device:**
+does a fresh profile created on-device from a default template carry a
+message-170 record? No. Eight archived profiles (Sandbox, Roadtemp,
+Ebike, Cyclocross, RoadClone and the staged/patched variants) have
+ZERO 170 records and zero markers. The record is created only when a
+Connect IQ app is actually placed.
+
+**FIRST FILE-LEVEL EVIDENCE OF THE ORIGINAL BUG.** The same survey
+found two archived profiles in the orphan state -- markers present
+that no record claims: `CyclingRoadClonebox.fit` has two markers at
+(5,0) and (6,2) and NO records at all, and `CyclingRoadWindTest2A.fit`
+has three markers but a single record claiming only one of them.
+Everything before this was inferred from what the device DISPLAYED;
+here the failure is visible in the bytes -- the toolkit wrote the
+marker with nothing behind it. `CyclingRoadClonebox.fit` is 4693 bytes
+against its working sibling's 4742: a 49-byte gap that is the record
+plus its definition message. Both files were run through the new code
+and correctly reported `action='orphan'` with records untouched, CRC
+valid, no crash. They also serve as real test fixtures for the orphan
+warning, which otherwise had none.
+
+**A structural consequence worth recording.** That 49-byte difference
+shows a message-170 record cannot be created by an in-place byte
+editor at all -- it requires GROWING the file and inserting a
+definition message. So "add a Connect IQ field to a profile that has
+none" is not merely unproven on hardware, it needs a different write
+mechanism than anything this toolkit currently has. That firms up the
+Phase 2 boundary considerably.
+
+**Also in this release, from Doug's own use of the GUI** (`gui_app.py`
+v0.21.1, no write-path logic touched). `PreflightPanel` LOOKED like a
+redundant second review, because the Screens view he'd just come from
+already showed the same change list -- making the extra click to
+Deploy feel like a bare "are you sure" prompt. It is not redundant: it
+performs a raw byte-diff against the untouched staged file and a real
+CRC check of the working copy's actual bytes, neither of which the
+Screens view does. Rather than remove a genuine verification step, it
+was made to LOOK like one -- retitled "Pre-Flight Verification", with
+the checks leading as explicit pass/fail lines and the change list
+following under "What will change on the device:". Merging it into
+`DeployPanel` was considered and rejected: that panel is a four-stage
+machine and folding a step in risks far more than a relabel.
+Separately, `DeployPanel`'s post-write verification box sat visibly
+empty through three of its four stages with nothing saying what it was
+for; it now has a label and stage-appropriate placeholder text. Never
+broken, just silent.
+
+Prior rev (109, 2026-09-06) follows.*
+
+*Doc rev 109 — refreshed 2026-09-06.* **BUILT (v1.3.0): Connect IQ
+placements are now maintained instead of refused. The guards that
+defined this project's Connect IQ story since Doc rev 95 are largely
+retired, replaced by keeping message 170 in step with the edit.** Code
+only -- everything here is headless-verified, and real GUI behavior is
+still Doug's own on-device testing, as with every GUI feature in this
+project.
+
+**What was built, following option "b" from Doc rev 108** (Doug's
+call: handle the unambiguous case, keep refusing the rest).
+
+`fit_patch.py` v1.16.0 gained the message-170 layer: `ciq_entry()`,
+`ciq_decode_entry()`, `ciq_pack_entries()`, `ciq_unpack_entries()`,
+`read_ciq_records()`, `write_ciq_records()`,
+`ciq_screen_marker_positions()`, and the wrapper
+`patch_screen_maintaining_ciq()` that every screen-shape edit now
+routes through. All raw-byte, since the SDK has no knowledge of this
+message. `fit_dump.py` v2.6.0 renamed `DEVICE_DEPENDENT_CIQ_IDS` to
+`CIQ_FIELD_MARKER_IDS` (old name kept as a working alias), correcting
+a name that Doc rev 106 showed to be wrong on both words.
+`gui_app.py` v0.21.0 routes `_swap_fields()`, `_apply_field_list()`
+and `on_layout_choice()` through the maintaining wrapper;
+`on_show_toggle()` (f12 only) and `AddScreenPanel.on_create()` (a
+brand-new empty slot) correctly still use bare `patch_screen()`.
+
+**What still refuses, and why each is information rather than
+caution.** Introducing a marker where a screen has none: the id is
+generic, so nothing in the edit says which app it should resolve to.
+Editing a screen holding two or more markers: two apps are
+indistinguishable in a field array, so which one moved where cannot be
+determined, and guessing risks silently swapping them. Neither has a
+`--force` override, same posture as before.
+
+**The GUI's `_ciq_guard_block()` survives but is much narrower** --
+only the two-marker case. A new `_ciq_report()` surfaces exactly one
+situation: a marker that no record claims, meaning the file was
+ALREADY inconsistent before the edit (almost certainly written by a
+pre-v1.3.0 toolkit). A placement quietly following an edit is correct
+behavior and deliberately says nothing.
+
+**Half-width advisory added,** from Doug's own observation: the device
+ACCEPTS a Connect IQ field in a half-width slot without complaint, but
+both apps tested need more room to be readable. Folded into
+`graph_bars_warnings()` so it reuses the existing Graph/Bars display
+path at all three call sites. Advisory only, never a block -- unlike
+the Graph/Bars case this is legibility rather than a documented
+rendering fallback, and how much room an app needs is its author's
+business.
+
+**Headless verification performed** (real device-written profiles, not
+synthetic fixtures): encode/decode round-trip across all 32 slots x 10
+positions; byte-exact re-pack of every record in all four captured
+profiles; a no-op write leaving a file byte-identical with a valid
+CRC; move, remove, insert-shift, no-CIQ-screen and ambiguous-refusal
+cases each checked with a full-file consistency sweep (no orphaned
+markers, no record pointing at a non-marker or past a field count, CRC
+valid); the CLI exercised end-to-end for move, swap, removal, both
+refusals, and confirming `--force` bypasses neither; and a five-step
+sequence mirroring real GUI usage (Move Down twice, Add Field, remove
+the field above the CIQ, then replace the CIQ field itself) with the
+consistency sweep clean at every step and an untouched placement on
+another screen surviving all five.
+
+**Still NOT built, deliberately, and unchanged from Doc rev 108's
+list:** creating a message-170 record from scratch in a profile that
+has none. That is what "add a Connect IQ field to a profile that never
+had one" and cross-profile Favorites both require, and it remains the
+one case never confirmed on hardware. The v1.2.3 Favorite blocks all
+stand for exactly that reason.
+
+Prior rev (108, 2026-09-06) follows.*
+
 *Doc rev 108 — refreshed 2026-09-06.* **CONFIRMED ON REAL HARDWARE:
 side-effect position shifts and clean removal both work. Every
 Connect IQ operation the v1.2.2/v1.2.3 guards currently refuse is now

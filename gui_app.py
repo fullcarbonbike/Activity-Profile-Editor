@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "0.20.1"  # Connect IQ guard COVERAGE FIX -- closes a route v0.20.0's guard never covered, found by a read-only audit of every writer into editing_path and CONFIRMED on real hardware by Doug (2026-09-06) before the fix was built: he saved a Favorite from a screen holding a CIQ data field, loaded it into a new screen, deployed, and the field rendered as "Timer" on the Edge -- the same failure mode as every other attempt to introduce one fresh. Root cause: v0.20.0 wired _ciq_guard_block() into EditScreenPanel's six call sites, but the Favorite pipeline reaches patch_screen() through AddScreenPanel.on_create() instead, which had NO CIQ check of any kind (the whole class had zero references to DEVICE_DEPENDENT_CIQ_IDS). The audit's other finding, recorded so it isn't re-checked: every OTHER writer is clean -- on_show_toggle (f12 only), _swap_screen_order (f9 only, Doc rev 99), on_remove (f1 only), ImportPanel.on_import (pure byte copy, rewrites no screen shape), and the three EditScreenPanel writers already guarded; on the CLI side --seed-from-slot copies only f9/f10 and never the f7 field array, and --new-slot is already covered because it routes through the --fields branch where fit_patch.py v1.15.0's pass-1 check lives. Fixed at three points, defense in depth: (1) on_save_favorite() hard-refuses to CAPTURE a favorite from a CIQ-bearing screen, keeping the store clean at the source; (2) on_load_favorite() STRIPS CIQ ids from whatever it loads and says so -- this one is mandatory and cannot be skipped, because the favorite is a single JSON file in the user's home dir (FAVORITE_PATH), outside the repo, surviving upgrades, so favorites captured before this version are already on disk and armed regardless of installed version; strips rather than refuses since the favorite's other fields stay perfectly valid, and filters BEFORE the layout-B validity check because dropping a field changes the count that check depends on, with a separate path for a favorite that was nothing BUT CIQ fields (leaves the current list alone rather than loading an empty one); (3) on_create() is the real ENFORCEMENT point, hard-refusing before patch_screen(). Point 3 deliberately does NOT reuse _ciq_guard_block(): that helper implements fit_patch.py's pass-2 semantics (does the TARGET SLOT's on-disk content already hold a CIQ field), but this panel always targets an unconfigured, EMPTY slot, so it would correctly find nothing every time and never fire -- what's needed is the pass-1 analogue, a REQUEST-side check against the field list about to be written, exactly like --fields' own guard. Same UX-vs-enforcement split v0.20.0 established: points 1-2 are hygiene, point 3 is what actually stands between self.field_ids and the write. See PROJECT_NOTES.md Doc rev 101-102. Prior entry (0.20.0): Device-dependent Connect IQ field guard, real-hardware-driven bug fixes -- see PROJECT_NOTES.md Doc rev 95-99, and fit_patch.py v1.15.0's changelog for the matching backend writeup. FieldPickerDialog (2026-09-02) now always excludes fit_dump.py's new DEVICE_DEPENDENT_CIQ_IDS (currently {216}) from its selectable Add/Change Field list, unioned on top of each call's own exclude_ids -- a single fix covering all 4 call sites, since every one of them constructs this same dialog. New _ciq_guard_block() (2026-09-03), added after Doug's own real-hardware test exposed a real gap: this GUI's actual write path (_apply_field_list()/_swap_fields()/on_layout_choice(), which all call patch_screen() DIRECTLY) never went through fit_patch.py's CLI at all, so its guard never ran here -- a screen that already had a working CIQ field broke exactly like a fresh introduction the moment ordinary fields were added/removed/reordered around it, with no warning shown. _ciq_guard_block() checks the slot's CURRENT on-disk content via fit_patch.py's screen_has_device_dependent_ciq_field() and hard-refuses (no override, OK-only MessageBox) before any screen-shape edit -- wired into all six real call sites: _apply_field_list, _swap_fields, on_add_field, on_remove_field, on_change_type, on_layout_choice (the last three call it eagerly, before opening a picker dialog, purely so the user isn't sent through a modal only to be told no afterward -- _apply_field_list/_swap_fields are the actual enforcement points). _swap_fields() now returns True/False so on_move_up/on_move_down only update the list selection when a swap actually happened. Doc-only/naming, Doug's go-ahead (2026-08-25): project rename extended past the GUI window title (which was already "Activity Profile Screen Editor for Garmin Edge" since v0.16.7). Doug clarified the canonical public name is "Activity Profile Editor for Garmin Edge" -- no "Screen" (matches the GitHub repo name "Activity-Profile-Editor" and his own Release titles "Activity Profile Editor for Garmin Edge Devices" (2026-08-25): the editor targets any Edge device generically, and even though screens are what actually get edited, backups/restores/deploys all operate at the Activity Profile level, so "Activity Profile" is the right noun to lead with, not "Screen"). Also drops the leading "Garmin Edge 530" pattern seen elsewhere (README.md/PROJECT_NOTES.md's old H1) -- deliberately not leading with "Garmin" at all, to avoid implying this is a Garmin product, and not device-specific despite the 530 being the only Edge model actually tested against so far. Three spots updated in this file: MainFrame's window title (super().__init__'s title= argument), the module docstring's own opening line, and ABOUT_TEXT (the About dialog shown via DetectPanel's About button) -- all three now read "Activity Profile Editor for Garmin Edge" with no "Screen"/"530". No behavior change anywhere, text-only. See README.md/PROJECT_NOTES.md/MVP_SCOPE.md/FIT_PATCH.md's own changelog entries for the matching doc-side renames -- MEMORY_LOG.md and the RELEASE_NOTES_v1.1.x.md files are deliberately LEFT UNCHANGED, since both are point-in-time historical records (an explicitly archived project log, and notes already published as GitHub Releases under Doug's own chosen title) rather than live documentation -- same reasoning this project already applies to not rewriting old changelog/Doc-rev entries.
+__version__ = "0.21.1"  # Deploy-flow clarity, both from Doug's own observations while using the app (2026-09-07), no logic change to any write path. (1) PreflightPanel LOOKED like a redundant second review: the Screens view he'd just come from already showed the same change list, so this panel read as a repeat and the extra click to Deploy felt like a bare "are you sure" prompt. It is not a repeat -- it performs two checks the Screens view cannot, a raw byte-diff against the untouched staged file and a real CRC check of the working copy's actual bytes -- so the fix was to make it LOOK like what it is rather than to remove it. Retitled "Review Changes -- Pre-Flight Check" to "Pre-Flight Verification"; verification results now lead, phrased as explicit checks ("✓ File integrity (CRC): PASS", "✓ Content check: this file DIFFERS from the copy on the device"), with the change list following under "What will change on the device:" instead of "Screens changed since you started editing:" -- reframing it as what's about to happen rather than a second review of edits already made. Deliberately NOT merged into DeployPanel, the other option considered: that panel is a four-stage machine and folding a step into it risks considerably more than a relabel. (2) DeployPanel's post-write verification box sat visibly EMPTY through three of four stages (it only fills at 'reconnected', after the device is back and describe_screen_changes() has run) with nothing indicating what it was for -- Doug reported never having seen text in it. Never broken, just silent: it now has a "Post-write verification:" label and stage-appropriate placeholder text instead of a blank box. All new strings routed through _wrap_status_paragraphs() and confirmed to wrap within the established 42-char width -- this codebase has hit the dynamic-text-widens-the-window bug four times (v0.16.2, v0.16.3, v0.16.16, v0.19.18) and every new status string is checked against it now. Prior entry (0.21.0): Connect IQ placements are now MAINTAINED, not refused (2026-09-06) -- see fit_patch.py v1.16.0 for the decoded mesg 170 format and PROJECT_NOTES.md Doc rev 103-108 for the investigation and on-device confirmations. The three EditScreenPanel paths that rewrite a screen's shape (_swap_fields, _apply_field_list, on_layout_choice) now call patch_screen_maintaining_ciq() instead of bare patch_screen(), so a Connect IQ placement follows the edit rather than being silently orphaned; on_show_toggle (f12 only) and AddScreenPanel.on_create (a brand-new, empty slot) correctly stay on plain patch_screen(). _ciq_guard_block() survives but is MUCH narrower: it no longer refuses any edit to a Connect IQ screen at all, only the one genuinely undecidable case of a screen holding TWO OR MORE Connect IQ fields -- both apps are stored as the same generic marker id, so when such a screen is rearranged there's no way to tell which app ended up where, and guessing risks silently swapping them. New _ciq_report() surfaces the orphan case only (a marker no record claims, meaning the file was ALREADY broken before this edit, almost certainly by a pre-v1.3.0 toolkit write); a placement quietly following an edit is correct behavior and deliberately says nothing. FieldPickerDialog still excludes the marker ids, and the Favorite Screen blocks from v0.20.1 all stand -- introducing a Connect IQ field remains out of scope for this release, since nothing in an edit says WHICH app a new marker means and the create-a-record-from-scratch case is still unproven on hardware. Also: graph_bars_warnings() now flags a Connect IQ field sitting in a shared/half-width row, reusing the existing Graph/Bars display path at all three of its call sites -- CONFIRMED (Doug) that the device ACCEPTS a Connect IQ field in a half-width slot without complaint, but the apps tested need more room than that to be readable; advisory only, never a block, since how much room an app needs is its author's business. Constant renamed throughout to fit_dump.py v2.6.0's CIQ_FIELD_MARKER_IDS. Prior entry (0.20.1): Connect IQ guard COVERAGE FIX -- closes a route v0.20.0's guard never covered, found by a read-only audit of every writer into editing_path and CONFIRMED on real hardware by Doug (2026-09-06) before the fix was built: he saved a Favorite from a screen holding a CIQ data field, loaded it into a new screen, deployed, and the field rendered as "Timer" on the Edge -- the same failure mode as every other attempt to introduce one fresh. Root cause: v0.20.0 wired _ciq_guard_block() into EditScreenPanel's six call sites, but the Favorite pipeline reaches patch_screen() through AddScreenPanel.on_create() instead, which had NO CIQ check of any kind (the whole class had zero references to CIQ_FIELD_MARKER_IDS). The audit's other finding, recorded so it isn't re-checked: every OTHER writer is clean -- on_show_toggle (f12 only), _swap_screen_order (f9 only, Doc rev 99), on_remove (f1 only), ImportPanel.on_import (pure byte copy, rewrites no screen shape), and the three EditScreenPanel writers already guarded; on the CLI side --seed-from-slot copies only f9/f10 and never the f7 field array, and --new-slot is already covered because it routes through the --fields branch where fit_patch.py v1.15.0's pass-1 check lives. Fixed at three points, defense in depth: (1) on_save_favorite() hard-refuses to CAPTURE a favorite from a CIQ-bearing screen, keeping the store clean at the source; (2) on_load_favorite() STRIPS CIQ ids from whatever it loads and says so -- this one is mandatory and cannot be skipped, because the favorite is a single JSON file in the user's home dir (FAVORITE_PATH), outside the repo, surviving upgrades, so favorites captured before this version are already on disk and armed regardless of installed version; strips rather than refuses since the favorite's other fields stay perfectly valid, and filters BEFORE the layout-B validity check because dropping a field changes the count that check depends on, with a separate path for a favorite that was nothing BUT CIQ fields (leaves the current list alone rather than loading an empty one); (3) on_create() is the real ENFORCEMENT point, hard-refusing before patch_screen(). Point 3 deliberately does NOT reuse _ciq_guard_block(): that helper implements fit_patch.py's pass-2 semantics (does the TARGET SLOT's on-disk content already hold a CIQ field), but this panel always targets an unconfigured, EMPTY slot, so it would correctly find nothing every time and never fire -- what's needed is the pass-1 analogue, a REQUEST-side check against the field list about to be written, exactly like --fields' own guard. Same UX-vs-enforcement split v0.20.0 established: points 1-2 are hygiene, point 3 is what actually stands between self.field_ids and the write. See PROJECT_NOTES.md Doc rev 101-102. Prior entry (0.20.0): Device-dependent Connect IQ field guard, real-hardware-driven bug fixes -- see PROJECT_NOTES.md Doc rev 95-99, and fit_patch.py v1.15.0's changelog for the matching backend writeup. FieldPickerDialog (2026-09-02) now always excludes fit_dump.py's new CIQ_FIELD_MARKER_IDS (currently {216}) from its selectable Add/Change Field list, unioned on top of each call's own exclude_ids -- a single fix covering all 4 call sites, since every one of them constructs this same dialog. New _ciq_guard_block() (2026-09-03), added after Doug's own real-hardware test exposed a real gap: this GUI's actual write path (_apply_field_list()/_swap_fields()/on_layout_choice(), which all call patch_screen() DIRECTLY) never went through fit_patch.py's CLI at all, so its guard never ran here -- a screen that already had a working CIQ field broke exactly like a fresh introduction the moment ordinary fields were added/removed/reordered around it, with no warning shown. _ciq_guard_block() checks the slot's CURRENT on-disk content via fit_patch.py's screen_has_device_dependent_ciq_field() and hard-refuses (no override, OK-only MessageBox) before any screen-shape edit -- wired into all six real call sites: _apply_field_list, _swap_fields, on_add_field, on_remove_field, on_change_type, on_layout_choice (the last three call it eagerly, before opening a picker dialog, purely so the user isn't sent through a modal only to be told no afterward -- _apply_field_list/_swap_fields are the actual enforcement points). _swap_fields() now returns True/False so on_move_up/on_move_down only update the list selection when a swap actually happened. Doc-only/naming, Doug's go-ahead (2026-08-25): project rename extended past the GUI window title (which was already "Activity Profile Screen Editor for Garmin Edge" since v0.16.7). Doug clarified the canonical public name is "Activity Profile Editor for Garmin Edge" -- no "Screen" (matches the GitHub repo name "Activity-Profile-Editor" and his own Release titles "Activity Profile Editor for Garmin Edge Devices" (2026-08-25): the editor targets any Edge device generically, and even though screens are what actually get edited, backups/restores/deploys all operate at the Activity Profile level, so "Activity Profile" is the right noun to lead with, not "Screen"). Also drops the leading "Garmin Edge 530" pattern seen elsewhere (README.md/PROJECT_NOTES.md's old H1) -- deliberately not leading with "Garmin" at all, to avoid implying this is a Garmin product, and not device-specific despite the 530 being the only Edge model actually tested against so far. Three spots updated in this file: MainFrame's window title (super().__init__'s title= argument), the module docstring's own opening line, and ABOUT_TEXT (the About dialog shown via DetectPanel's About button) -- all three now read "Activity Profile Editor for Garmin Edge" with no "Screen"/"530". No behavior change anywhere, text-only. See README.md/PROJECT_NOTES.md/MVP_SCOPE.md/FIT_PATCH.md's own changelog entries for the matching doc-side renames -- MEMORY_LOG.md and the RELEASE_NOTES_v1.1.x.md files are deliberately LEFT UNCHANGED, since both are point-in-time historical records (an explicitly archived project log, and notes already published as GitHub Releases under Doug's own chosen title) rather than live documentation -- same reasoning this project already applies to not rewriting old changelog/Doc-rev entries.
 """
 gui_app.py -- Activity Profile Editor for Garmin Edge, GUI.
 
@@ -132,7 +132,7 @@ from fit_dump import (
     field_name,
     active_field_ids,
     FIELD_ID_NAMES,
-    DEVICE_DEPENDENT_CIQ_IDS,
+    CIQ_FIELD_MARKER_IDS,
     screen_type_name,
     NAMED_SCREEN_TYPES,
     GRAPH_OR_BARS_FIELD_IDS,
@@ -153,7 +153,8 @@ from fit_patch import (
     check_system_screen_guard,
     would_hide_last_visible_screen,
     hide_unsupported_screen_type,
-    screen_has_device_dependent_ciq_field,
+    ciq_screen_marker_positions,
+    patch_screen_maintaining_ciq,
     remove_screen,
     swap_display_order,
     next_available_field9,
@@ -370,17 +371,36 @@ def graph_bars_warnings(field_ids, layout_variant):
     doesn't error or look obviously wrong -- it silently falls back to
     plain text with no indication anything's off. This is the only way
     a user would find out short of deploying and looking at the device.
+
+    v0.21.0 also flags Connect IQ data fields in a shared row, same
+    display path and same reasoning. CONFIRMED on real hardware (Doug,
+    2026-09-06): the device ACCEPTS a Connect IQ field in a half-width
+    slot without complaint -- nothing in the file or the firmware stops
+    it -- but the two apps tested both need more room than a half-width
+    cell gives to show what they're for. Advisory only, never a block:
+    unlike the Graph/Bars case this is about legibility rather than a
+    documented rendering fallback, and how much room a given Connect IQ
+    app really needs is the app author's business, not this toolkit's.
     """
     count = len(field_ids)
     warnings = []
     for position, fid in enumerate(field_ids):
-        if fid not in GRAPH_OR_BARS_FIELD_IDS:
+        is_graph = fid in GRAPH_OR_BARS_FIELD_IDS
+        is_ciq = fid in CIQ_FIELD_MARKER_IDS
+        if not (is_graph or is_ciq):
             continue
         full_width = is_position_full_width(count, layout_variant, position)
-        if full_width is False:
+        if full_width is not False:
+            continue
+        if is_graph:
             warnings.append(
                 f"⚠ “{field_name(fid, terse=True)}” shares a row -- needs "
                 f"full width to render as a graph/bar, not plain text."
+            )
+        else:
+            warnings.append(
+                f"⚠ “{field_name(fid, terse=True)}” shares a row -- Connect "
+                f"IQ fields usually need full width to be readable."
             )
     return warnings
 
@@ -1756,7 +1776,7 @@ class ViewScreensPanel(wx.Panel):
         # but it canNOT be the only check, since favorites saved by earlier
         # versions already exist on disk (see on_load_favorite()'s own
         # filter, and on_create()'s enforcement backstop).
-        blocked = sorted(set(field_ids) & DEVICE_DEPENDENT_CIQ_IDS)
+        blocked = sorted(set(field_ids) & CIQ_FIELD_MARKER_IDS)
         if blocked:
             wx.MessageBox(
                 f"This screen has a device-dependent Connect IQ data field "
@@ -1986,7 +2006,7 @@ class FieldPickerDialog(wx.Dialog):
     unresolved or mistyped field ID (see the "Editing UX decision"
     note at the top of this file).
 
-    Always excludes DEVICE_DEPENDENT_CIQ_IDS (fit_dump.py) on top of
+    Always excludes CIQ_FIELD_MARKER_IDS (fit_dump.py) on top of
     whatever per-call exclude_ids the caller passes -- CONFIRMED via
     real-hardware testing (PROJECT_NOTES.md Doc rev 95-97) that this
     toolkit cannot introduce or relocate one of these fields into a
@@ -2004,7 +2024,7 @@ class FieldPickerDialog(wx.Dialog):
     def __init__(self, parent, exclude_ids):
         super().__init__(parent, title="Add Field", size=(360, 420))
         self.selected_id = None
-        excluded = set(exclude_ids) | DEVICE_DEPENDENT_CIQ_IDS
+        excluded = set(exclude_ids) | CIQ_FIELD_MARKER_IDS
         self._all_choices = sorted(
             ((name, fid) for fid, name in FIELD_ID_NAMES.items() if fid not in excluded),
             key=lambda t: t[0].lower(),
@@ -2377,51 +2397,75 @@ class EditScreenPanel(wx.Panel):
     def _ciq_guard_block(self):
         """
         Returns True (and shows a HARD, OK-only block -- no override,
-        unlike _confirm_guard() above) if this slot currently holds a
-        device-dependent Connect IQ field (fit_dump.py's
-        DEVICE_DEPENDENT_CIQ_IDS), False if it's safe to proceed.
+        unlike _confirm_guard() above) if this screen holds MORE THAN
+        ONE Connect IQ data field, False if it's safe to proceed.
 
-        CORRECTION (2026-09-03, Doug, real on-device test): originally
-        this toolkit only refused to let you SELECT one of these ids
-        via FieldPickerDialog (v1 of this guard, 2026-09-02). That
-        missed a real failure mode -- Doug added two ordinary fields to
-        a screen that already had a working Edge 3270 CIQ field
-        (rearranging it from 1 field to 3, CIQ field kept in the
-        middle), and the write went through with no warning at all,
-        because _apply_field_list()/`_swap_fields()`/on_layout_choice()
-        below call patch_screen() DIRECTLY -- they never went through
-        fit_patch.py's CLI at all, so that guard never even ran. On
-        deploy the CIQ field broke exactly like a fresh introduction
-        does, even though its own id/position was never itself being
-        changed -- only the fields AROUND it were. See
-        screen_has_device_dependent_ciq_field() in fit_patch.py (the
-        shared, single-source-of-truth check both this and the CLI's
-        own equivalent guard now call) for the full evidence writeup.
+        MUCH NARROWER since v0.21.0. Through v0.20.x this refused ANY
+        edit to a screen holding a Connect IQ field at all, because
+        rearranging even unrelated fields around one broke it
+        on-device. That was correct for the evidence then available,
+        but the cause is now known (PROJECT_NOTES.md Doc rev 103-108):
+        the field's position is recorded in mesg 170, and the old code
+        rewrote the field array without moving the record, leaving the
+        device with no entry claiming the marker's new position. The
+        write paths below now call patch_screen_maintaining_ciq(),
+        which keeps the record in step -- CONFIRMED on real hardware
+        for moves, inserts, removals and side-effect position shifts.
 
-        No Yes/No override, matching fit_patch.py's posture for this
-        same check -- this isn't a "did you mean to?" pause, it's a
-        byte pattern this toolkit cannot make work at all once a
-        device-dependent CIQ field already occupies the screen.
+        What remains genuinely impossible, and is all this now blocks:
+        a screen holding TWO Connect IQ fields. The field id is a
+        generic marker (both apps store as 216, confirmed by placing
+        two different apps side by side on one screen), so when such a
+        screen's shape changes there is no way to tell which app moved
+        where. This toolkit won't guess.
+
+        Still no Yes/No override, same posture as before and as
+        fit_patch.py's matching CLI check: this isn't a "did you mean
+        to?" pause, it's information the edit doesn't contain.
         """
-        present = screen_has_device_dependent_ciq_field(self.frame.editing_path, self.slot)
-        if not present:
+        positions = ciq_screen_marker_positions(self.frame.editing_path, self.slot)
+        if len(positions) <= 1:
             return False
         wx.MessageBox(
-            f"This screen currently has a device-dependent Connect IQ "
-            f"data field on it (ID {present}). CONFIRMED on real "
-            f"hardware that changing this screen's field count, field "
-            f"list, or layout -- even just adding/removing/reordering "
-            f"OTHER, ordinary fields around it -- breaks that field's "
-            f"on-device linkage, exactly like trying to add one fresh "
-            f"does. It renders as \"Timer\" afterward, regardless of "
-            f"what this file/GUI shows.\n\n"
-            f"This toolkit can't safely make ANY change to this "
-            f"screen's layout -- only Garmin's own on-device editor "
-            f"can restructure a screen that already has one of these.",
-            "Can't edit -- Connect IQ field present",
+            f"This screen has {len(positions)} Connect IQ data fields on "
+            f"it (positions {[p + 1 for p in positions]}).\n\n"
+            f"A Connect IQ field is stored as a generic marker that "
+            f"carries no app identity -- two different apps look "
+            f"identical in the file. When a screen holding two of them "
+            f"is rearranged, this toolkit can't tell which app ended up "
+            f"where, and won't guess rather than risk swapping them.\n\n"
+            f"Use Garmin's own on-device editor for this screen. Screens "
+            f"with a single Connect IQ field edit normally.",
+            "Can't edit -- two Connect IQ fields on one screen",
             wx.OK | wx.ICON_ERROR,
         )
         return True
+
+    def _ciq_report(self, result):
+        """
+        Surface what patch_screen_maintaining_ciq() did, when it did
+        something worth mentioning. Deliberately quiet for the ordinary
+        cases -- a placement quietly following an edit is the correct
+        behavior, not news. Only the orphan case gets a dialog, since
+        that means the file was ALREADY broken before this edit and the
+        user should know why that field will show "Timer" on-device.
+        """
+        if result.get('action') != 'orphan':
+            return
+        wx.MessageBox(
+            "Heads up: this screen has a Connect IQ data field that no "
+            "link record in the file claims.\n\n"
+            "That means it was already broken before this edit -- it "
+            "will render as \"Timer\" on the device regardless of what "
+            "this app shows. Most likely it was written by an older "
+            "version of this toolkit, before Connect IQ placements were "
+            "maintained properly.\n\n"
+            "Your edit went through and didn't make it worse. To fix the "
+            "field itself, set it again using Garmin's own on-device "
+            "editor.",
+            "Connect IQ field already unlinked",
+            wx.OK | wx.ICON_INFORMATION,
+        )
 
     def on_show_toggle(self, event):
         new_enabled = self.show_checkbox.GetValue()  # True = show, False = hide
@@ -2513,8 +2557,13 @@ class EditScreenPanel(wx.Panel):
         current_array = read_current_field_array(self.frame.editing_path, self.slot)
         current_array[pos_a], current_array[pos_b] = current_array[pos_b], current_array[pos_a]
         changes = {7: struct.pack('<10H', *current_array)}
-        patch_screen(self.frame.editing_path, self.frame.editing_path, self.slot, changes)
+        # v0.21.0: maintains mesg 170 so a Connect IQ placement follows
+        # the swap instead of being silently orphaned -- see
+        # patch_screen_maintaining_ciq() and PROJECT_NOTES.md Doc rev 108.
+        result = patch_screen_maintaining_ciq(
+            self.frame.editing_path, self.frame.editing_path, self.slot, changes)
         self.refresh_from_file()
+        self._ciq_report(result)
         return True
 
     def _apply_field_list(self, new_ids):
@@ -2534,8 +2583,14 @@ class EditScreenPanel(wx.Panel):
         if current_layout == 1 and len(new_ids) not in COUNTS_WITH_B_VARIANT:
             changes[8] = pack_layout_variant(0)
 
-        patch_screen(self.frame.editing_path, self.frame.editing_path, self.slot, changes)
+        # v0.21.0: maintains mesg 170 so an existing Connect IQ placement
+        # follows this rewrite (moved, or dropped if the field itself was
+        # removed) instead of being left pointing at a stale position --
+        # the exact failure the v1.2.2 guard existed to prevent.
+        result = patch_screen_maintaining_ciq(
+            self.frame.editing_path, self.frame.editing_path, self.slot, changes)
         self.refresh_from_file()
+        self._ciq_report(result)
 
     def on_add_field(self, event):
         # Fail fast, before opening the picker -- _apply_field_list()
@@ -2612,8 +2667,15 @@ class EditScreenPanel(wx.Panel):
             self.layout_a_radio.SetValue(True)
             return
         changes = {8: pack_layout_variant(new_layout)}
-        patch_screen(self.frame.editing_path, self.frame.editing_path, self.slot, changes)
+        # v0.21.0: routed through the maintaining wrapper for
+        # consistency with the other shape edits. A bare layout change
+        # doesn't move any field's POSITION, so in practice this is a
+        # no-op for mesg 170 -- but going through one path means there's
+        # no second, unmaintained way to write f8.
+        result = patch_screen_maintaining_ciq(
+            self.frame.editing_path, self.frame.editing_path, self.slot, changes)
         self.refresh_from_file()
+        self._ciq_report(result)
 
     def on_back(self, event):
         self.frame.show_panel("screens")
@@ -2923,10 +2985,10 @@ class AddScreenPanel(wx.Panel):
         # than losing the whole favorite. Filtering happens BEFORE the
         # layout-B validity check below, since dropping a field changes the
         # field count that check depends on.
-        dropped = sorted(set(field_ids) & DEVICE_DEPENDENT_CIQ_IDS)
+        dropped = sorted(set(field_ids) & CIQ_FIELD_MARKER_IDS)
         if dropped:
             field_ids = [f for f in field_ids
-                         if f not in DEVICE_DEPENDENT_CIQ_IDS]
+                         if f not in CIQ_FIELD_MARKER_IDS]
         if not field_ids:
             wx.MessageBox(
                 f"Your saved favorite contains nothing but device-dependent "
@@ -3008,7 +3070,7 @@ class AddScreenPanel(wx.Panel):
         # against the field list about to be written, exactly like
         # fit_patch.py's own --fields guard (v1.15.0). The two passes are
         # not interchangeable; this is the case that shows why both exist.
-        blocked = sorted(set(self.field_ids) & DEVICE_DEPENDENT_CIQ_IDS)
+        blocked = sorted(set(self.field_ids) & CIQ_FIELD_MARKER_IDS)
         if blocked:
             wx.MessageBox(
                 f"This new screen's field list contains a device-dependent "
@@ -3258,25 +3320,39 @@ class PreflightPanel(wx.Panel):
 
         outer = wx.BoxSizer(wx.VERTICAL)
 
-        self.title_text = wx.StaticText(self, label="Review Changes -- Pre-Flight Check")
+        self.title_text = wx.StaticText(self, label="Pre-Flight Verification")
         title_font = self.title_text.GetFont()
         title_font.PointSize += 2
         title_font = title_font.Bold()
         self.title_text.SetFont(title_font)
         outer.Add(self.title_text, 0, wx.ALL | wx.EXPAND, 12)
 
+        # v0.21.1, Doug's own observation from using the app: this panel
+        # LOOKED like a second review step, because the Screens view he'd
+        # just come from already showed the same changes -- so it read as
+        # a repeat rather than a distinct step, and the extra click to
+        # Deploy felt like an "are you sure" prompt. It isn't a repeat:
+        # it does two things the Screens view can't, a raw byte-diff
+        # against the untouched staged file and a real CRC check of the
+        # working file's actual bytes. The fix was to make the panel LOOK
+        # like what it is -- verification results now lead, presented as
+        # explicit pass/fail checks, and the change list follows as
+        # "what will change on the device" rather than as another review
+        # of edits already made. Deliberately NOT merged into DeployPanel
+        # (the other option considered): that panel is a four-stage
+        # machine and folding a step into it risks more than a relabel.
+        self.crc_text = wx.StaticText(self, label="")
+        outer.Add(self.crc_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
+
         self.summary_text = wx.StaticText(self, label="")
         outer.Add(self.summary_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
 
-        outer.Add(wx.StaticText(self, label="Screens changed since you started editing:"),
+        outer.Add(wx.StaticText(self, label="What will change on the device:"),
                   0, wx.LEFT | wx.RIGHT, 12)
         self.diff_text = wx.TextCtrl(
             self, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_DONTWRAP | wx.HSCROLL
         )
         outer.Add(self.diff_text, 1, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
-
-        self.crc_text = wx.StaticText(self, label="")
-        outer.Add(self.crc_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
 
         button_row = wx.BoxSizer(wx.HORIZONTAL)
         back_btn = wx.Button(self, label="‹ Back to Screens")
@@ -3338,21 +3414,26 @@ class PreflightPanel(wx.Panel):
         deployable = bytes_changed or self.frame.import_pending
 
         if bytes_changed:
-            self.summary_text.SetLabel(
-                f"{len(summary_lines)} screen(s) changed since you started editing."
-            )
+            self.summary_text.SetLabel(_wrap_status_paragraphs(
+                f"✓ Content check: this file DIFFERS from the copy currently "
+                f"on the device -- {len(summary_lines)} screen(s) changed."
+            ))
             self.diff_text.SetValue("\n\n".join(summary_lines))
         elif self.frame.import_pending:
-            self.summary_text.SetLabel(
-                "Freshly imported profile -- no screens edited yet, but this "
-                "is new content the device doesn't have. Ready to deploy "
-                "as-is, or go back and edit screens first."
-            )
+            self.summary_text.SetLabel(_wrap_status_paragraphs(
+                "✓ Content check: this is an imported profile the device has "
+                "never had. Byte-identical to what was staged because no "
+                "screens have been edited, which is the correct state for a "
+                "fresh import -- it's ready to deploy as-is, or go back and "
+                "edit screens first."
+            ))
             self.diff_text.SetValue("(no edits made -- deploying the imported file as-is)")
         else:
-            self.summary_text.SetLabel(
-                "No differences from the staged file -- nothing to deploy."
-            )
+            self.summary_text.SetLabel(_wrap_status_paragraphs(
+                "✗ Content check: no differences from the copy on the device "
+                "-- there is nothing to deploy. Go back and edit a screen "
+                "first."
+            ))
             self.diff_text.SetValue("(no changes yet)")
 
         # CRC check against the working file's actual current bytes --
@@ -3361,13 +3442,17 @@ class PreflightPanel(wx.Panel):
         expected = struct.unpack('<H', trailer)[0]
         computed = fit_crc(body)
         if computed == expected:
-            self.crc_text.SetLabel(f"CRC check: PASS (0x{expected:04x})")
+            self.crc_text.SetLabel(_wrap_status_paragraphs(
+                f"✓ File integrity (CRC): PASS (0x{expected:04x}) -- the "
+                f"working copy's checksum matches its actual contents."
+            ))
             self.deploy_btn.Enable(deployable)
         else:
-            self.crc_text.SetLabel(
-                f"CRC check: FAIL -- expected 0x{expected:04x}, computed 0x{computed:04x}. "
-                f"DO NOT DEPLOY THIS FILE -- this indicates a real bug, not a normal state."
-            )
+            self.crc_text.SetLabel(_wrap_status_paragraphs(
+                f"✗ File integrity (CRC): FAIL -- expected 0x{expected:04x}, "
+                f"computed 0x{computed:04x}. DO NOT DEPLOY THIS FILE. This "
+                f"indicates a real bug, not a normal state."
+            ))
             self.deploy_btn.Disable()
 
         self.frame._relayout()
@@ -3459,6 +3544,16 @@ class DeployPanel(wx.Panel):
         # once self.stage == "reconnected"; empty/hidden-by-content
         # otherwise. Same read-only multiline style as PreflightPanel's
         # diff_text.
+        # v0.21.1, Doug's own observation: this box sits visibly EMPTY
+        # through three of this panel's four stages (ready/written/
+        # waiting) and only fills in at 'reconnected', after the device
+        # is back and post-write verification has run -- so from the
+        # user's side it looked like a large unexplained blank area with
+        # no indication of what, if anything, it was for. It was never
+        # broken; it just never said what it was waiting for. A static
+        # label above it now does.
+        outer.Add(wx.StaticText(self, label="Post-write verification:"),
+                  0, wx.LEFT | wx.RIGHT, 12)
         self.verify_text = wx.TextCtrl(
             self, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_DONTWRAP | wx.HSCROLL
         )
@@ -3524,7 +3619,8 @@ class DeployPanel(wx.Panel):
             self.eject_manual_btn.Disable()
             self.check_btn.Disable()
             self.done_btn.Disable()
-            self.verify_text.SetValue("")
+            self.verify_text.SetValue(
+                "(results appear here after the device reconnects and is checked)")
 
         elif self.stage == "written":
             self.status_text.SetLabel(_wrap_status_paragraphs(
@@ -3542,7 +3638,8 @@ class DeployPanel(wx.Panel):
             self.eject_manual_btn.Enable()
             self.check_btn.Disable()
             self.done_btn.Disable()
-            self.verify_text.SetValue("")
+            self.verify_text.SetValue(
+                "(results appear here after the device reconnects and is checked)")
 
         elif self.stage == "waiting":
             self.status_text.SetLabel(_wrap_status_paragraphs(
@@ -3556,7 +3653,9 @@ class DeployPanel(wx.Panel):
             self.eject_manual_btn.Disable()
             self.check_btn.Enable()
             self.done_btn.Disable()
-            self.verify_text.SetValue("")
+            self.verify_text.SetValue(
+                "(waiting for the device -- click \"Check for Reconnected Device\" "
+                "once it is back)")
 
         elif self.stage == "reconnected":
             if self.verify_error is not None:
@@ -3568,7 +3667,8 @@ class DeployPanel(wx.Panel):
                     "profile) or garmin_device.py's screens command, then "
                     "click Done.",
                 ))
-                self.verify_text.SetValue("")
+                self.verify_text.SetValue(
+                    "(verification could not run -- see the message above)")
             elif self.verify_lines:
                 self.status_text.SetLabel(_wrap_status_paragraphs(
                     f"Reconnected. The device has re-imported \"{profile}\" "

@@ -1,6 +1,20 @@
 ```
 FIT_PATCH(1)     Activity Profile Editor for Garmin Edge      FIT_PATCH(1)
 
+Doc rev 33 -- refreshed 2026-09-06. **Connect IQ data fields: the
+hard refusals from v1.15.0 are replaced by maintenance.** FIT message
+170 -- one record per Connect IQ app, carrying its UUID plus a packed
+list of the exact (screen slot, field position) pairs it occupies --
+was decoded and confirmed on real hardware. Any write touching a
+screen's f3/f7/f8 now keeps those records in step, so a Connect IQ
+placement follows a reorder, insertion or removal instead of being
+orphaned and falling back to "Timer". Two refusals remain, both
+because the request lacks the information rather than out of caution:
+introducing a marker (the id is generic, nothing says which app it
+means) and editing a screen holding two markers (indistinguishable in
+a field array). --fields' section below rewritten accordingly. Prior
+rev (32, 2026-08-25) follows.
+
 Doc rev 32 -- refreshed 2026-08-25. **Doc-only: banner renamed to
 match the project's canonical name.** Was "Garmin Edge FIT Toolkit" --
 Doug clarified the canonical public name is "Activity Profile Editor
@@ -326,35 +340,53 @@ OPTIONS
               below) and refuses to proceed if it matches, unless
               --force is given.
 
-              HARD refusal, NO --force override, if any requested ID
-              is in DEVICE_DEPENDENT_CIQ_IDS (fit_dump.py; currently
-              {216}) -- confirmed via extensive real-hardware testing
-              that this toolkit cannot introduce or relocate a
-              Connect IQ third-party data field (e.g. WindField) into
-              a fresh slot; the write silently renders as "Timer" on
-              the device regardless of what the file/GUI shows. This
-              is a different check from the system-screen guard above
-              and doesn't overlap it: it fires on the REQUESTED field
-              IDs, not the slot's current content, and applies even to
-              slots that pass the system-screen check cleanly.
+              CONNECT IQ DATA FIELDS (v1.16.0 -- this behavior changed
+              substantially; through v1.15.x any edit to a screen
+              holding one was refused outright).
 
-              SECOND, independent HARD refusal (added 2026-09-03, also
-              no --force): fires whenever this call touches the
-              screen's count/array/layout (f3/f7/f8) AT ALL if the
-              slot's CURRENT on-disk content (via
-              screen_has_device_dependent_ciq_field(), checked right
-              before the final patch_screen() call) already contains a
-              device-dependent CIQ id -- regardless of what's actually
-              being requested. CONFIRMED on real hardware that adding/
-              removing/reordering OTHER, ordinary fields around an
-              already-placed CIQ field breaks its linkage exactly like
-              a fresh introduction does, even when the CIQ field's own
-              ID/position was never itself part of the request. This
-              also applies to --swap-fields and a bare --layout change
-              (no --fields at all), not just --fields. See
-              PROJECT_NOTES.md Doc rev 95-98 for the full investigation,
-              including why the first (request-side) check alone
-              wasn't enough.
+              A Connect IQ third-party data field is stored in the
+              field array as a generic marker id (CIQ_FIELD_MARKER_IDS
+              in fit_dump.py; currently {216}) that carries NO app
+              identity -- two different Connect IQ apps are stored
+              identically, confirmed on real hardware by placing both
+              on one screen at once. The app identity, and the exact
+              (screen slot, field position) each app occupies, live in
+              FIT message 170, which is absent from Garmin's published
+              FIT Profile entirely. The device renders a Connect IQ
+              field only where a message-170 entry claims that exact
+              position, and falls back to Garmin's generic "Timer"
+              otherwise.
+
+              Any write touching a screen's count/array/layout
+              (f3/f7/f8) now goes through
+              patch_screen_maintaining_ciq(), which keeps those records
+              in step -- so a Connect IQ placement follows a reorder,
+              an insertion, or a removal instead of being orphaned.
+              CONFIRMED on real hardware for all of those, including a
+              position shift caused by inserting a neighbouring field.
+              This applies to --fields, --swap-fields, and a bare
+              --layout change alike. A note is printed to stderr when a
+              placement moves or is removed.
+
+              TWO HARD REFUSALS REMAIN, neither with a --force
+              override, because in both cases the request simply does
+              not contain the needed information:
+
+              (1) Introducing a marker where the screen currently has
+              none -- i.e. asking for more markers than are already
+              there. The id is generic, so nothing says which Connect
+              IQ app the new one should resolve to; it would render as
+              "Timer".
+
+              (2) Editing a screen that already holds TWO OR MORE
+              markers. Two apps are indistinguishable in a field array,
+              so after a rearrange there is no way to determine which
+              app ended up where, and this tool will not guess.
+
+              In both cases, use Garmin's own on-device editor. See
+              PROJECT_NOTES.md Doc rev 95-109 for the full
+              investigation, the decoded message-170 format, and the
+              on-device confirmations.
 
        --force
               Proceed with --fields even if check_system_screen_guard()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "1.15.0"  # Device-dependent Connect IQ field guard, two passes, both real-hardware-driven bug fixes -- see PROJECT_NOTES.md Doc rev 95-99 for the full investigation. Pass 1 (2026-09-02): --fields now hard-refuses (no --force) if any REQUESTED field ID is in fit_dump.py's new DEVICE_DEPENDENT_CIQ_IDS (currently {216}) -- CONFIRMED this toolkit cannot write a Connect IQ third-party field (e.g. WindField) into a slot at all, it silently renders as "Timer" on-device regardless of what the file/GUI shows. Pass 2 (2026-09-03), added after Doug's own further real-hardware testing exposed a real gap in pass 1: the request-side check alone missed a screen that ALREADY has a device-dependent CIQ field on it having ITS OWN id/position left untouched while OTHER, ordinary fields are added/removed/reordered around it -- confirmed this breaks the CIQ field's linkage exactly like a fresh introduction does. New screen_has_device_dependent_ciq_field() checks the slot's CURRENT on-disk content (independent of what's being requested) and hard-refuses whenever a write touches the screen's shape (f3 count / f7 field array / f8 layout) -- applies to --fields, --swap-fields, and a bare --layout change alike; does not apply to --swap-order (f9 only, screen DISPLAY position, confirmed separately safe in Doc rev 99) or --enable/--disable (f12 only, no evidence either way yet). Doc-only, no functional change, Doug's decision (2026-08-15): comments referencing the f10=32 Conditional runtime record as "GroupTrack"/"the GroupTrack Conditional record" updated to describe it as "Reserved" (display name change lives in fit_dump.py v2.4.12's NAMED_SCREEN_TYPES -- this file has no code path of its own that special-cases f10=32, only prose describing it) -- read_current_state()'s docstring and NO_SHOW_TOGGLE_TYPES' comment block updated to match, both now note the record's real purpose was never actually confirmed rather than asserting a GroupTrack identity. count_shown_active_screens()'s docstring updated the same way. f10=57 "GroupTrack List" is untouched by this pass -- that one remains correctly, confirmedly GroupTrack-specific. No behavior change anywhere in this file. Prior entry (1.14.1): Doc-only, no functional change (2026-08-14): --remove is now CONFIRMED via a real on-device round-trip test (Doug) -- the target screen was correctly removed from the on-device Data Screens order, matching a real Remove button press, and (as expected, matching the retired --un-remove's own history and Doug's stated reasoning for retiring it) the removed screen does NOT survive as a recoverable Removed-state slot after the deploy -- NewFiles wipes it, same as every other Removed-state slot on any NewFiles deploy. Updated remove_screen()'s docstring and --remove's argparse help text from "NOT YET VERIFIED ON REAL HARDWARE" to CONFIRMED. This closes step 2 of the two-phase build plan (backend + headless verification, then a real device test) -- the GUI wrapper (ViewScreensPanel, per Doug's placement decision) is now the one remaining, unblocked step; still not built until Doug asks for it, per this project's established discipline of not building ahead of an explicit go-ahead. Prior entry (1.14.0): New feature, first half of "Delete Screen" (2026-08-14): added --remove and its backend primitive remove_screen() -- transitions an Active screen slot to the Removed state (f1=0, f9/f10 cleared to sentinel, f3/f7 content left untouched, matching the confirmed on-device Removed-state model). Mirrors --new-slot's activation in reverse, same spirit as the now-retired --un-remove but going the other direction. Reuses hide_unsupported_screen_type() and would_hide_last_visible_screen() directly as --remove's two hard guards (no --force override for either) -- CONFIRMED (2026-08-13, Doug, directly on-device) that NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) bounds Remove availability identically to Show/Hide, and the last-visible-user-screen floor rule is documented as already covering Remove too, so no new guard logic was needed, only reuse. ONE-WAY by design -- no --un-remove exists anymore (retired v1.13.0); Restore-from-Backup is the only real undo path, matching Garmin's own editor (Hide is reversible, Remove is permanent, same as Add New). Headless-verified only so far, against a real profile copy (CyclingRoadSandbox): remove_screen() correctly transitions the target slot to 'removed' (read_current_state()), leaves f3/f7 byte-identical to before, and leaves read_current_state() unchanged on every OTHER slot in the file; the CLI end-to-end path (--slot 3 --remove) wrote a file with a valid trailing CRC (fit_crc() recomputation matched the stored value exactly); both guards were exercised directly and blocked exactly as designed -- --slot 2 (Map) errored via hide_unsupported_screen_type(), and removing a profile's second-to-last then last visible user screen correctly errored via would_hide_last_visible_screen() on the second attempt. But this is NOT YET VERIFIED ON REAL HARDWARE (no on-device round-trip test yet, unlike --new-slot/--hide/--swap-order, all of which are proven live). Per the two-phase build plan recorded when "Delete Screen" was scoped (see PROJECT_NOTES.md Open Items, 2026-08-13): this backend flag is step one: a real on-device round-trip test is needed next, and ONLY THEN (not before) does a GUI wrapper (ViewScreensPanel, per Doug's placement decision) get built. Prior entry (1.13.2): doc-only, no functional change (2026-08-13): corrected a self-inflicted gap from the previous entry -- Doug clarified that "GroupTrack" in his confirmed-active-Remove list meant the on-device editor's actual label "GroupTrack List" (f10=57), which was already covered, not a separate untested type. The genuinely separate f10=32 GroupTrack Conditional runtime record never appears as a row in the on-device Data Screens editor at all (no real f9), so it has no Remove-button status to check and is already structurally out of reach of the future --remove flag regardless. Also recorded, for pattern-recognition: an early, already-removed SYSTEM_SLOT_HINTS hardcode once claimed "slot 10 = GroupTrack" by message_index -- confirmed wrong on the Indoor profile (slot 10 there is a genuine Cadence screen); slot numbers were never reliable for identifying GroupTrack or anything else, only f10 is. NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) is now documented as the COMPLETE confirmed Remove-block set for common named types, no remaining gap. No code/behavior change -- comment only. Prior entry (1.13.1): doc-only, no functional change (2026-08-13): Doug confirmed directly on-device that NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) also bounds Remove availability, not just the Show/Hide toggle it already guards -- every other common named type (Elevation, GroupTrack, Cycling Dynamics, Lap Summary, Virtual Partner, Compass, Segment) has an active Remove option. Added a comment documenting this at the constant's definition, directly relevant to the still-scoped, not-yet-built --remove flag (its future type-check guard can reuse this exact set). No code/behavior change -- comment only. Prior entry (1.13.0): RETIRED --un-remove entirely, Doug's decision (2026-08-13): Restore-from-Backup already covers the real recovery use case (a whole-profile undo, already CONFIRMED on real hardware), and --un-remove itself was never a clean win -- it had a CONFIRMED real device-side data-loss hazard pre-v1.12.0 (root-caused to the same f10=0 collision --new-slot had, see BUGS in FIT_PATCH.md), was never re-tested live after that fix (still "unverified-but-plausibly-fixed" as of v1.12.0), and Garmin's own on-device editor doesn't expose an un-remove workflow at all -- Hide (temporary) and Remove + Add New (permanent) are the only two lifecycle actions it offers, matching this project's own "Product note on --un-remove" which had left the final call deferred. Removed the --un-remove argparse flag, its --new-slot mutual-exclusion check, its Removed-state validation block, and simplified every `args.new_slot or args.un_remove` conditional down to just `args.new_slot` (the f1 configured-flag set, and the f9/f10 auto-fill safety net) -- confirmed via grep that zero `un_remove` references remain in this file outside this changelog line and the retirement note left in its place. No behavior change to --new-slot itself. This also removes a layer of unverified risk that would otherwise sit underneath any future --remove (Delete Screen) flag -- see PROJECT_NOTES.md Open Items. Prior entry (1.12.0): add next_available_field10() and wire it into --new-slot/--un-remove's auto-default, replacing the old hardcoded f10=0 -- ROOT-CAUSES the long-standing "Add New Screen via NewFiles always fails" limitation as an f10 IDENTITY COLLISION (0 = "Screen 1", already in use on almost every real profile), not a hard device restriction. CONFIRMED via live on-device round-trip (2026-08-05, CyclingRoadSandbox): --new-slot with a collision-free f10 survives the NewFiles restart cycle intact, verified independently by both fit_dump.py and garmin_device.py reading the live mounted device. Also fixed next_available_field9()'s f3-presence gate to match the f1-based gate used elsewhere (same Virtual-Partner-style blind spot fixed in classify_screens()/read_current_state() earlier)
+__version__ = "1.16.0"  # Connect IQ placements are now MAINTAINED instead of refused (2026-09-06). mesg_num 170 -- absent from Garmin's published FIT Profile entirely -- was decoded and CONFIRMED on real hardware: one record per Connect IQ app, field 1 the app's 16-byte UUID, field 2 a packed array of 15-BIT entries, one per placement, each entry = (1 << (5 + field_position)) | slot_index (bits 0-4 the screen slot's message_index, bits 5-14 a ONE-HOT field position). Entries are stored in ascending slot order. Five slot bits plus ten position bits is exactly 15, matching the ~30 preallocated slots and the confirmed 10-field-per-screen maximum. New primitives: ciq_entry()/ciq_decode_entry()/ciq_pack_entries()/ciq_unpack_entries()/read_ciq_records()/write_ciq_records(), all raw-byte (the SDK can't help with an unpublished message), plus ciq_screen_marker_positions() and the wrapper patch_screen_maintaining_ciq() that every screen-shape edit should now call. ROOT CAUSE of the whole v1.2.2/v1.2.3 saga: patch_screen() rewrote field arrays without moving the records, so the device found no entry claiming the marker's new position and fell back to "Timer" -- the file always carried the mapping, this toolkit just never wrote it. The v1.15.0 pass-2 hard refusal is therefore REPLACED by maintenance; CONFIRMED on real hardware for moving a placement within a screen, adding one where none existed, choosing which app renders, removing one cleanly, and a position shift arising as a side effect of inserting a neighbouring field. Two refusals REMAIN, both narrowed to what's genuinely unknowable from a field array rather than merely risky, and neither with a --force override: (1) INTRODUCING a marker where the screen has none -- the id is generic, so nothing in the request says which app it should resolve to; (2) editing a screen that holds TWO OR MORE markers -- two apps are indistinguishable in a field array, so which one moved where can't be determined, and this toolkit won't guess (PROJECT_NOTES.md Doc rev 108, option "b"). --swap-order (f9 only) and --enable/--disable (f12 only) never needed any of this and still don't. Prior entry (1.15.0): Device-dependent Connect IQ field guard, two passes, both real-hardware-driven bug fixes -- see PROJECT_NOTES.md Doc rev 95-99 for the full investigation. Pass 1 (2026-09-02): --fields now hard-refuses (no --force) if any REQUESTED field ID is in fit_dump.py's new DEVICE_DEPENDENT_CIQ_IDS (currently {216}) -- CONFIRMED this toolkit cannot write a Connect IQ third-party field (e.g. WindField) into a slot at all, it silently renders as "Timer" on-device regardless of what the file/GUI shows. Pass 2 (2026-09-03), added after Doug's own further real-hardware testing exposed a real gap in pass 1: the request-side check alone missed a screen that ALREADY has a device-dependent CIQ field on it having ITS OWN id/position left untouched while OTHER, ordinary fields are added/removed/reordered around it -- confirmed this breaks the CIQ field's linkage exactly like a fresh introduction does. New screen_has_device_dependent_ciq_field() checks the slot's CURRENT on-disk content (independent of what's being requested) and hard-refuses whenever a write touches the screen's shape (f3 count / f7 field array / f8 layout) -- applies to --fields, --swap-fields, and a bare --layout change alike; does not apply to --swap-order (f9 only, screen DISPLAY position, confirmed separately safe in Doc rev 99) or --enable/--disable (f12 only, no evidence either way yet). Doc-only, no functional change, Doug's decision (2026-08-15): comments referencing the f10=32 Conditional runtime record as "GroupTrack"/"the GroupTrack Conditional record" updated to describe it as "Reserved" (display name change lives in fit_dump.py v2.4.12's NAMED_SCREEN_TYPES -- this file has no code path of its own that special-cases f10=32, only prose describing it) -- read_current_state()'s docstring and NO_SHOW_TOGGLE_TYPES' comment block updated to match, both now note the record's real purpose was never actually confirmed rather than asserting a GroupTrack identity. count_shown_active_screens()'s docstring updated the same way. f10=57 "GroupTrack List" is untouched by this pass -- that one remains correctly, confirmedly GroupTrack-specific. No behavior change anywhere in this file. Prior entry (1.14.1): Doc-only, no functional change (2026-08-14): --remove is now CONFIRMED via a real on-device round-trip test (Doug) -- the target screen was correctly removed from the on-device Data Screens order, matching a real Remove button press, and (as expected, matching the retired --un-remove's own history and Doug's stated reasoning for retiring it) the removed screen does NOT survive as a recoverable Removed-state slot after the deploy -- NewFiles wipes it, same as every other Removed-state slot on any NewFiles deploy. Updated remove_screen()'s docstring and --remove's argparse help text from "NOT YET VERIFIED ON REAL HARDWARE" to CONFIRMED. This closes step 2 of the two-phase build plan (backend + headless verification, then a real device test) -- the GUI wrapper (ViewScreensPanel, per Doug's placement decision) is now the one remaining, unblocked step; still not built until Doug asks for it, per this project's established discipline of not building ahead of an explicit go-ahead. Prior entry (1.14.0): New feature, first half of "Delete Screen" (2026-08-14): added --remove and its backend primitive remove_screen() -- transitions an Active screen slot to the Removed state (f1=0, f9/f10 cleared to sentinel, f3/f7 content left untouched, matching the confirmed on-device Removed-state model). Mirrors --new-slot's activation in reverse, same spirit as the now-retired --un-remove but going the other direction. Reuses hide_unsupported_screen_type() and would_hide_last_visible_screen() directly as --remove's two hard guards (no --force override for either) -- CONFIRMED (2026-08-13, Doug, directly on-device) that NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) bounds Remove availability identically to Show/Hide, and the last-visible-user-screen floor rule is documented as already covering Remove too, so no new guard logic was needed, only reuse. ONE-WAY by design -- no --un-remove exists anymore (retired v1.13.0); Restore-from-Backup is the only real undo path, matching Garmin's own editor (Hide is reversible, Remove is permanent, same as Add New). Headless-verified only so far, against a real profile copy (CyclingRoadSandbox): remove_screen() correctly transitions the target slot to 'removed' (read_current_state()), leaves f3/f7 byte-identical to before, and leaves read_current_state() unchanged on every OTHER slot in the file; the CLI end-to-end path (--slot 3 --remove) wrote a file with a valid trailing CRC (fit_crc() recomputation matched the stored value exactly); both guards were exercised directly and blocked exactly as designed -- --slot 2 (Map) errored via hide_unsupported_screen_type(), and removing a profile's second-to-last then last visible user screen correctly errored via would_hide_last_visible_screen() on the second attempt. But this is NOT YET VERIFIED ON REAL HARDWARE (no on-device round-trip test yet, unlike --new-slot/--hide/--swap-order, all of which are proven live). Per the two-phase build plan recorded when "Delete Screen" was scoped (see PROJECT_NOTES.md Open Items, 2026-08-13): this backend flag is step one: a real on-device round-trip test is needed next, and ONLY THEN (not before) does a GUI wrapper (ViewScreensPanel, per Doug's placement decision) get built. Prior entry (1.13.2): doc-only, no functional change (2026-08-13): corrected a self-inflicted gap from the previous entry -- Doug clarified that "GroupTrack" in his confirmed-active-Remove list meant the on-device editor's actual label "GroupTrack List" (f10=57), which was already covered, not a separate untested type. The genuinely separate f10=32 GroupTrack Conditional runtime record never appears as a row in the on-device Data Screens editor at all (no real f9), so it has no Remove-button status to check and is already structurally out of reach of the future --remove flag regardless. Also recorded, for pattern-recognition: an early, already-removed SYSTEM_SLOT_HINTS hardcode once claimed "slot 10 = GroupTrack" by message_index -- confirmed wrong on the Indoor profile (slot 10 there is a genuine Cadence screen); slot numbers were never reliable for identifying GroupTrack or anything else, only f10 is. NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) is now documented as the COMPLETE confirmed Remove-block set for common named types, no remaining gap. No code/behavior change -- comment only. Prior entry (1.13.1): doc-only, no functional change (2026-08-13): Doug confirmed directly on-device that NO_SHOW_TOGGLE_TYPES (Map, ClimbPro) also bounds Remove availability, not just the Show/Hide toggle it already guards -- every other common named type (Elevation, GroupTrack, Cycling Dynamics, Lap Summary, Virtual Partner, Compass, Segment) has an active Remove option. Added a comment documenting this at the constant's definition, directly relevant to the still-scoped, not-yet-built --remove flag (its future type-check guard can reuse this exact set). No code/behavior change -- comment only. Prior entry (1.13.0): RETIRED --un-remove entirely, Doug's decision (2026-08-13): Restore-from-Backup already covers the real recovery use case (a whole-profile undo, already CONFIRMED on real hardware), and --un-remove itself was never a clean win -- it had a CONFIRMED real device-side data-loss hazard pre-v1.12.0 (root-caused to the same f10=0 collision --new-slot had, see BUGS in FIT_PATCH.md), was never re-tested live after that fix (still "unverified-but-plausibly-fixed" as of v1.12.0), and Garmin's own on-device editor doesn't expose an un-remove workflow at all -- Hide (temporary) and Remove + Add New (permanent) are the only two lifecycle actions it offers, matching this project's own "Product note on --un-remove" which had left the final call deferred. Removed the --un-remove argparse flag, its --new-slot mutual-exclusion check, its Removed-state validation block, and simplified every `args.new_slot or args.un_remove` conditional down to just `args.new_slot` (the f1 configured-flag set, and the f9/f10 auto-fill safety net) -- confirmed via grep that zero `un_remove` references remain in this file outside this changelog line and the retirement note left in its place. No behavior change to --new-slot itself. This also removes a layer of unverified risk that would otherwise sit underneath any future --remove (Delete Screen) flag -- see PROJECT_NOTES.md Open Items. Prior entry (1.12.0): add next_available_field10() and wire it into --new-slot/--un-remove's auto-default, replacing the old hardcoded f10=0 -- ROOT-CAUSES the long-standing "Add New Screen via NewFiles always fails" limitation as an f10 IDENTITY COLLISION (0 = "Screen 1", already in use on almost every real profile), not a hard device restriction. CONFIRMED via live on-device round-trip (2026-08-05, CyclingRoadSandbox): --new-slot with a collision-free f10 survives the NewFiles restart cycle intact, verified independently by both fit_dump.py and garmin_device.py reading the live mounted device. Also fixed next_available_field9()'s f3-presence gate to match the f1-based gate used elsewhere (same Virtual-Partner-style blind spot fixed in classify_screens()/read_current_state() earlier)
 """
 fit_patch.py - Surgical patcher for Garmin Edge data_screen (mesg_num=14) messages.
 
@@ -37,7 +37,7 @@ import sys
 import struct
 from fit_raw_walk import parse_fit
 from fit_crc import fit_crc
-from fit_dump import NAMED_SCREEN_TYPES, DEVICE_DEPENDENT_CIQ_IDS
+from fit_dump import NAMED_SCREEN_TYPES, CIQ_FIELD_MARKER_IDS
 
 DATA_SCREEN_MESG_NUM = 14
 
@@ -560,7 +560,277 @@ def screen_has_device_dependent_ciq_field(input_path, message_index):
     current_array = read_current_field_array(input_path, message_index)
     if current_array is None:
         return []
-    return sorted(set(current_array) & DEVICE_DEPENDENT_CIQ_IDS)
+    return sorted(set(current_array) & CIQ_FIELD_MARKER_IDS)
+
+
+# --------------------------------------------------------------------
+# Connect IQ link records (mesg_num 170)
+#
+# DECODED 2026-09-06 and CONFIRMED on real hardware -- see
+# PROJECT_NOTES.md Doc rev 103-108 for the full investigation. This
+# message is absent from Garmin's published FIT Profile entirely, so
+# everything here comes from black-box reverse engineering plus
+# on-device round-trip verification.
+#
+#   mesg 170, one record per Connect IQ app used by the profile:
+#     field 1 -- 16 bytes, the app's UUID (big-endian, RFC 4122)
+#     field 2 -- 20 bytes, a packed array of 15-BIT entries, one per
+#                placement of that app within this profile:
+#                   bits 0-4   screen SLOT index (message_index), 0-31
+#                   bits 5-14  ONE-HOT field position within that
+#                              screen -- bit (5 + position)
+#
+#       entry = (1 << (5 + field_position)) | slot_index
+#
+# Entries are stored in ascending slot order (the device's own
+# convention in every sample observed; writing them out of order was
+# never tested and is deliberately not done here). Five slot bits
+# covers the ~30 preallocated screen slots; ten position bits covers
+# the confirmed 10-field-per-screen maximum. 5 + 10 = 15 exactly.
+#
+# The device renders a Connect IQ field at a position holding the
+# marker id (CIQ_FIELD_MARKER_IDS, e.g. 216) ONLY if some record claims
+# that exact (slot, position). Otherwise it falls back to "Timer".
+# Keeping these records in step with field-array edits is the whole
+# reason the pre-v1.3.0 hard refusals existed.
+# --------------------------------------------------------------------
+
+CIQ_ENTRY_BITS = 15          # width of one packed placement entry
+CIQ_SLOT_BITS = 5            # bits 0-4: screen slot index
+CIQ_POSITION_SHIFT = 5       # bit (5 + position) is the one-hot position
+
+
+def ciq_entry(slot_index, field_position):
+    """Encode one placement as its 15-bit entry value."""
+    return (1 << (CIQ_POSITION_SHIFT + field_position)) | slot_index
+
+
+def ciq_decode_entry(entry):
+    """
+    Inverse of ciq_entry(): returns (slot_index, field_position).
+
+    Returns None for an entry with no position bit set at all, which
+    shouldn't occur in a device-written file and indicates either a
+    corrupt record or a wrong reading of the format.
+    """
+    slot = entry & ((1 << CIQ_SLOT_BITS) - 1)
+    position_bits = entry >> CIQ_POSITION_SHIFT
+    if position_bits == 0:
+        return None
+    return (slot, position_bits.bit_length() - 1)
+
+
+def ciq_pack_entries(placements):
+    """
+    Pack [(slot, position), ...] into field 2's little-endian bit
+    stream. Sorted into ascending slot order to match the device's own
+    convention. Duplicates are collapsed.
+    """
+    value = 0
+    for i, (slot, position) in enumerate(sorted(set(placements))):
+        value |= ciq_entry(slot, position) << (CIQ_ENTRY_BITS * i)
+    return value
+
+
+def ciq_unpack_entries(value):
+    """Inverse of ciq_pack_entries(): returns [(slot, position), ...]."""
+    out = []
+    mask = (1 << CIQ_ENTRY_BITS) - 1
+    while value:
+        decoded = ciq_decode_entry(value & mask)
+        if decoded is not None:
+            out.append(decoded)
+        value >>= CIQ_ENTRY_BITS
+    return out
+
+
+def read_ciq_records(input_path):
+    """
+    Parse every mesg 170 record out of the file, at the raw byte level
+    (this message isn't in the SDK Profile, so the SDK can't help).
+
+    Returns a list of dicts, in file order:
+        {'uuid':        bytes (16),
+         'placements':  [(slot, position), ...],
+         'offset':      int   -- byte offset of field 2's payload,
+         'size':        int}  -- field 2's payload length
+
+    'offset'/'size' are what write_ciq_records() edits in place; every
+    other byte in the file is left untouched, same discipline
+    patch_screen() follows.
+    """
+    data = open(input_path, 'rb').read()
+    header_size = data[0]
+    data_size = struct.unpack('<I', data[4:8])[0]
+    pos = header_size
+    end = header_size + data_size
+    local = {}
+    records = []
+    while pos < end:
+        record_header = data[pos]
+        if record_header & 0x40:                      # definition message
+            local_num = record_header & 0x0F
+            global_num = struct.unpack('<H', data[pos + 3:pos + 5])[0]
+            field_count = data[pos + 5]
+            fields = []
+            p = pos + 6
+            for _ in range(field_count):
+                fields.append((data[p], data[p + 1], data[p + 2]))
+                p += 3
+            if record_header & 0x20:                  # developer fields
+                p += 1 + data[p] * 3
+            local[local_num] = (global_num, fields)
+            pos = p
+            continue
+        local_num = record_header & 0x0F
+        global_num, fields = local[local_num]
+        total = sum(size for _, size, _ in fields)
+        if global_num == 170:
+            uuid = b''
+            offset = size = None
+            o = pos + 1
+            for field_def_num, field_size, _base in fields:
+                if field_def_num == 1:
+                    uuid = data[o:o + field_size]
+                elif field_def_num == 2:
+                    offset, size = o, field_size
+                o += field_size
+            placements = []
+            if offset is not None:
+                packed = int.from_bytes(data[offset:offset + size], 'little')
+                placements = ciq_unpack_entries(packed)
+            records.append({'uuid': uuid, 'placements': placements,
+                            'offset': offset, 'size': size})
+        pos += 1 + total
+    return records
+
+
+def write_ciq_records(input_path, output_path, records):
+    """
+    Write updated placement lists back into the file's mesg 170
+    records, in place, then recompute the trailing CRC.
+
+    `records` must be the list returned by read_ciq_records() for this
+    same file, with 'placements' modified as needed -- the 'offset'
+    values are only valid for that exact file, since this rewrites
+    field 2's bytes at fixed offsets rather than re-encoding the file.
+    """
+    data = bytearray(open(input_path, 'rb').read())
+    for record in records:
+        if record['offset'] is None:
+            continue
+        packed = ciq_pack_entries(record['placements'])
+        data[record['offset']:record['offset'] + record['size']] = \
+            packed.to_bytes(record['size'], 'little')
+    body = bytes(data[:-2])
+    data[-2:] = struct.pack('<H', fit_crc(body))
+    with open(output_path, 'wb') as f:
+        f.write(bytes(data))
+
+
+def ciq_screen_marker_positions(input_path, message_index):
+    """
+    Positions of Connect IQ marker ids among this screen's ACTIVE
+    fields (i.e. the first f3 entries of f7), left to right.
+
+    Only active positions count: a marker sitting past the field count
+    isn't rendered and isn't claimed by any record.
+    """
+    array = read_current_field_array(input_path, message_index)
+    if array is None:
+        return []
+    count, _layout = read_current_count_and_layout(input_path, message_index)
+    if count is None:
+        count = 0
+    return [i for i, value in enumerate(array[:count])
+            if value in CIQ_FIELD_MARKER_IDS]
+
+
+def patch_screen_maintaining_ciq(input_path, output_path, message_index, changes):
+    """
+    patch_screen(), plus keeping this profile's mesg 170 Connect IQ
+    records in step with the edit.
+
+    THIS IS THE FUNCTION EVERY SCREEN-SHAPE EDIT SHOULD CALL. Writing
+    f3/f7/f8 through bare patch_screen() on a screen that holds a
+    Connect IQ field is what produced the "Timer" breakage this project
+    spent Doc rev 95-108 chasing: the field array moved, the record
+    didn't follow, and the device found no entry claiming the marker's
+    new position.
+
+    Returns a dict describing what happened, for the caller to surface:
+        {'action': 'none'|'moved'|'removed'|'orphan',
+         'from':   old position or None,
+         'to':     new position or None,
+         'uuid':   owning app's UUID bytes, or None}
+
+    SCOPE (deliberate, see PROJECT_NOTES.md Doc rev 108 option "b"):
+    handles a screen holding AT MOST ONE marker. Because the marker id
+    is generic -- two different apps are both stored as 216 -- a screen
+    with two markers can't be tracked through an edit expressed as
+    "here is the new field array": there is no way to tell which app
+    moved where. Callers must check ciq_screen_marker_positions()
+    first and refuse when it returns more than one. Introducing a
+    marker where none existed is likewise out of scope, since nothing
+    in the edit says WHICH app it should resolve to.
+    """
+    before_positions = ciq_screen_marker_positions(input_path, message_index)
+    if len(before_positions) > 1:
+        raise ValueError(
+            f"slot {message_index} holds {len(before_positions)} Connect IQ "
+            f"markers; this function can only track one (see docstring)")
+    records = read_ciq_records(input_path)
+
+    # Which record, if any, currently claims the marker's position?
+    owner = None
+    old_position = before_positions[0] if before_positions else None
+    if old_position is not None:
+        for record in records:
+            if (message_index, old_position) in record['placements']:
+                owner = record
+                break
+
+    patch_screen(input_path, output_path, message_index, changes)
+
+    after_positions = ciq_screen_marker_positions(output_path, message_index)
+    new_position = after_positions[0] if after_positions else None
+
+    if old_position is None and new_position is None:
+        return {'action': 'none', 'from': None, 'to': None, 'uuid': None}
+    if owner is None:
+        # A marker is present but no record claims it -- the file was
+        # already inconsistent before this edit (an orphan, e.g. left by
+        # a pre-v1.3.0 toolkit write). That position already renders as
+        # "Timer" on-device; this edit neither causes nor worsens it, and
+        # there's no way to guess which app it should have belonged to.
+        # Left alone deliberately, and reported so callers can say so.
+        return {'action': 'orphan', 'from': old_position,
+                'to': new_position, 'uuid': None}
+
+    # read_ciq_records() returns offsets valid for input_path; re-read
+    # against the freshly written file so write_ciq_records() edits the
+    # right bytes (patch_screen may have been an in-place write, but
+    # input_path and output_path are not required to be the same file).
+    fresh = read_ciq_records(output_path)
+    target = next((r for r in fresh if r['uuid'] == owner['uuid']), None)
+    if target is None:                       # shouldn't happen; fail loudly
+        raise ValueError("owning Connect IQ record vanished during patch")
+
+    placements = [p for p in target['placements']
+                  if p != (message_index, old_position)]
+    if new_position is not None:
+        placements.append((message_index, new_position))
+    target['placements'] = placements
+    write_ciq_records(output_path, output_path, fresh)
+
+    if new_position is None:
+        action = 'removed'
+    elif new_position != old_position:
+        action = 'moved'
+    else:
+        action = 'none'
+    return {'action': action, 'from': old_position, 'to': new_position,
+            'uuid': owner['uuid']}
 
 
 def hide_unsupported_screen_type(input_path, message_index):
@@ -941,27 +1211,44 @@ def _cli():
         if len(ids) > 10:
             parser.error("at most 10 fields per screen")
 
-        # Device-dependent CIQ field guard: HARD refuse, no --force
-        # override -- same posture as NO_SHOW_TOGGLE_TYPES above, not a
-        # heuristic. CONFIRMED via extensive real-hardware testing (see
-        # PROJECT_NOTES.md Doc rev 95-97, DEVICE_DEPENDENT_CIQ_IDS in
-        # fit_dump.py) that these numeric field IDs are DEVICE-local and
-        # install-order-reassigned -- writing one via this tool produces
-        # a file that looks correct in the GUI/dump but renders as
-        # "Timer" on-device, every single time this was tested. There is
-        # nothing --force could safely do here: this isn't a guess about
-        # risk, it's a byte pattern this toolkit cannot make work at all.
-        blocked = sorted(set(ids) & DEVICE_DEPENDENT_CIQ_IDS)
-        if blocked:
+        # Connect IQ marker guard, REWRITTEN in v1.16.0. Until v1.15.x
+        # this refused any --fields write mentioning a CIQ marker id at
+        # all, because the toolkit had no way to keep mesg 170 in step.
+        # It can now (see patch_screen_maintaining_ciq()), so the rule
+        # narrows to the one case still genuinely out of reach:
+        # INTRODUCING a marker where the screen doesn't already have
+        # one. Nothing in a --fields request says WHICH Connect IQ app a
+        # new marker should resolve to -- the id itself is generic, and
+        # the app identity lives only in the mesg 170 records (Doc rev
+        # 106). Moving or removing an EXISTING placement is fine and is
+        # maintained automatically.
+        #
+        # No --force override, same posture as NO_SHOW_TOGGLE_TYPES:
+        # this isn't a risk judgement, it's information the request
+        # doesn't contain.
+        requested_markers = [i for i in ids if i in CIQ_FIELD_MARKER_IDS]
+        current_markers = ciq_screen_marker_positions(args.input_file, args.slot)
+        if len(requested_markers) > len(current_markers):
             parser.error(
-                f"--fields: {blocked} {'is a' if len(blocked) == 1 else 'are'} "
-                f"device-dependent Connect IQ field ID{'s' if len(blocked) != 1 else ''} "
-                f"(see DEVICE_DEPENDENT_CIQ_IDS in fit_dump.py). CONFIRMED on real "
-                f"hardware that this toolkit cannot introduce or relocate one of "
-                f"these into a fresh slot -- it renders as \"Timer\" on-device "
-                f"regardless of what the file/GUI shows. No --force override: "
-                f"only Garmin's own on-device editor can place these, and only "
-                f"whole-profile Clone Profile preserves an existing placement."
+                f"--fields: this would put {len(requested_markers)} Connect IQ "
+                f"data field marker(s) on slot {args.slot}, which currently has "
+                f"{len(current_markers)}. This toolkit can MOVE or REMOVE an "
+                f"existing Connect IQ placement (mesg 170 is maintained "
+                f"automatically), but it can't INTRODUCE one: the field id is "
+                f"a generic marker carrying no app identity, so nothing here "
+                f"says which Connect IQ app it should resolve to. It would "
+                f"render as \"Timer\" on-device. Use Garmin's own on-device "
+                f"editor to place a Connect IQ field for the first time."
+            )
+        if len(current_markers) > 1:
+            parser.error(
+                f"--fields: slot {args.slot} holds {len(current_markers)} "
+                f"Connect IQ data field markers, at positions "
+                f"{current_markers}. Because the marker id is generic, two "
+                f"placements on one screen can't be told apart in a new field "
+                f"array, so this toolkit can't work out which app moved where "
+                f"and won't guess. Edit this screen with Garmin's own "
+                f"on-device editor."
             )
 
         # System-screen guard: check the slot's CURRENT content (before
@@ -1114,37 +1401,51 @@ def _cli():
     if not changes:
         parser.error("nothing to do -- specify at least one of --fields/--layout/--enable/--disable")
 
-    # Device-dependent CIQ guard, PASS 2: checks the slot's CURRENT
-    # on-disk content, independent of the request-side check above
-    # (which only catches a CIQ id being freshly REQUESTED). HARD
-    # refuse, no --force -- see screen_has_device_dependent_ciq_field()
-    # for the real-hardware evidence (2026-09-03) behind why this
-    # second check exists at all: rearranging OTHER fields around an
-    # already-placed CIQ field broke it just as completely as trying
-    # to introduce one fresh, even though its own id/bytes never
-    # changed. Only fires when this call actually touches the screen's
-    # shape (f3 count / f7 array / f8 layout) -- --enable/--disable
-    # alone (f12 only) don't go through this, since there's no
-    # confirmed evidence yet that Show/Hide alone affects the linkage.
-    if {3, 7, 8} & set(changes.keys()):
-        present = screen_has_device_dependent_ciq_field(args.input_file, args.slot)
-        if present:
-            parser.error(
-                f"slot {args.slot} currently contains device-dependent Connect "
-                f"IQ field ID(s) {present} (see DEVICE_DEPENDENT_CIQ_IDS in "
-                f"fit_dump.py). CONFIRMED on real hardware (2026-09-03) that "
-                f"rewriting this screen's count/field-array/layout AT ALL -- "
-                f"even just adding/removing/rearranging OTHER, ordinary "
-                f"fields around it -- breaks the CIQ field's on-device linkage "
-                f"exactly like trying to introduce one fresh does, and it "
-                f"renders as \"Timer\" afterward regardless of what the file/"
-                f"GUI shows. No --force override: leave this screen alone via "
-                f"this tool entirely: only Garmin's own on-device editor can "
-                f"restructure a screen that has one of these without breaking "
-                f"it."
-            )
+    # Connect IQ handling, v1.16.0. Until v1.15.x this point held a
+    # second HARD REFUSAL: any write touching the screen's shape (f3
+    # count / f7 array / f8 layout) was rejected outright if the slot
+    # already held a CIQ marker, because rearranging even unrelated
+    # fields around one broke it on-device. That was the correct
+    # response to the evidence at the time, but the real cause is now
+    # known (PROJECT_NOTES.md Doc rev 103-108): the marker's position
+    # is recorded in mesg 170, and the old code moved the field without
+    # moving the record. Now that the record is maintained, the refusal
+    # becomes MAINTENANCE -- CONFIRMED on real hardware for moves,
+    # inserts, removals and side-effect position shifts alike.
+    #
+    # Still refused above, in the --fields branch, and for the same
+    # reason as before: INTRODUCING a marker (nothing says which app it
+    # means) and editing a screen holding TWO markers (they're
+    # indistinguishable in a field array). --enable/--disable (f12
+    # only) and --swap-order (f9 only) never needed this and still
+    # don't.
+    touches_shape = bool({3, 7, 8} & set(changes.keys()))
+    if touches_shape and len(ciq_screen_marker_positions(args.input_file, args.slot)) > 1:
+        parser.error(
+            f"slot {args.slot} holds more than one Connect IQ data field "
+            f"marker. Because the marker id is generic, this toolkit can't "
+            f"tell which app is which when the screen's shape changes, and "
+            f"won't guess. Use Garmin's own on-device editor for this screen."
+        )
 
-    patch_screen(args.input_file, args.output_file, args.slot, changes)
+    if touches_shape:
+        result = patch_screen_maintaining_ciq(
+            args.input_file, args.output_file, args.slot, changes)
+        if result['action'] == 'moved':
+            print(f"note: Connect IQ placement on slot {args.slot} followed the "
+                  f"edit, position {result['from']} -> {result['to']} "
+                  f"(mesg 170 updated)", file=sys.stderr)
+        elif result['action'] == 'removed':
+            print(f"note: Connect IQ placement removed from slot {args.slot} "
+                  f"(mesg 170 entry deleted)", file=sys.stderr)
+        elif result['action'] == 'orphan':
+            print(f"WARNING: slot {args.slot} holds a Connect IQ marker that no "
+                  f"mesg 170 record claims -- this file was already inconsistent "
+                  f"before this edit (it renders as \"Timer\" on-device). Left "
+                  f"as-is; this edit neither caused nor worsened it.",
+                  file=sys.stderr)
+    else:
+        patch_screen(args.input_file, args.output_file, args.slot, changes)
     print(f"wrote {args.output_file}: slot {args.slot} patched with {sorted(changes.keys())}")
 
 
