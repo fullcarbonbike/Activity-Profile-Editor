@@ -1,5 +1,152 @@
 # Activity Profile Editor for Garmin Edge
 
+*Doc rev 111 — refreshed 2026-09-10.* **Point patch (v1.3.1):
+GroupTrack List, Virtual Partner and Workout can no longer have data
+fields edited. Also records what was learned about how Garmin's
+"special" screens are really laid out, which is more complicated than
+this project assumed and is NOT yet built.**
+
+**The fix.** Doug reported that selecting GroupTrack List in the GUI
+and pressing "Add Field..." opened the normal field picker. That
+screen renders a device-generated list of connected GroupTrack/
+LiveTrack riders -- there is no field array behind it, and all 17
+profiles this project has on hand carry it at **f3=0** without
+exception. New `NO_FIELD_EDIT_TYPES = {26, 38, 57}` in `fit_dump.py`
+v2.7.0, enforced by `_no_field_edit_guard()` in `fit_patch.py` v1.16.1
+and `EditScreenPanel._field_edit_blocked()` in `gui_app.py` v0.21.2.
+
+A HARD block with no `--force` override, deliberately distinct from
+the `FIELD_EDIT_UNCERTAIN_TYPES` warning: that one flags types whose
+field bytes are real but whose rendering is unverified, whereas here
+there is nothing to edit at all, so offering the controls is simply
+wrong rather than merely unproven. The GUI now
+also GREYS the five field buttons and both layout radios for these
+types -- a dialog after the click is exactly what was reported as
+wrong -- with the block kept as a backstop. **Show/Hide and
+`--swap-order` are deliberately unaffected**: GroupTrack List is not in
+`NO_SHOW_TOGGLE_TYPES`, so hiding or reordering it is legitimate.
+
+One ordering detail worth keeping: the CLI guard runs BEFORE
+`check_system_screen_guard()` inside the `--fields` branch. That older
+guard offers `--force` as a way through, which would actively mislead
+here, since `--force` cannot conjure a field array. It is called a
+second time before the final write so `--swap-fields` and a bare
+`--layout` are covered, as neither reaches the `--fields` branch.
+
+**Virtual Partner (f10=26) is included too**, added the same day once
+Doug checked the ON-DEVICE editor directly: its screen-edit section
+offers no user-editable data fields and no preview-screen option, the
+same treatment GroupTrack List gets. That direct check is what promoted
+it from "likely" to a hard block. The file evidence alone would NOT
+have been sufficient, and was in fact ambiguous -- Virtual Partner
+carries **f3=255**, the uint8 "unset" sentinel, rather than GroupTrack
+List's clean f3=0. Worth recording as a small vindication of the
+project's rule: the inference was right, but only a device check could
+establish it, and the byte pattern it rested on turned out to differ
+from the one assumed.
+
+**Workout (f10=38) was PROMOTED into the same hard block** on
+2026-09-10, out of `FIELD_EDIT_UNCERTAIN_TYPES` — where it had been the
+sole member since v2.4.15 — once Doug confirmed on-device that its
+editor offers no field options either. That warning set is now empty
+but is deliberately KEPT, machinery and all: it remains the right home
+for the next type whose field bytes are real and readable but whose
+rendering is unverified, a situation that has recurred repeatedly here.
+
+Workout's promotion settles a methodological question this project had
+been circling since Doc rev 95. It carries **f3=2 with a real, readable
+field array** — byte-for-byte identical to Cycling Dynamics' on the
+same profile — while GroupTrack List carries f3=0 and Virtual Partner
+f3=255. Three types, three DIFFERENT f3 values, identical "no editable
+fields" behaviour. That is conclusive: **f3 content cannot be used to
+infer field-editability.** Only the on-device editor can, which is now
+the stated bar for anything added to the set later. Worth flagging as a
+caught near-miss: a "0 fields means no field array" heuristic was
+floated earlier in this work and would have silently locked the Map
+screen, which legitimately supports a 0-field layout.
+
+**GUI-verified on real hardware (Doug, 2026-09-10)** against a clone
+profile carrying all twelve named types plus a Connect IQ screen, no
+deploy required since every v1.3.1 behaviour happens before any write.
+All seven checks passed: the field buttons greyed with Show Screen
+still live on GroupTrack List and Virtual Partner; "+ Add Field"
+reaching the refusal dialog rather than the picker; an ordinary user
+screen and a named-but-editable screen (Elevation/Compass) fully
+enabled, confirming the guard does not leak; Show/Hide persisting
+across the return to the screen list; screen reordering unaffected;
+and the Connect IQ screen still accepting field adds and reorders,
+which is the regression that mattered, since `_field_edit_blocked()`
+was inserted AHEAD of `_ciq_guard_block()` at all six call sites.
+
+One structural note from planning that test: **conditional screens are
+not selectable in the GUI at all** — `ViewScreensPanel` renders them
+into a read-only `wx.StaticText` summary, not list rows. So Workout and
+Segment were already unreachable there, and Workout's guard is
+exercised only through `fit_patch.py`, where it was verified by CLI.
+The GUI half of this fix is what covers GroupTrack List and Virtual
+Partner, both of which do appear in the orderable list.
+
+**Separately: the named-screen layout model is wrong, and the fix is
+bigger than it first looked.** The GUI draws a 2-field named screen as
+two stacked full-width rows, because `LAYOUT_GRIDS` is keyed only on
+(count, variant). Doug reported most named screens actually render as
+a device-generated content area plus data fields. This is NOT merely
+cosmetic: `is_position_full_width()` is the single source feeding the
+layout diagram, the Graph/Bars full-width advisory AND the Connect IQ
+half-width advisory, so all three are silently wrong on named screens
+today.
+
+Investigating Lap Summary (f10=74) specifically, with a device
+screenshot plus raw-byte analysis:
+
+- Its content area sits at the **BOTTOM**, not the top -- the flexible
+  data fields are above it. So "content panel on top" was wrong.
+- The flexible section takes **1-4 fields**, with its own count-driven
+  arrangement (1 = whole, 2 = stacked full width, 3 = one full width
+  plus two half, 4 = two half plus two half) and **NO A/B choice** --
+  Doug confirmed the on-device selector offers only 1/2/3/4. So f8
+  appears unused for this type.
+- The "Avg Speed" item visible in the content area is **NOT a data
+  field** -- it is the selectable third column of the lap table, and it
+  is **not stored in the profile at all**. Confirmed three ways: mesg-14
+  fields 5 (10 bytes) and 6 (16 bytes) exist on every record but are
+  `ff..ff` / `00..00` on every screen of every profile on hand; field id
+  49 appears in no mesg-14 record; and a raw scan of the whole file for
+  `0x0031` hits only `speed_zone` (mesg 53), coincidentally.
+
+**So `fit_dump.py` reporting 2 fields for Lap Summary is CORRECT** --
+those genuinely are all the profile stores. That also SIMPLIFIES the
+eventual model: the content area needs only a labelled block, with no
+embedded-field index to track, and no f7-ordering ambiguity.
+
+**That survey is now COMPLETE** (Doug, on-device, all twelve named
+types, 2026-09-10) and answers all three questions, but nothing is
+built yet: it lands as v1.4.0 with its own Doc rev rather than as part
+of this patch. Two results worth recording here because they correct
+assumptions stated above and elsewhere in these notes:
+
+- The named types fall into four groups, not one. Three have no
+  editable fields at all (now `NO_FIELD_EDIT_TYPES`), four are fixed at
+  exactly two half-width fields, three are flexible 1-4, and Map and
+  Segment are one-offs with their own option sets including legitimate
+  **0-field** layouts.
+- **A/B variant values must be STORED, never computed.** The working
+  assumption was A=0 / B=1 universally. Segment's 4-field A layout
+  measures **f8=2**. Only a paired A-then-B pull revealed it; a single
+  4/B pull would have left that assumption intact and wrong. A live
+  consequence in today's code: `COUNTS_WITH_B_VARIANT` includes 4, so
+  the GUI offers A/B on a 4-field Segment and writing "A" stores f8=0
+  where the device stores 2. Known defect, fixed in v1.4.0.
+
+Also found, and NOT a toolkit defect: where a stored field count
+exceeds what a type can render, the device renders clamped (keeps the
+first N) but does **not** rewrite the file, so the stored count
+persists and the toolkit will report it. Garmin's own on-device editor
+behaves the same way, so a read-side flag is an improvement over stock
+rather than a fix for something this project broke.
+
+Prior rev (110, 2026-09-07) follows.*
+
 *Doc rev 110 — refreshed 2026-09-07.* **v1.3.0 CONFIRMED on real
 hardware through the actual GUI, plus two findings from surveying this
 project's own archived profiles -- including the first FILE-level
