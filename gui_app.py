@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "0.21.2"  # GroupTrack List field-edit guard (2026-09-09), Doug's report: selecting that screen and pressing "Add Field..." opened the normal field picker, which it should not -- the device generates that screen's contents (the list of connected riders) and every profile examined carries it at f3=0. New EditScreenPanel._field_edit_blocked() checks fit_dump.py v2.7.0's NO_FIELD_EDIT_TYPES and hard-refuses (OK-only, no override), wired into all six field call sites AHEAD of _ciq_guard_block(): _swap_fields, _apply_field_list, on_add_field, on_remove_field, on_change_type, on_layout_choice. refresh_from_file() now also DISABLES the five field buttons and both layout radios for these types, so the controls are visibly unavailable rather than merely refusing after a click -- a dialog after the fact is precisely what was reported as wrong; the block remains as a backstop. New self.type_f10 kept alongside self.type_name, since guards need the raw f10 rather than its display string. Show/Hide is deliberately LEFT ENABLED: GroupTrack List is not in NO_SHOW_TOGGLE_TYPES, so hiding it is legitimate and stays available -- only field editing is refused. Prior entry (0.21.1): Deploy-flow clarity, both from Doug's own observations while using the app (2026-09-07), no logic change to any write path. (1) PreflightPanel LOOKED like a redundant second review: the Screens view he'd just come from already showed the same change list, so this panel read as a repeat and the extra click to Deploy felt like a bare "are you sure" prompt. It is not a repeat -- it performs two checks the Screens view cannot, a raw byte-diff against the untouched staged file and a real CRC check of the working copy's actual bytes -- so the fix was to make it LOOK like what it is rather than to remove it. Retitled "Review Changes -- Pre-Flight Check" to "Pre-Flight Verification"; verification results now lead, phrased as explicit checks ("✓ File integrity (CRC): PASS", "✓ Content check: this file DIFFERS from the copy on the device"), with the change list following under "What will change on the device:" instead of "Screens changed since you started editing:" -- reframing it as what's about to happen rather than a second review of edits already made. Deliberately NOT merged into DeployPanel, the other option considered: that panel is a four-stage machine and folding a step into it risks considerably more than a relabel. (2) DeployPanel's post-write verification box sat visibly EMPTY through three of four stages (it only fills at 'reconnected', after the device is back and describe_screen_changes() has run) with nothing indicating what it was for -- Doug reported never having seen text in it. Never broken, just silent: it now has a "Post-write verification:" label and stage-appropriate placeholder text instead of a blank box. All new strings routed through _wrap_status_paragraphs() and confirmed to wrap within the established 42-char width -- this codebase has hit the dynamic-text-widens-the-window bug four times (v0.16.2, v0.16.3, v0.16.16, v0.19.18) and every new status string is checked against it now. Prior entry (0.21.0): Connect IQ placements are now MAINTAINED, not refused (2026-09-06) -- see fit_patch.py v1.16.0 for the decoded mesg 170 format and PROJECT_NOTES.md Doc rev 103-108 for the investigation and on-device confirmations. The three EditScreenPanel paths that rewrite a screen's shape (_swap_fields, _apply_field_list, on_layout_choice) now call patch_screen_maintaining_ciq() instead of bare patch_screen(), so a Connect IQ placement follows the edit rather than being silently orphaned; on_show_toggle (f12 only) and AddScreenPanel.on_create (a brand-new, empty slot) correctly stay on plain patch_screen(). _ciq_guard_block() survives but is MUCH narrower: it no longer refuses any edit to a Connect IQ screen at all, only the one genuinely undecidable case of a screen holding TWO OR MORE Connect IQ fields -- both apps are stored as the same generic marker id, so when such a screen is rearranged there's no way to tell which app ended up where, and guessing risks silently swapping them. New _ciq_report() surfaces the orphan case only (a marker no record claims, meaning the file was ALREADY broken before this edit, almost certainly by a pre-v1.3.0 toolkit write); a placement quietly following an edit is correct behavior and deliberately says nothing. FieldPickerDialog still excludes the marker ids, and the Favorite Screen blocks from v0.20.1 all stand -- introducing a Connect IQ field remains out of scope for this release, since nothing in an edit says WHICH app a new marker means and the create-a-record-from-scratch case is still unproven on hardware. Also: graph_bars_warnings() now flags a Connect IQ field sitting in a shared/half-width row, reusing the existing Graph/Bars display path at all three of its call sites -- CONFIRMED (Doug) that the device ACCEPTS a Connect IQ field in a half-width slot without complaint, but the apps tested need more room than that to be readable; advisory only, never a block, since how much room an app needs is its author's business. Constant renamed throughout to fit_dump.py v2.6.0's CIQ_FIELD_MARKER_IDS. Prior entry (0.20.1): Connect IQ guard COVERAGE FIX -- closes a route v0.20.0's guard never covered, found by a read-only audit of every writer into editing_path and CONFIRMED on real hardware by Doug (2026-09-06) before the fix was built: he saved a Favorite from a screen holding a CIQ data field, loaded it into a new screen, deployed, and the field rendered as "Timer" on the Edge -- the same failure mode as every other attempt to introduce one fresh. Root cause: v0.20.0 wired _ciq_guard_block() into EditScreenPanel's six call sites, but the Favorite pipeline reaches patch_screen() through AddScreenPanel.on_create() instead, which had NO CIQ check of any kind (the whole class had zero references to CIQ_FIELD_MARKER_IDS). The audit's other finding, recorded so it isn't re-checked: every OTHER writer is clean -- on_show_toggle (f12 only), _swap_screen_order (f9 only, Doc rev 99), on_remove (f1 only), ImportPanel.on_import (pure byte copy, rewrites no screen shape), and the three EditScreenPanel writers already guarded; on the CLI side --seed-from-slot copies only f9/f10 and never the f7 field array, and --new-slot is already covered because it routes through the --fields branch where fit_patch.py v1.15.0's pass-1 check lives. Fixed at three points, defense in depth: (1) on_save_favorite() hard-refuses to CAPTURE a favorite from a CIQ-bearing screen, keeping the store clean at the source; (2) on_load_favorite() STRIPS CIQ ids from whatever it loads and says so -- this one is mandatory and cannot be skipped, because the favorite is a single JSON file in the user's home dir (FAVORITE_PATH), outside the repo, surviving upgrades, so favorites captured before this version are already on disk and armed regardless of installed version; strips rather than refuses since the favorite's other fields stay perfectly valid, and filters BEFORE the layout-B validity check because dropping a field changes the count that check depends on, with a separate path for a favorite that was nothing BUT CIQ fields (leaves the current list alone rather than loading an empty one); (3) on_create() is the real ENFORCEMENT point, hard-refusing before patch_screen(). Point 3 deliberately does NOT reuse _ciq_guard_block(): that helper implements fit_patch.py's pass-2 semantics (does the TARGET SLOT's on-disk content already hold a CIQ field), but this panel always targets an unconfigured, EMPTY slot, so it would correctly find nothing every time and never fire -- what's needed is the pass-1 analogue, a REQUEST-side check against the field list about to be written, exactly like --fields' own guard. Same UX-vs-enforcement split v0.20.0 established: points 1-2 are hygiene, point 3 is what actually stands between self.field_ids and the write. See PROJECT_NOTES.md Doc rev 101-102. Prior entry (0.20.0): Device-dependent Connect IQ field guard, real-hardware-driven bug fixes -- see PROJECT_NOTES.md Doc rev 95-99, and fit_patch.py v1.15.0's changelog for the matching backend writeup. FieldPickerDialog (2026-09-02) now always excludes fit_dump.py's new CIQ_FIELD_MARKER_IDS (currently {216}) from its selectable Add/Change Field list, unioned on top of each call's own exclude_ids -- a single fix covering all 4 call sites, since every one of them constructs this same dialog. New _ciq_guard_block() (2026-09-03), added after Doug's own real-hardware test exposed a real gap: this GUI's actual write path (_apply_field_list()/_swap_fields()/on_layout_choice(), which all call patch_screen() DIRECTLY) never went through fit_patch.py's CLI at all, so its guard never ran here -- a screen that already had a working CIQ field broke exactly like a fresh introduction the moment ordinary fields were added/removed/reordered around it, with no warning shown. _ciq_guard_block() checks the slot's CURRENT on-disk content via fit_patch.py's screen_has_device_dependent_ciq_field() and hard-refuses (no override, OK-only MessageBox) before any screen-shape edit -- wired into all six real call sites: _apply_field_list, _swap_fields, on_add_field, on_remove_field, on_change_type, on_layout_choice (the last three call it eagerly, before opening a picker dialog, purely so the user isn't sent through a modal only to be told no afterward -- _apply_field_list/_swap_fields are the actual enforcement points). _swap_fields() now returns True/False so on_move_up/on_move_down only update the list selection when a swap actually happened. Doc-only/naming, Doug's go-ahead (2026-08-25): project rename extended past the GUI window title (which was already "Activity Profile Screen Editor for Garmin Edge" since v0.16.7). Doug clarified the canonical public name is "Activity Profile Editor for Garmin Edge" -- no "Screen" (matches the GitHub repo name "Activity-Profile-Editor" and his own Release titles "Activity Profile Editor for Garmin Edge Devices" (2026-08-25): the editor targets any Edge device generically, and even though screens are what actually get edited, backups/restores/deploys all operate at the Activity Profile level, so "Activity Profile" is the right noun to lead with, not "Screen"). Also drops the leading "Garmin Edge 530" pattern seen elsewhere (README.md/PROJECT_NOTES.md's old H1) -- deliberately not leading with "Garmin" at all, to avoid implying this is a Garmin product, and not device-specific despite the 530 being the only Edge model actually tested against so far. Three spots updated in this file: MainFrame's window title (super().__init__'s title= argument), the module docstring's own opening line, and ABOUT_TEXT (the About dialog shown via DetectPanel's About button) -- all three now read "Activity Profile Editor for Garmin Edge" with no "Screen"/"530". No behavior change anywhere, text-only. See README.md/PROJECT_NOTES.md/MVP_SCOPE.md/FIT_PATCH.md's own changelog entries for the matching doc-side renames -- MEMORY_LOG.md and the RELEASE_NOTES_v1.1.x.md files are deliberately LEFT UNCHANGED, since both are point-in-time historical records (an explicitly archived project log, and notes already published as GitHub Releases under Doug's own chosen title) rather than live documentation -- same reasoning this project already applies to not rewriting old changelog/Doc-rev entries.
+__version__ = "0.22.0"  # NAMED SCREENS ARE DRAWN AND EDITED AS THE DEVICE ACTUALLY PRESENTS THEM (2026-09-10), from the complete 12-type on-device survey in PROJECT_NOTES.md Doc rev 112. LAYOUT_GRIDS and is_position_full_width() MOVED OUT of this file into fit_dump.py v2.8.0, which is now the single source for layout geometry -- that split (grids here, COUNTS_WITH_B_VARIANT in fit_patch.py) is what let the two drift apart unnoticed. EditScreenPanel now gives NAMED screen types a LAYOUT PICKER instead of Add/Remove Field plus A/B radios: the device presents whole layouts in one menu ("Layout and Data Fields"), not a count and a variant chosen independently, and only some combinations exist -- Segment offers 0, 2, 4/A, 4/B, 6 with no odd count at all, so a "+ Add Field" button that adds exactly one could only ever produce a state the device doesn't have. Mirroring the device's own control makes invalid counts unreachable by construction rather than caught by validation afterwards. Growing a layout stamps DEFAULT_FILLER_FIELD_ID ("Timer") into the new slots, with a status line pointing at Change Type, rather than chaining modal field pickers; shrinking confirms first, naming the fields that will be dropped, and routes through patch_screen_maintaining_ciq() so a Connect IQ placement follows or is cleanly dropped. The four fixed-2 types (Compass, Elevation, Cycling Dynamics, ClimbPro) have their count HARD-LOCKED -- the on-device editor offers no count choice for them, and writing 3 renders 2 while leaving the file unchanged, i.e. a permanent silent file-vs-device disagreement -- but their field CONTENTS, order and Change Type all stay live. Ordinary user screens are deliberately untouched: they keep Add/Remove Field and the radios, and AddScreenPanel keeps the generic geometry ON PURPOSE (it can only ever create a plain user screen, since on_create() takes its f10 from next_available_field10(), which never returns a named type's code -- commented there so it doesn't read as an oversight). LayoutDiagramPanel draws the device-generated CONTENT AREA as a distinct dashed block, at the top for most types and at the BOTTOM for Lap Summary (fields above it) -- a zero-field Map or Segment now draws as a full-panel content block rather than "(no layout to show)", since that is a real state and not an absent one. graph_bars_warnings()/graph_bars_warning_text() take f10 and pass it through: without it they measured every screen against ordinary-user-screen geometry and so stayed SILENT on exactly the fixed-2 named screens where a Graph/Bars or Connect IQ field is most cramped. New read-side flag for a stored (count, variant) the device doesn't offer -- e.g. a Compass holding 3 -- which states what the device will actually render and CHANGES NOTHING on disk; Garmin's own editor produces that state too, so surfacing it is an improvement over stock rather than a defect being repaired. _apply_field_list()'s A/B fallback is now per type via layout_default_variant(), not a global count test that also assumed the fallback value is 0. Prior entry (0.21.2): GroupTrack List field-edit guard (2026-09-09), Doug'sreport: selecting that screen and pressing "Add Field..." opened the normal field picker, which it should not -- the device generates that screen's contents (the list of connected riders) and every profile examined carries it at f3=0. New EditScreenPanel._field_edit_blocked() checks fit_dump.py v2.7.0's NO_FIELD_EDIT_TYPES and hard-refuses (OK-only, no override), wired into all six field call sites AHEAD of _ciq_guard_block(): _swap_fields, _apply_field_list, on_add_field, on_remove_field, on_change_type, on_layout_choice. refresh_from_file() now also DISABLES the five field buttons and both layout radios for these types, so the controls are visibly unavailable rather than merely refusing after a click -- a dialog after the fact is precisely what was reported as wrong; the block remains as a backstop. New self.type_f10 kept alongside self.type_name, since guards need the raw f10 rather than its display string. Show/Hide is deliberately LEFT ENABLED: GroupTrack List is not in NO_SHOW_TOGGLE_TYPES, so hiding it is legitimate and stays available -- only field editing is refused. Prior entry (0.21.1): Deploy-flow clarity, both from Doug's own observations while using the app (2026-09-07), no logic change to any write path. (1) PreflightPanel LOOKED like a redundant second review: the Screens view he'd just come from already showed the same change list, so this panel read as a repeat and the extra click to Deploy felt like a bare "are you sure" prompt. It is not a repeat -- it performs two checks the Screens view cannot, a raw byte-diff against the untouched staged file and a real CRC check of the working copy's actual bytes -- so the fix was to make it LOOK like what it is rather than to remove it. Retitled "Review Changes -- Pre-Flight Check" to "Pre-Flight Verification"; verification results now lead, phrased as explicit checks ("✓ File integrity (CRC): PASS", "✓ Content check: this file DIFFERS from the copy on the device"), with the change list following under "What will change on the device:" instead of "Screens changed since you started editing:" -- reframing it as what's about to happen rather than a second review of edits already made. Deliberately NOT merged into DeployPanel, the other option considered: that panel is a four-stage machine and folding a step into it risks considerably more than a relabel. (2) DeployPanel's post-write verification box sat visibly EMPTY through three of four stages (it only fills at 'reconnected', after the device is back and describe_screen_changes() has run) with nothing indicating what it was for -- Doug reported never having seen text in it. Never broken, just silent: it now has a "Post-write verification:" label and stage-appropriate placeholder text instead of a blank box. All new strings routed through _wrap_status_paragraphs() and confirmed to wrap within the established 42-char width -- this codebase has hit the dynamic-text-widens-the-window bug four times (v0.16.2, v0.16.3, v0.16.16, v0.19.18) and every new status string is checked against it now. Prior entry (0.21.0): Connect IQ placements are now MAINTAINED, not refused (2026-09-06) -- see fit_patch.py v1.16.0 for the decoded mesg 170 format and PROJECT_NOTES.md Doc rev 103-108 for the investigation and on-device confirmations. The three EditScreenPanel paths that rewrite a screen's shape (_swap_fields, _apply_field_list, on_layout_choice) now call patch_screen_maintaining_ciq() instead of bare patch_screen(), so a Connect IQ placement follows the edit rather than being silently orphaned; on_show_toggle (f12 only) and AddScreenPanel.on_create (a brand-new, empty slot) correctly stay on plain patch_screen(). _ciq_guard_block() survives but is MUCH narrower: it no longer refuses any edit to a Connect IQ screen at all, only the one genuinely undecidable case of a screen holding TWO OR MORE Connect IQ fields -- both apps are stored as the same generic marker id, so when such a screen is rearranged there's no way to tell which app ended up where, and guessing risks silently swapping them. New _ciq_report() surfaces the orphan case only (a marker no record claims, meaning the file was ALREADY broken before this edit, almost certainly by a pre-v1.3.0 toolkit write); a placement quietly following an edit is correct behavior and deliberately says nothing. FieldPickerDialog still excludes the marker ids, and the Favorite Screen blocks from v0.20.1 all stand -- introducing a Connect IQ field remains out of scope for this release, since nothing in an edit says WHICH app a new marker means and the create-a-record-from-scratch case is still unproven on hardware. Also: graph_bars_warnings() now flags a Connect IQ field sitting in a shared/half-width row, reusing the existing Graph/Bars display path at all three of its call sites -- CONFIRMED (Doug) that the device ACCEPTS a Connect IQ field in a half-width slot without complaint, but the apps tested need more room than that to be readable; advisory only, never a block, since how much room an app needs is its author's business. Constant renamed throughout to fit_dump.py v2.6.0's CIQ_FIELD_MARKER_IDS. Prior entry (0.20.1): Connect IQ guard COVERAGE FIX -- closes a route v0.20.0's guard never covered, found by a read-only audit of every writer into editing_path and CONFIRMED on real hardware by Doug (2026-09-06) before the fix was built: he saved a Favorite from a screen holding a CIQ data field, loaded it into a new screen, deployed, and the field rendered as "Timer" on the Edge -- the same failure mode as every other attempt to introduce one fresh. Root cause: v0.20.0 wired _ciq_guard_block() into EditScreenPanel's six call sites, but the Favorite pipeline reaches patch_screen() through AddScreenPanel.on_create() instead, which had NO CIQ check of any kind (the whole class had zero references to CIQ_FIELD_MARKER_IDS). The audit's other finding, recorded so it isn't re-checked: every OTHER writer is clean -- on_show_toggle (f12 only), _swap_screen_order (f9 only, Doc rev 99), on_remove (f1 only), ImportPanel.on_import (pure byte copy, rewrites no screen shape), and the three EditScreenPanel writers already guarded; on the CLI side --seed-from-slot copies only f9/f10 and never the f7 field array, and --new-slot is already covered because it routes through the --fields branch where fit_patch.py v1.15.0's pass-1 check lives. Fixed at three points, defense in depth: (1) on_save_favorite() hard-refuses to CAPTURE a favorite from a CIQ-bearing screen, keeping the store clean at the source; (2) on_load_favorite() STRIPS CIQ ids from whatever it loads and says so -- this one is mandatory and cannot be skipped, because the favorite is a single JSON file in the user's home dir (FAVORITE_PATH), outside the repo, surviving upgrades, so favorites captured before this version are already on disk and armed regardless of installed version; strips rather than refuses since the favorite's other fields stay perfectly valid, and filters BEFORE the layout-B validity check because dropping a field changes the count that check depends on, with a separate path for a favorite that was nothing BUT CIQ fields (leaves the current list alone rather than loading an empty one); (3) on_create() is the real ENFORCEMENT point, hard-refusing before patch_screen(). Point 3 deliberately does NOT reuse _ciq_guard_block(): that helper implements fit_patch.py's pass-2 semantics (does the TARGET SLOT's on-disk content already hold a CIQ field), but this panel always targets an unconfigured, EMPTY slot, so it would correctly find nothing every time and never fire -- what's needed is the pass-1 analogue, a REQUEST-side check against the field list about to be written, exactly like --fields' own guard. Same UX-vs-enforcement split v0.20.0 established: points 1-2 are hygiene, point 3 is what actually stands between self.field_ids and the write. See PROJECT_NOTES.md Doc rev 101-102. Prior entry (0.20.0): Device-dependent Connect IQ field guard, real-hardware-driven bug fixes -- see PROJECT_NOTES.md Doc rev 95-99, and fit_patch.py v1.15.0's changelog for the matching backend writeup. FieldPickerDialog (2026-09-02) now always excludes fit_dump.py's new CIQ_FIELD_MARKER_IDS (currently {216}) from its selectable Add/Change Field list, unioned on top of each call's own exclude_ids -- a single fix covering all 4 call sites, since every one of them constructs this same dialog. New _ciq_guard_block() (2026-09-03), added after Doug's own real-hardware test exposed a real gap: this GUI's actual write path (_apply_field_list()/_swap_fields()/on_layout_choice(), which all call patch_screen() DIRECTLY) never went through fit_patch.py's CLI at all, so its guard never ran here -- a screen that already had a working CIQ field broke exactly like a fresh introduction the moment ordinary fields were added/removed/reordered around it, with no warning shown. _ciq_guard_block() checks the slot's CURRENT on-disk content via fit_patch.py's screen_has_device_dependent_ciq_field() and hard-refuses (no override, OK-only MessageBox) before any screen-shape edit -- wired into all six real call sites: _apply_field_list, _swap_fields, on_add_field, on_remove_field, on_change_type, on_layout_choice (the last three call it eagerly, before opening a picker dialog, purely so the user isn't sent through a modal only to be told no afterward -- _apply_field_list/_swap_fields are the actual enforcement points). _swap_fields() now returns True/False so on_move_up/on_move_down only update the list selection when a swap actually happened. Doc-only/naming, Doug's go-ahead (2026-08-25): project rename extended past the GUI window title (which was already "Activity Profile Screen Editor for Garmin Edge" since v0.16.7). Doug clarified the canonical public name is "Activity Profile Editor for Garmin Edge" -- no "Screen" (matches the GitHub repo name "Activity-Profile-Editor" and his own Release titles "Activity Profile Editor for Garmin Edge Devices" (2026-08-25): the editor targets any Edge device generically, and even though screens are what actually get edited, backups/restores/deploys all operate at the Activity Profile level, so "Activity Profile" is the right noun to lead with, not "Screen"). Also drops the leading "Garmin Edge 530" pattern seen elsewhere (README.md/PROJECT_NOTES.md's old H1) -- deliberately not leading with "Garmin" at all, to avoid implying this is a Garmin product, and not device-specific despite the 530 being the only Edge model actually tested against so far. Three spots updated in this file: MainFrame's window title (super().__init__'s title= argument), the module docstring's own opening line, and ABOUT_TEXT (the About dialog shown via DetectPanel's About button) -- all three now read "Activity Profile Editor for Garmin Edge" with no "Screen"/"530". No behavior change anywhere, text-only. See README.md/PROJECT_NOTES.md/MVP_SCOPE.md/FIT_PATCH.md's own changelog entries for the matching doc-side renames -- MEMORY_LOG.md and the RELEASE_NOTES_v1.1.x.md files are deliberately LEFT UNCHANGED, since both are point-in-time historical records (an explicitly archived project log, and notes already published as GitHub Releases under Doug's own chosen title) rather than live documentation -- same reasoning this project already applies to not rewriting old changelog/Doc-rev entries.
 """
 gui_app.py -- Activity Profile Editor for Garmin Edge, GUI.
 
@@ -138,6 +138,21 @@ from fit_dump import (
     GRAPH_OR_BARS_FIELD_IDS,
     FIELD_EDIT_UNCERTAIN_TYPES,
     NO_FIELD_EDIT_TYPES,
+    # Layout geometry, consolidated into fit_dump.py in v0.22.0 -- see
+    # the comment where LAYOUT_GRIDS used to be defined in this file.
+    LAYOUT_GRIDS,
+    COUNTS_WITH_B_VARIANT,
+    DEFAULT_FILLER_FIELD_ID,
+    is_position_full_width,
+    named_layout,
+    layout_states,
+    layout_grid,
+    layout_counts,
+    layout_state_is_valid,
+    layout_variants_for_count,
+    layout_default_variant,
+    count_is_locked,
+    content_area_position,
 )
 from fit_crc import fit_crc
 from fit_clone_profile import patch_profile_name, PROFILE_NAME_MAX_CHARS
@@ -160,7 +175,6 @@ from fit_patch import (
     swap_display_order,
     next_available_field9,
     next_available_field10,
-    COUNTS_WITH_B_VARIANT,
 )
 
 
@@ -294,69 +308,22 @@ def save_favorite(field_ids, layout_variant, source_profile):
 MAX_FIELDS_PER_SCREEN = 10
 MAX_USER_SCREENS = 10
 
-# On-device grid geometry, per field count and layout variant --
-# which field positions (0-based) stack vertically (each its own row)
-# vs. sit side-by-side (grouped in the same row list). Supplied
-# directly from the developer's own text-based Edge 530 layout
-# reference; cross-checked against fit_patch.py's COUNTS_WITH_B_VARIANT
-# (3/4/5/6/7 have a real A/B choice) -- matches exactly, no
-# discrepancies. Counts 3 A vs B are visually the SAME row structure on
-# this reference (B just renders the top field smaller) -- that size
-# difference isn't representable by row/column grouping alone, so it's
-# noted in a comment rather than faked into the geometry.
-LAYOUT_GRIDS = {
-    1: {0: [[0]]},
-    2: {0: [[0], [1]]},
-    3: {
-        0: [[0], [1], [2]],  # "A" -- equal sized fields
-        1: [[0], [1], [2]],  # "B" -- same rows; on-device the TOP field renders smaller
-    },
-    4: {
-        0: [[0], [1], [2], [3]],
-        1: [[0, 1], [2], [3]],
-    },
-    5: {
-        0: [[0], [1], [2], [3], [4]],
-        1: [[0], [1], [2, 3], [4]],
-    },
-    6: {
-        0: [[0], [1], [2], [3], [4, 5]],
-        1: [[0, 1], [2], [3], [4, 5]],
-    },
-    7: {
-        0: [[0], [1], [2], [3, 4], [5, 6]],
-        1: [[0, 1], [2], [3, 4], [5, 6]],
-    },
-    8: {0: [[0], [1], [2, 3], [4, 5], [6, 7]]},
-    9: {0: [[0], [1, 2], [3, 4], [5, 6], [7, 8]]},
-    10: {0: [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]},
-}
+# LAYOUT_GRIDS and is_position_full_width() were DEFINED here until
+# v0.22.0. Both now live in fit_dump.py and are imported at the top of
+# this file, alongside the new per-type NAMED_SCREEN_LAYOUTS table and
+# its query helpers.
+#
+# The move was the point of the v1.4.0 work, not housekeeping. This
+# module owned the grid geometry while fit_patch.py separately owned
+# COUNTS_WITH_B_VARIANT (which counts have a real A/B choice), and
+# nothing forced the two to agree. They drifted, and the drift was
+# invisible because each was self-consistent: fit_patch.py believed
+# every 4-field screen has an A/B pair with A=0, which is true of an
+# ordinary user screen and wrong for a 4-field Segment, whose "A"
+# stores f8=2. With one table in one module, that can't recur.
 
 
-def is_position_full_width(count, layout_variant, position):
-    """
-    True if `position` (0-based, matching LAYOUT_GRIDS' own indexing)
-    sits alone in its row for this field count + layout variant --
-    i.e. would actually get the full screen width on-device. False if
-    it shares a row with another field. None if the count/layout/
-    position combination isn't found in LAYOUT_GRIDS at all (shouldn't
-    happen for any real on-device count -- defensive only).
-
-    Backs the Graph/Bars full-width warning (see
-    graph_bars_warnings() below) -- fully derivable from data this GUI
-    already has for the LayoutDiagramPanel preview, no new geometry
-    model needed.
-    """
-    grid = LAYOUT_GRIDS.get(count, {}).get(layout_variant)
-    if grid is None:
-        return None
-    for row in grid:
-        if position in row:
-            return len(row) == 1
-    return None
-
-
-def graph_bars_warnings(field_ids, layout_variant):
+def graph_bars_warnings(field_ids, layout_variant, f10=None):
     """
     Return a list of human-readable warning strings, one per field in
     `field_ids` that's individually CONFIRMED (GRAPH_OR_BARS_FIELD_IDS,
@@ -382,6 +349,14 @@ def graph_bars_warnings(field_ids, layout_variant):
     unlike the Graph/Bars case this is about legibility rather than a
     documented rendering fallback, and how much room a given Connect IQ
     app really needs is the app author's business, not this toolkit's.
+
+    v0.22.0: takes `f10`, the screen TYPE. Without it this measured every
+    screen against ordinary-user-screen geometry, so on the fixed-2 named
+    types (Compass, Elevation, Cycling Dynamics, ClimbPro) it read a
+    half-width pair as two full-width rows and therefore stayed silent
+    about exactly the screens where a Graph/Bars or Connect IQ field is
+    most cramped. Trailing and optional so older callers still work, but
+    every caller in this module now passes it.
     """
     count = len(field_ids)
     warnings = []
@@ -390,7 +365,8 @@ def graph_bars_warnings(field_ids, layout_variant):
         is_ciq = fid in CIQ_FIELD_MARKER_IDS
         if not (is_graph or is_ciq):
             continue
-        full_width = is_position_full_width(count, layout_variant, position)
+        full_width = is_position_full_width(count, layout_variant, position,
+                                            f10=f10)
         if full_width is not False:
             continue
         if is_graph:
@@ -442,7 +418,7 @@ def _wrap_status_paragraphs(*paragraphs):
     return "\n\n".join(textwrap.fill(p, GRAPH_WARNING_WRAP_WIDTH) for p in paragraphs)
 
 
-def graph_bars_warning_text(field_ids, layout_variant):
+def graph_bars_warning_text(field_ids, layout_variant, f10=None):
     """
     Ready-to-display, HARD-WRAPPED version of graph_bars_warnings() --
     each individual warning is wrapped to GRAPH_WARNING_WRAP_WIDTH
@@ -450,8 +426,10 @@ def graph_bars_warning_text(field_ids, layout_variant):
     multiple warnings are joined with a blank line between them. Empty
     string if there's nothing to flag. See GRAPH_WARNING_WRAP_WIDTH's
     comment for why this doesn't use wx.StaticText.Wrap() instead.
+
+    `f10` is passed straight through -- see graph_bars_warnings().
     """
-    warnings = graph_bars_warnings(field_ids, layout_variant)
+    warnings = graph_bars_warnings(field_ids, layout_variant, f10=f10)
     return "\n\n".join(textwrap.fill(w, GRAPH_WARNING_WRAP_WIDTH) for w in warnings)
 
 
@@ -1890,9 +1868,24 @@ class LayoutDiagramPanel(wx.Panel):
     """
     Draws a simple box diagram of a screen's on-device layout -- which
     field positions stack vertically (each its own full-width row) vs.
-    sit side-by-side, per LAYOUT_GRIDS. Purely a read-only preview;
-    all actual editing happens through the field list and its buttons
-    in EditScreenPanel, not by interacting with this diagram directly.
+    sit side-by-side. Purely a read-only preview; all actual editing
+    happens through the field list and its buttons in EditScreenPanel,
+    not by interacting with this diagram directly.
+
+    v0.22.0: geometry now comes from fit_dump.layout_grid(f10, ...)
+    rather than a bare LAYOUT_GRIDS[count] lookup, and a named screen's
+    device-generated CONTENT AREA (the map, the compass rose, the lap
+    table) is drawn as a distinct labelled block. Before this, every
+    named screen was drawn as if it were an ordinary user screen, which
+    was wrong in two visible ways: a 2-field named screen was shown as
+    two stacked full-width rows when the device renders two half-width
+    fields side by side, and the content area -- usually the majority of
+    the physical screen -- wasn't drawn at all.
+
+    The content block carries no field index. The survey confirmed
+    nothing inside it is stored in the profile: Lap Summary's selectable
+    lap-table metric is not a data field and does not appear in the file
+    at all, so there is no embedded position to track or reorder.
     """
 
     def __init__(self, parent):
@@ -1916,6 +1909,11 @@ class LayoutDiagramPanel(wx.Panel):
         self.grid_rows = []      # list of rows, each a list of 0-based field positions
         self.field_labels = []   # field_labels[i] = display name for position i
         self.note = ""
+        # v0.22.0: 'top' / 'bottom' / None -- where this screen type's
+        # device-generated content area sits relative to the data
+        # fields. None for an ordinary user screen, which has none.
+        self.content = None
+        self.content_label = ""
         self.Bind(wx.EVT_PAINT, self.on_paint)
         self.Bind(wx.EVT_SIZE, self.on_size)
 
@@ -1935,10 +1933,20 @@ class LayoutDiagramPanel(wx.Panel):
         if not self.IsBeingDeleted():
             self.Refresh()
 
-    def set_layout(self, grid_rows, field_labels, note=""):
+    def set_layout(self, grid_rows, field_labels, note="",
+                   content=None, content_label=""):
+        """
+        `content` is 'top', 'bottom' or None, from
+        fit_dump.content_area_position(); `content_label` is what to
+        write in that block (e.g. "Map", "Lap table"). Both default to
+        the pre-v0.22.0 behaviour of drawing fields only, so ordinary
+        user screens call this exactly as before.
+        """
         self.grid_rows = grid_rows
         self.field_labels = field_labels
         self.note = note
+        self.content = content
+        self.content_label = content_label
         if not self.IsBeingDeleted():
             self.Refresh()
 
@@ -1963,16 +1971,53 @@ class LayoutDiagramPanel(wx.Panel):
             note_h = 20
             dc.DrawText(self.note, 8, height - note_h + 2)
 
-        if not self.grid_rows:
+        # v0.22.0: an EMPTY grid is no longer automatically "nothing to
+        # show". Map and Segment both offer a legal ZERO-field layout
+        # where the content area fills the whole screen -- that is a real
+        # state the device renders, not an absence of one, so it gets
+        # drawn as a full-panel content block.
+        if not self.grid_rows and self.content is None:
             dc.SetFont(wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
             dc.SetTextForeground(wx.Colour(140, 140, 140))
             dc.DrawText("(no layout to show)", 8, 8)
             return
 
         margin = 8
-        n_rows = len(self.grid_rows)
         available_h = height - 2 * margin - note_h
-        row_h = available_h / n_rows if n_rows else available_h
+
+        # The content area is given roughly twice a field row's height:
+        # on the real device it dominates the screen, and drawing it the
+        # same size as a data field would misrepresent the proportions
+        # the user is choosing between. With zero fields it takes the
+        # whole panel.
+        content_weight = 2.0
+        n_rows = len(self.grid_rows)
+        total_weight = n_rows + (content_weight if self.content else 0)
+        unit_h = available_h / total_weight if total_weight else available_h
+        row_h = unit_h
+        content_h = unit_h * content_weight if self.content else 0
+
+        def _draw_content(top_y):
+            rect = wx.Rect(int(margin), int(top_y),
+                           max(int(width - 2 * margin) - 2, 1),
+                           max(int(content_h) - 2, 1))
+            # Deliberately a different fill and a dashed edge from the
+            # field cells: this block is not editable and not a field,
+            # and it should not look like one.
+            dc.SetPen(wx.Pen(wx.Colour(120, 120, 120), 1, wx.PENSTYLE_SHORT_DASH))
+            dc.SetBrush(wx.Brush(wx.Colour(240, 238, 230)))
+            dc.DrawRectangle(rect)
+            dc.SetFont(wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_ITALIC,
+                               wx.FONTWEIGHT_NORMAL))
+            dc.SetTextForeground(wx.Colour(90, 90, 90))
+            dc.SetClippingRegion(rect)
+            dc.DrawLabel(self.content_label or "(device-generated)", rect, wx.ALIGN_CENTER)
+            dc.DestroyClippingRegion()
+
+        y = margin
+        if self.content == 'top':
+            _draw_content(y)
+            y += content_h
 
         dc.SetPen(wx.Pen(wx.Colour(70, 70, 70), 1))
         dc.SetBrush(wx.Brush(wx.Colour(233, 241, 250)))
@@ -1986,7 +2031,6 @@ class LayoutDiagramPanel(wx.Panel):
         # testing on dense screens.
         dc.SetFont(wx.Font(13, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL))
 
-        y = margin
         for row in self.grid_rows:
             n_cells = len(row) if row else 1
             available_w = width - 2 * margin
@@ -1995,15 +2039,26 @@ class LayoutDiagramPanel(wx.Panel):
             x = margin
             for pos in row:
                 rect = wx.Rect(int(x), int(y), max(int(cell_w) - 2, 1), max(int(row_h) - 2, 1))
+                dc.SetPen(wx.Pen(wx.Colour(70, 70, 70), 1))
+                dc.SetBrush(wx.Brush(wx.Colour(233, 241, 250)))
                 dc.DrawRectangle(rect)
 
                 label = self.field_labels[pos] if pos < len(self.field_labels) else "(empty)"
+                dc.SetFont(wx.Font(13, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL,
+                                   wx.FONTWEIGHT_NORMAL))
+                dc.SetTextForeground(wx.Colour(30, 30, 30))
                 dc.SetClippingRegion(rect)
                 dc.DrawLabel(label, rect, wx.ALIGN_CENTER)
                 dc.DestroyClippingRegion()
 
                 x += cell_w
             y += row_h
+
+        # Lap Summary (f10=74) is the only type whose content area sits
+        # BELOW its data fields. This project assumed 'top' for every
+        # named type until a device screenshot showed otherwise.
+        if self.content == 'bottom':
+            _draw_content(y)
 
 
 class FieldPickerDialog(wx.Dialog):
@@ -2209,6 +2264,40 @@ class EditScreenPanel(wx.Panel):
         layout_row.Add(self.layout_a_radio, 0, wx.RIGHT, 6)
         layout_row.Add(self.layout_b_radio, 0)
         left_col.Add(layout_row, 0, wx.BOTTOM, 8)
+        self.layout_row = layout_row
+
+        # v0.22.0: for Garmin's NAMED screen types, the count and the A/B
+        # variant are not two independent choices -- the device presents a
+        # single list of whole layouts ("Layout and Data Fields" in its own
+        # menu), and only some combinations exist. Segment offers 0, 2,
+        # 4/A, 4/B and 6, with no odd count at all, so an "+ Add Field"
+        # button that adds exactly one could only ever produce a state the
+        # device doesn't have.
+        #
+        # So named types get this picker INSTEAD of Add/Remove Field and
+        # the A/B radios, which are hidden for them. Mirroring the
+        # device's own control makes every invalid count unreachable by
+        # construction rather than by validation after the fact.
+        #
+        # Ordinary user screens are untouched: they keep Add/Remove Field
+        # and the radios, and this row stays hidden for them.
+        self.named_layout_row = wx.BoxSizer(wx.HORIZONTAL)
+        self.named_layout_row.Add(wx.StaticText(self, label="Layout:"), 0,
+                                  wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
+        self.layout_picker = wx.Choice(self, choices=[])
+        self.layout_picker.Bind(wx.EVT_CHOICE, self.on_named_layout_choice)
+        self.named_layout_row.Add(self.layout_picker, 1)
+        left_col.Add(self.named_layout_row, 0, wx.EXPAND | wx.BOTTOM, 8)
+        # Holds the (count, variant) pair behind each picker entry, by
+        # index -- the labels are for humans, these are what get written.
+        self._picker_states = []
+
+        # Flags a stored (count, variant) the device does not actually
+        # offer for this screen type -- e.g. a Compass holding 3 fields,
+        # which renders as 2. Read-side only: the bytes are left exactly
+        # as found unless the user deliberately picks a valid layout.
+        self.layout_flag_text = wx.StaticText(self, label="")
+        left_col.Add(self.layout_flag_text, 0, wx.BOTTOM, 6)
 
         # "Show Screen" -- matches the on-device wording exactly (per
         # the developer: Garmin's own UI uses "Show" with the toggle,
@@ -2339,20 +2428,69 @@ class EditScreenPanel(wx.Panel):
                     self.change_type_btn, self.move_up_btn, self.move_down_btn):
             btn.Enable(fields_editable)
 
-        supports_b = count in COUNTS_WITH_B_VARIANT
-        self.layout_b_radio.Enable(supports_b and fields_editable)
-        self.layout_a_radio.Enable(fields_editable)
-        if self.layout_variant == 1 and supports_b:
-            self.layout_b_radio.SetValue(True)
+        # --- v0.22.0: named types use the layout picker, not the -------
+        # --- count buttons + A/B radios --------------------------------
+        entry = named_layout(self.type_f10)
+        is_named = entry is not None
+        self.layout_row.ShowItems(not is_named)
+        self.named_layout_row.ShowItems(is_named and fields_editable)
+
+        if is_named:
+            states = layout_states(self.type_f10)
+            self._picker_states = states
+            self.layout_picker.Set([self._state_label(self.type_f10, c, v)
+                                    for c, v in states])
+            try:
+                self.layout_picker.SetSelection(
+                    states.index((count, self.layout_variant)))
+            except ValueError:
+                # Stored state isn't one the device offers. Leave the
+                # picker UNSELECTED rather than snapping it to a nearby
+                # value: a selection would imply the file already holds
+                # that layout, and choosing for the user here would
+                # rewrite bytes they only came to look at. The flag below
+                # explains it; picking an entry is what commits a change.
+                self.layout_picker.SetSelection(wx.NOT_FOUND)
+
+            # The count is not a user choice for a named type -- it comes
+            # with the chosen layout -- so Add/Remove Field stay off even
+            # when the type is otherwise fully editable. Change Type and
+            # the Move buttons remain live: reordering and retyping the
+            # fields a layout provides is exactly what the device allows.
+            self.add_field_btn.Enable(False)
+            self.remove_field_btn.Enable(False)
+            # A single-count type (the fixed-2 group: Compass, Elevation,
+            # Cycling Dynamics, ClimbPro) has nothing to choose at all.
+            self.layout_picker.Enable(fields_editable
+                                      and not count_is_locked(self.type_f10))
+            supports_b = len(layout_variants_for_count(self.type_f10, count)) > 1
         else:
-            self.layout_a_radio.SetValue(True)
+            supports_b = count in COUNTS_WITH_B_VARIANT
+            self.layout_b_radio.Enable(supports_b and fields_editable)
+            self.layout_a_radio.Enable(fields_editable)
+            if self.layout_variant == 1 and supports_b:
+                self.layout_b_radio.SetValue(True)
+            else:
+                self.layout_a_radio.SetValue(True)
+
+        self.layout_flag_text.SetLabel(self._layout_flag_text(count))
 
         # field 12: 0 = shown/enabled, 1 = hidden/disabled -- matches
         # the on-device "Show Screen" toggle exactly.
         self.show_checkbox.SetValue(mesg.get(12) != 1)
 
         variant_for_diagram = self.layout_variant if supports_b else 0
-        grid_rows = LAYOUT_GRIDS.get(count, {}).get(variant_for_diagram, [])
+        # v0.22.0: layout_grid() is f10-aware. The old
+        # LAYOUT_GRIDS[count][variant] lookup drew every named screen with
+        # ordinary-user-screen geometry, which got the 2-field case exactly
+        # backwards -- two stacked full-width rows where the device renders
+        # two half-width fields side by side.
+        grid_rows = layout_grid(self.type_f10, count, variant_for_diagram)
+        if grid_rows is None:
+            # A stored count this type can't render. Fall back to the
+            # generic geometry so the user still sees their fields rather
+            # than an empty box; layout_flag_text above says what's off.
+            grid_rows = LAYOUT_GRIDS.get(count, {}).get(variant_for_diagram, [])
         # v0.16.2 FIX (real reported bug, 2026-08-07): terse=True, not
         # the full "UNKNOWN (id=N, ...)" form -- see fields_list.Set()
         # above for the full explanation. The diagram itself doesn't
@@ -2375,22 +2513,153 @@ class EditScreenPanel(wx.Panel):
         # ever shrinks it back down.
         labels = [field_name(fid, terse=True) for fid in self.field_ids]
         note = ""
-        if count == 3 and variant_for_diagram == 1:
+        if not is_named and count == 3 and variant_for_diagram == 1:
             note = "B: top field renders smaller on-device (not shown to scale here)"
-        self.diagram.set_layout(grid_rows, labels, note)
-
-        self.graph_warning_text.SetLabel(
-            graph_bars_warning_text(self.field_ids, variant_for_diagram)
+        elif is_named and self.type_f10 == 25 and count == 0:
+            note = "B devotes more of the map to the elevation graph"
+        elif is_named and self.type_f10 == 56 and count == 4:
+            note = "B resizes/removes the elevation graphic above the fields"
+        self.diagram.set_layout(
+            grid_rows, labels, note,
+            content=content_area_position(self.type_f10),
+            content_label=(entry['label'] if is_named else ""),
         )
 
-        self.move_up_btn.Enable(count > 1)
-        self.move_down_btn.Enable(count > 1)
-        self.add_field_btn.Enable(count < MAX_FIELDS_PER_SCREEN)
-        self.remove_field_btn.Enable(count > 1)
-        self.change_type_btn.Enable(count > 0)
+        self.graph_warning_text.SetLabel(
+            graph_bars_warning_text(self.field_ids, variant_for_diagram,
+                                    f10=self.type_f10)
+        )
+
+        self.move_up_btn.Enable(fields_editable and count > 1)
+        self.move_down_btn.Enable(fields_editable and count > 1)
+        self.change_type_btn.Enable(fields_editable and count > 0)
+        if not is_named:
+            # Count controls apply to ordinary user screens only -- for a
+            # named type the count comes with the chosen layout, and both
+            # buttons were disabled above.
+            self.add_field_btn.Enable(fields_editable
+                                      and count < MAX_FIELDS_PER_SCREEN)
+            self.remove_field_btn.Enable(fields_editable and count > 1)
 
         self.status_text.SetLabel("")
         self.frame._relayout()
+
+    @staticmethod
+    def _state_label(f10, count, variant):
+        """
+        Human-readable label for one (count, variant) entry in the named
+        layout picker, phrased the way the device's own menu does.
+
+        The A/B suffix is added only where that count actually HAS more
+        than one variant for this type, so a Segment reads "2 fields"
+        but "4 fields (A)" / "4 fields (B)". The letter is positional
+        within the device's own ordering -- deliberately not derived from
+        the f8 value, which is why Segment's "A" can be f8=2.
+        """
+        variants = layout_variants_for_count(f10, count)
+        if count == 0:
+            base = "No data fields"
+        elif count == 1:
+            base = "1 field"
+        else:
+            base = f"{count} fields"
+        if len(variants) > 1:
+            letter = "AB"[variants.index(variant)] \
+                if variants.index(variant) < 2 else str(variants.index(variant) + 1)
+            return f"{base} ({letter})"
+        return base
+
+    def _layout_flag_text(self, count):
+        """
+        Advisory for a stored (count, variant) this screen type does not
+        actually offer -- hard-wrapped, empty when there's nothing to
+        say.
+
+        This is READ-SIDE ONLY and deliberately changes nothing. The
+        device clamps an over-range count when rendering (keeps the first
+        N) and does NOT rewrite the file, so a profile can sit
+        indefinitely holding a count larger than the screen displays --
+        and Garmin's own on-device editor produces exactly this state
+        too, so the toolkit showing it is an improvement over stock
+        behaviour rather than a defect it introduced.
+        """
+        if named_layout(self.type_f10) is None:
+            return ""
+        if layout_state_is_valid(self.type_f10, count, self.layout_variant):
+            return ""
+        counts = layout_counts(self.type_f10)
+        renders = max((c for c in counts if c <= count), default=counts[0])
+        msg = (
+            f"Note: this screen stores {count} field(s), which is not a layout "
+            f"{self.type_name} offers on-device ({counts} supported). The device "
+            f"will show only the first {renders} and ignore the rest, without "
+            f"changing the file -- so what you see here and what you see on the "
+            f"Edge will differ. Nothing has been altered. Picking a layout above "
+            f"is what would correct it."
+        )
+        return textwrap.fill(msg, GRAPH_WARNING_WRAP_WIDTH)
+
+    def on_named_layout_choice(self, event):
+        """
+        Apply a whole layout chosen from the named-screen picker: sets
+        the field count and the f8 variant together, as one state.
+
+        Growing the count appends DEFAULT_FILLER_FIELD_ID ("Timer") for
+        each new position rather than chaining modal field pickers --
+        Change Type then edits each one. Shrinking drops from the END of
+        the list, which is the only predictable rule and matches how the
+        device's own stack fills.
+        """
+        if self._field_edit_blocked():
+            return
+        sel = self.layout_picker.GetSelection()
+        if sel == wx.NOT_FOUND or sel >= len(self._picker_states):
+            return
+        new_count, new_variant = self._picker_states[sel]
+        if (new_count, new_variant) == (len(self.field_ids), self.layout_variant):
+            return  # nothing to do
+
+        old_count = len(self.field_ids)
+        new_ids = list(self.field_ids[:new_count])
+        dropped = self.field_ids[new_count:]
+        added = max(0, new_count - old_count)
+        while len(new_ids) < new_count:
+            new_ids.append(DEFAULT_FILLER_FIELD_ID)
+
+        if dropped:
+            names = ", ".join(field_name(fid, terse=True) for fid in dropped)
+            answer = wx.MessageBox(
+                f"Switching to \"{self.layout_picker.GetString(sel)}\" removes "
+                f"{len(dropped)} field(s) from this screen: {names}.\n\nProceed?",
+                "Fewer fields in this layout", wx.YES_NO | wx.ICON_WARNING)
+            if answer != wx.YES:
+                self.refresh_from_file()  # put the picker back where it was
+                return
+
+        # Count and variant must be written TOGETHER. Writing the count
+        # alone would leave f8 holding a variant that may not exist at
+        # the new count -- the failure mode this whole release exists to
+        # fix, in miniature.
+        changes = {
+            3: pack_field_count(len(new_ids)),
+            7: pack_field_id_array(new_ids),
+            8: pack_layout_variant(new_variant),
+        }
+        # Routed through the CIQ-maintaining writer so a Connect IQ
+        # placement follows the new arrangement, or is cleanly dropped if
+        # its position no longer exists in the chosen layout.
+        result = patch_screen_maintaining_ciq(
+            self.frame.editing_path, self.frame.editing_path, self.slot, changes)
+        self.refresh_from_file()
+        self._ciq_report(result)
+        # Set AFTER refresh_from_file(), which clears status_text --
+        # and computed from old_count, captured before the refresh
+        # replaced self.field_ids.
+        if added > 0:
+            self.status_text.SetLabel(
+                f"Added {added} placeholder field(s) as \"Timer\" -- use "
+                f"Change Type to set what each should show."
+            )
 
     def _confirm_guard(self):
         """
@@ -2646,9 +2915,17 @@ class EditScreenPanel(wx.Panel):
         # variant, fall back to A automatically -- mirrors fit_patch.py's
         # own hard validation error, just resolved here instead of
         # erroring, since the GUI already knows the effective count.
+        # v0.22.0: per-type, via layout_variants_for_count(). The old
+        # global `len(new_ids) not in COUNTS_WITH_B_VARIANT` test asked
+        # the wrong question for a named screen, and also assumed the
+        # fallback value is 0 -- which is wrong for Segment, whose
+        # 4-field "A" is f8=2. layout_default_variant() returns whatever
+        # the device actually offers first at the new count.
         _, current_layout = read_current_count_and_layout(self.frame.editing_path, self.slot)
-        if current_layout == 1 and len(new_ids) not in COUNTS_WITH_B_VARIANT:
-            changes[8] = pack_layout_variant(0)
+        legal_variants = layout_variants_for_count(self.type_f10, len(new_ids))
+        if legal_variants and current_layout not in legal_variants:
+            changes[8] = pack_layout_variant(
+                layout_default_variant(self.type_f10, len(new_ids)))
 
         # v0.21.0: maintains mesg 170 so an existing Connect IQ placement
         # follows this rewrite (moved, or dropped if the field itself was
@@ -2949,6 +3226,14 @@ class AddScreenPanel(wx.Panel):
             self.layout_a_radio.SetValue(True)
 
         variant_for_diagram = self.layout_variant if supports_b else 0
+        # DELIBERATELY the ordinary-user-screen geometry, not the
+        # f10-aware layout_grid() that EditScreenPanel switched to in
+        # v0.22.0 -- and not an oversight. This panel can only ever
+        # create a PLAIN USER SCREEN: on_create() takes its f10 from
+        # next_available_field10(), which returns one past the highest
+        # user-screen f10 and never a named type's code. So there is no
+        # f10 to be aware of here, and COUNTS_WITH_B_VARIANT above is
+        # the right constant for the same reason.
         grid_rows = LAYOUT_GRIDS.get(count, {}).get(variant_for_diagram, [])
         # v0.16.2 FIX: terse=True -- see EditScreenPanel's equivalent
         # fix note for the full explanation.
@@ -2959,6 +3244,8 @@ class AddScreenPanel(wx.Panel):
         self.diagram.set_layout(grid_rows, labels, note)
 
         self.graph_warning_text.SetLabel(
+            # f10 omitted for the reason given above: a new screen from
+            # this panel is always a plain user screen.
             graph_bars_warning_text(self.field_ids, variant_for_diagram)
         )
 

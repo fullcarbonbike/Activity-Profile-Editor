@@ -485,6 +485,38 @@ Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
 
+*Doc rev 78 — refreshed 2026-09-10.* **v1.4.0 — Garmin's special screens
+are now edited the way the device actually presents them.** Map, Segment,
+Compass, Elevation, ClimbPro, Cycling Dynamics, Lap Summary, eBike
+Metrics and STEPS Metrics each have their own rules, and the editor had
+been treating all of them like ordinary screens.
+
+Instead of Add/Remove Field and an A/B choice, these screens now offer a
+single **Layout** list containing exactly what the device offers — for a
+Segment that's 0, 2, 4/A, 4/B or 6 fields, with no odd number available,
+because the Edge doesn't allow one. Screens fixed at two fields (Compass,
+Elevation, ClimbPro, Cycling Dynamics) no longer let you add a third: the
+device would quietly show only two while the file claimed three. Map and
+Segment can now be set to **no data fields at all**, which is a layout
+the device has always supported and the toolkit simply couldn't express.
+
+The layout diagram draws the map, compass rose or lap table as its own
+block, so what you see matches the shape of the real screen — including
+Lap Summary, whose fields sit *above* its content rather than below. The
+"needs full width" advisories for Graph/Bars and Connect IQ fields are
+corrected too: they read a two-field special screen as two stacked
+full-width rows, when the device puts those fields side by side at half
+width, and so stayed silent exactly where the warning mattered most.
+
+Also fixed: setting a Segment to its 4-field "A" layout wrote the wrong
+value. If you have a Segment screen set that way from an earlier version,
+re-pick the layout once and it'll be stored correctly.
+
+If a screen already holds more fields than its type supports, the editor
+now says so and tells you what the device will really show — and leaves
+the file exactly as it is. Nothing is rewritten unless you choose a
+layout yourself. Prior rev (77, 2026-09-10) follows.*
+
 *Doc rev 77 — refreshed 2026-09-10.* **v1.3.1 — GroupTrack List,
 Virtual Partner and Workout can no longer have data fields edited.**
 Selecting one and pressing "Add Field..." used to open the normal field

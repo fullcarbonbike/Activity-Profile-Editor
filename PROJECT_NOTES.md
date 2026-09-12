@@ -1,5 +1,128 @@
 # Activity Profile Editor for Garmin Edge
 
+*Doc rev 112 — refreshed 2026-09-10.* **BUILT (v1.4.0): Garmin's named
+screens are now modelled per type, from a complete on-device survey of
+all twelve. Four things this code treated as global constants turned
+out to be per-type, and the layout geometry has been consolidated into
+one module so they cannot drift again. Field-index orientation since
+CONFIRMED on hardware; the GUI itself is NOT yet tested there.**
+
+**The survey.** All 12 named types characterised directly from the Edge
+530's own editor. They fall into four groups, not one:
+
+| Group | Types | On-device options |
+|---|---|---|
+| No editable fields | Virtual Partner, Workout, GroupTrack List | *none* |
+| Fixed 2 half-width | Compass, Elevation, Cycling Dynamics, ClimbPro | `2` only |
+| Flexible 1–4 | Lap Summary, eBike Metrics, STEPS Metrics | `1`/`2`/`3`/`4` |
+| One-offs | Map, Segment | `0/A`,`0/B`,`1`,`2` — `0`,`2`,`4/A`,`4/B`,`6` |
+
+Content areas sit at the **top** for every type except **Lap Summary**,
+whose data fields sit ABOVE its lap table. Nothing inside a content area
+is stored in the profile: Lap Summary's selectable lap-table metric is
+not a data field and appears nowhere in the file, confirmed three ways
+(mesg-14 fields 5 and 6 are `ff..ff`/`00..00` on every screen of every
+profile on hand; field id 49 appears in no mesg-14 record; a raw scan for
+`0x0031` hits only `speed_zone` in mesg 53). So a content area needs only
+a labelled block — no embedded field index, no f7-ordering ambiguity.
+
+**The four constants that were actually per-type:**
+
+| Constant | Was | Actually |
+|---|---|---|
+| `LAYOUT_GRIDS` | count → rows | **type + count → rows** |
+| `COUNTS_WITH_B_VARIANT` | `{3,4,5,6,7}` | **per type** |
+| minimum field count | 1, hardcoded | **0 for Map and Segment** |
+| maximum field count | 10 | **fixed 2** for four types; Segment even-only |
+
+**f8 values are MEASURED, never computed — and this is the point.** The
+standing assumption was A=0 / B=1 universally. Segment's 4-field layout
+that the device's own menu labels **"A" stores f8=2.** It was found only
+by a paired pull: save 4/A, pull, save 4/B, pull again — the two files
+differed by exactly one byte plus the CRC, at mesg 14 / field 8. A single
+4/B pull would have confirmed "B=1" and left the wrong assumption intact.
+The letters are positional in Garmin's menu and carry no relation to the
+stored number, so the table stores states and `layout_default_variant()`
+returns one rather than deriving it.
+
+**Consolidation was the structural fix, not housekeeping.** `gui_app.py`
+owned `LAYOUT_GRIDS` while `fit_patch.py` owned `COUNTS_WITH_B_VARIANT`.
+Nothing forced them to agree, and the drift was invisible because each
+was internally consistent — `fit_patch.py` believed every 4-field screen
+has an A/B pair with A=0, true of a user screen and wrong for Segment.
+Both now import from `fit_dump.py` v2.8.0, which holds the geometry, the
+`NAMED_SCREEN_LAYOUTS` table and its query helpers. Any f10 absent from
+that table falls through to the previous behaviour, so ordinary user
+screens are unaffected and a named type on a future Edge model degrades
+gracefully rather than erroring.
+
+**What changed in the GUI.** Named types get a LAYOUT PICKER in place of
+Add/Remove Field and the A/B radios, listing exactly the states the
+device offers. This was a deliberate choice over making Add/Remove step
+per type: a button labelled "+ Add Field" that adds two fields on Segment
+would be a lie, and mirroring Garmin's own single control makes invalid
+counts unreachable by construction rather than caught by validation after
+the fact. Growing a layout stamps "Timer" placeholders and says so;
+shrinking confirms first, naming what will be dropped, and routes through
+`patch_screen_maintaining_ciq()`. The fixed-2 types have their COUNT
+locked while contents, order and Change Type stay live. The diagram now
+draws content areas, and a zero-field Map renders as a full-panel content
+block rather than "(no layout to show)".
+
+**Two CLI defects surfaced during testing, not design** — both cases of a
+declaration contradicting measured data:
+
+- `--layout`'s argparse `choices` were hardcoded `[0, 1]`, so Segment's
+  f8=2 was unreachable from the command line *regardless* of what the new
+  validation permitted. Widened to `[0, 1, 2]`, with the real per-type
+  check downstream. A good argument against baking measured device values
+  into an argparse declaration.
+- `--fields` could not express ZERO fields at all — it `int()`'d every
+  token, so an empty value raised `ValueError`. Now `--fields none`. A
+  bare empty string is refused ON PURPOSE rather than read as zero: that
+  is what an unset shell variable expands to, and silently wiping a
+  screen's field array on `--fields "$IDS"` is a bad trade.
+
+**Verified headlessly, NOT yet through the GUI.** A 12-case CLI matrix
+passes against the RoadClone profile: Segment 4/A stores f8=2 and 4/B
+stores 1, odd Segment counts and over-range fixed-2 counts are refused
+with the legal values named, 0-field Map at both A and B round-trips, and
+every ordinary-user-screen case behaves as before. The model was also
+validated against the three survey profiles' real bytes, where the only
+state it flags as invalid is the Compass deliberately written to 3 — no
+false positives on the other eleven screens. The GUI half cannot be
+exercised here (no wx in the build environment) and needs the same
+on-hardware pass v1.3.1 got.
+
+**Field-index orientation CONFIRMED, closing the one assumption this
+build shipped with** (Doug, real hardware, 2026-09-10). The open question
+was whether stored position 0 is the topmost field on **Lap Summary**
+specifically — the only type whose content area sits at the BOTTOM, so
+the only one where a bottom-up fill order was plausible, and where being
+wrong would have inverted every index in `_FLEX4_GRIDS`. Walking a single
+"Speed" field through all four counts settles it:
+
+| Count | Where Speed ended up |
+|---|---|
+| 1 | alone, full width |
+| 2 | **top** row, full width; new field below |
+| 3 | **top** row unchanged, full width; the two NEW fields form the half-width pair below |
+| 4 | **top-left** half-width cell |
+
+So the array is top-to-bottom, left-to-right, identically to an ordinary
+user screen. No index change needed — `_FLEX4_GRIDS` was already right.
+
+The second half of that result matters as much as the first and wasn't
+being looked for: **an existing field KEEPS its index when the count
+grows.** New fields are appended after it rather than displacing it. That
+is precisely what `on_named_layout_choice()` assumes when it grows a
+screen by slicing and appending, so the user's existing fields stay put
+through a layout change. Had the device instead inserted at the top and
+pushed existing fields down, that code would have silently reassigned
+every field on the screen while appearing to work.
+
+Prior rev (111, 2026-09-10) follows.*
+
 *Doc rev 111 — refreshed 2026-09-10.* **Point patch (v1.3.1):
 GroupTrack List, Virtual Partner and Workout can no longer have data
 fields edited. Also records what was learned about how Garmin's
