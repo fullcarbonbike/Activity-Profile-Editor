@@ -1,5 +1,74 @@
 # Activity Profile Editor for Garmin Edge
 
+*Doc rev 113 — refreshed 2026-09-12.* **Newer Edge models use MTP, not
+USB mass storage, so this toolkit cannot detect them at all. Documented;
+no code change yet. This is very likely also why no non-530 testers have
+turned up.**
+
+**The finding.** Garmin moved the Edge 540, 840, 1040 and 1050 to MTP
+(Media Transfer Protocol), in at least some cases via a firmware update
+rather than at launch, citing filesystem stability. MTP presents a
+firmware-controlled virtual view instead of a block device.
+
+**It breaks detection on BOTH platforms, not just macOS.** The obvious
+reading is that this is a Mac problem, because Finder has no MTP support
+while Windows Explorer shows the device fine. That reading is wrong for
+our purposes: Explorer shows it as a **"Portable Device" with no drive
+letter**, and `_find_garmin_root_windows()` scans `C:` through `Z:` with
+`os.path.exists()`. No drive letter, no match. `_find_garmin_root_macos()`
+scans `/Volumes` and fails the same way. Since `find_garmin_root()` gates
+DetectPanel and nothing downstream is reachable without it, the result is
+a hard stop at screen one, not a degraded workflow.
+
+**So the supported set is Edge 530 and earlier** — which is every model
+this project has ever tested against anyway, but it had never been
+stated. NOT verified: whether a future firmware could switch the 530
+itself to MTP.
+
+**The likely explanation for zero outside testers.** The current Edge
+lineup *is* 540/840/1040/1050. Requests for testers "on models other than
+the 530" were therefore aimed largely at people who cannot get past the
+first screen — and someone who sees "no device detected" and leaves has
+no reason to post about it. Silence here looks identical to disinterest
+and is not evidence of it. Worth remembering before drawing conclusions
+about demand from forum quiet.
+
+**Route forward, scoped but NOT built.** Full MTP support (libmtp on
+macOS, WPD COM on Windows) is a large job with new dependencies. The
+cheap alternative is that the toolkit already has Import (an external
+`.fit` in via `wx.FileDialog`); the missing half is Export. With both, an
+MTP user copies the profile off with an MTP browser, imports, edits,
+exports, and copies into `NewFiles/` themselves — no MTP code, no
+dependency, and no writes to the device from us. For those users the
+toolkit becomes a profile editor rather than a device manager, which is
+the genuinely novel part regardless.
+
+**Two manual-path details that fail SILENTLY**, documented in README Doc
+rev 79 because both cost real time to diagnose: the file to hand-copy is
+`working_dir/staging/<name>_staged_<ts>.fit.editing.fit`, NOT the plain
+`_staged_` file beside it (that one is the pristine pre-edit copy), and
+it must be renamed to the profile's original filename, since
+`write_to_newfiles()`'s own docstring records that the device matches by
+filename on import. A wrongly-named file is ignored with no error.
+
+**The one blocking unknown**, and it decides whether the Export work is
+worth doing: **is `NewFiles/` even exposed and writable over MTP?** If the
+firmware only surfaces Activities and media folders, Import/Export gets a
+modern Edge user as far as reading their profile and no further, and the
+honest position becomes "editing supported, deploying not". No MTP
+hardware is available to this project, so this needs an outside report.
+
+**A caution when researching this.** Forum searches for MTP on these
+models return two mixed populations: the deliberate MSC→MTP change on
+healthy devices, and devices stuck in a bootloader/recovery state after a
+failed update that ALSO enumerate as MTP. The second group is not running
+normal firmware, so anything they report about visible directory
+structure says nothing about a working device. The two are causally
+linked though — losing block-level access is precisely what turned a
+recoverable bad update into an unrecoverable one.
+
+Prior rev (112, 2026-09-10) follows.*
+
 *Doc rev 112 — refreshed 2026-09-10.* **BUILT (v1.4.0): Garmin's named
 screens are now modelled per type, from a complete on-device survey of
 all twelve. Four things this code treated as global constants turned

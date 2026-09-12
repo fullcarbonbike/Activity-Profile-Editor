@@ -44,6 +44,66 @@ rather than just hide it, clone a profile under a new name, restore a
 profile that's no longer on the device, batch several changes into one
 device restart, and automatic backups before every write.
 
+## Which Edge models this works with
+
+**Your Edge has to mount as a normal disk for the automatic workflow to
+work.** On a Mac that means a volume appears under `/Volumes`; on Windows
+it means the device gets a drive letter. The toolkit finds your Garmin by
+looking for that mount, so if it isn't there, nothing past the first
+screen will run.
+
+| | |
+|---|---|
+| **Fully supported** | Edge models that use USB Mass Storage — including the **Edge 530**, the model this project is developed and tested against |
+| **Editing only, manual copy in and out** | Edge models that use **MTP** — reported for the **540, 840, 1040 and 1050** |
+
+Garmin moved the newer models to MTP (Media Transfer Protocol), which
+presents a firmware-controlled view of the device rather than a real
+disk. Windows shows it as a "Portable Device" with no drive letter;
+macOS Finder can't browse MTP at all. Either way this toolkit's device
+detection won't find it, and that's a hard stop rather than a
+degradation — you'll get "no device detected" and go no further.
+
+Note this may have arrived on your device through a firmware update
+rather than being true when you bought it.
+
+### Using it as a profile editor on an MTP device
+
+You can still use everything this toolkit does to a profile — it just
+can't move files on and off the device for you. You'll need an MTP file
+browser: **Windows Explorer** handles this natively, and on macOS
+[OpenMTP](https://openmtp.ganeshrvel.com/) or Commander One will.
+
+1. Copy the profile you want to edit off the device. Profiles live in
+   `Garmin/Sports/` and are `.fit` files named after the profile.
+2. In the GUI, use **Import Profile** and pick that file. Edit as normal.
+3. Copy the edited file back into the device's `Garmin/NewFiles/` folder
+   yourself, then restart the Edge to make it import.
+
+**Two things will silently waste your time if you get them wrong:**
+
+The file to copy back is in your working folder under
+`staging/`, and it's the one ending **`.editing.fit`** — for example
+`staging/CyclingRoad_staged_20260912_101500.fit.editing.fit`. The plain
+`_staged_` file next to it is the untouched original the edits were built
+from, not your result.
+
+**Rename it to the profile's original filename** (`CyclingRoad.fit` in
+that example) when you put it in `NewFiles/`. The device matches by
+filename on import — a file with any other name is ignored, and you get
+no error to tell you why nothing changed.
+
+Back up the original `.fit` file you copied off the device before you
+start. On a mass-storage Edge the toolkit does that for you
+automatically; on this path nothing is protecting you but your own copy.
+
+Whether `NewFiles/` is actually visible and writable over MTP is
+**unverified** — this project has no MTP device to test against. If you
+try this, please
+[open a discussion](https://github.com/fullcarbonbike/Activity-Profile-Editor/discussions)
+and say whether it worked and on which model. That single data point
+would settle whether this workflow is real or theoretical.
+
 ## License
 
 Released under the [MIT License](LICENSE) — free to use, modify, and
@@ -484,6 +544,31 @@ link is missing; restore from a backup, or set it again on the device.
 Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
+
+*Doc rev 79 — refreshed 2026-09-12.* **Documentation only, no code
+change: which Edge models this actually works with.** Newer Edge models —
+reported for the 540, 840, 1040 and 1050 — connect over MTP rather than
+as a USB mass-storage disk, so they never appear under `/Volumes` on a
+Mac or get a drive letter on Windows. This toolkit finds your Garmin by
+looking for that mount, which makes it a hard stop at the first screen
+rather than a degraded experience. That was previously undocumented, so
+anyone with a current-generation Edge would reasonably have concluded the
+software was broken.
+
+The new "Which Edge models this works with" section says so plainly and
+describes the manual route for MTP devices: copy the profile off with an
+MTP browser, use Import Profile, edit normally, then copy the result into
+`Garmin/NewFiles/` yourself. Two details in there are easy to get wrong
+and fail silently — the file to copy back is the one ending
+`.editing.fit` in your working folder's `staging/`, not the plain
+`_staged_` original beside it, and it must be renamed to the profile's
+original filename, since the device matches by filename on import and
+ignores anything else without reporting an error.
+
+Flagged honestly in that section: whether `NewFiles/` is visible and
+writable over MTP at all is **unverified**, since this project has no MTP
+device to test against, with a request for anyone who tries it to report
+back. Prior rev (78, 2026-09-10) follows.*
 
 *Doc rev 78 — refreshed 2026-09-10.* **v1.4.0 — Garmin's special screens
 are now edited the way the device actually presents them.** Map, Segment,
