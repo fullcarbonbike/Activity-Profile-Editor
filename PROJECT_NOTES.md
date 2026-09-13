@@ -1,5 +1,63 @@
 # Activity Profile Editor for Garmin Edge
 
+*Doc rev 114 — refreshed 2026-09-13.* **A second device is coming: an
+Edge 840 (MTP), arriving ~2026-09-22, with the 530 deliberately KEPT.
+"Keep backups of separate physical devices apart" is PROMOTED to the
+next item to build. One conclusion from Doc rev 85 is reopened as a
+result — it was narrower than it has been read as.**
+
+**Why keeping the 530 matters.** Garmin's trade-in offer would have
+taken it. Every confirmed finding in this project — 169 field IDs, the
+f10 table, mesg 170, the twelve-type layout survey — rests on that
+device. Without it there is no way to distinguish "the 840 behaves
+differently" from "the toolkit regressed." It is the regression
+baseline, and the project would have lost it for roughly no saving.
+
+**What gets built next.** The per-device-serial backup folder work
+(Open item, design-complete since 2026-08-15) was LOW PRIORITY only
+because it served a hypothetical two-device user. That user now exists.
+The design is unchanged and still sound: auto-switch `working_dir` on
+the `serial_number` `get_device_info()` already reads at Detect,
+serial-keyed map in the existing JSON sidecar, `Change...` learns the
+mapping itself, fall back to today's behaviour for an unknown serial.
+The one known wrinkle also stands — `save_working_dir()`'s blind
+`json.dump()` overwrite must become read-modify-write first, or a
+`Change...` click wipes the map.
+
+**⚠ REOPENED: Doc rev 85's "mismatch is harmless and self-correcting"
+does NOT cover cross-MODEL deploys.** That test put a profile carrying
+a deliberately FAKE serial onto a 530; the device imported it cleanly,
+kept every screen/field/zone byte-for-byte, and silently rewrote the
+serial to its own. On that basis the planned cross-device warning was
+downgraded to an informational nudge. The flaw in carrying that
+forward: the test varied the SERIAL and held the MODEL constant — it
+was 530 -> 530. It establishes that a serial mismatch is benign, which
+is strictly narrower than "a profile from another device is benign."
+
+Deploying a 530 profile to an 840 is a different question: another
+hardware generation, plausibly a different set of supported f10 screen
+types and field IDs, and no evidence at all about how the receiving
+device treats a screen type it doesn't implement. The nudge-versus-
+warning wording is therefore UNDECIDED again, pending a real
+cross-model test with both units present. Build the plumbing; decide
+the wording from evidence, not from the 530 result.
+
+Recorded because this is the second time in two weeks a conclusion has
+turned out to be scoped to the one device this project owns — the MTP
+finding (Doc rev 113) was the first. Worth a standing habit of asking
+which variable a hardware test actually varied.
+
+**Also unlocked by the 840, at no risk:** the first non-530 screen
+census. Reading its factory profiles with `fit_dump.py screens` tests
+whether `NAMED_SCREEN_TYPES` and the new `NAMED_SCREEN_LAYOUTS` hold
+across models — the single largest unknown in the codebase — without
+writing anything. Do that before any write-side test; it should predict
+what the cross-model deploy does. It will also answer directly whether
+`NewFiles/` is exposed and writable over MTP, which is the blocker
+gating the offline-mode/Export work in Doc rev 113.
+
+Prior rev (113, 2026-09-12) follows.*
+
 *Doc rev 113 — refreshed 2026-09-12.* **Newer Edge models use MTP, not
 USB mass storage, so this toolkit cannot detect them at all. Documented;
 no code change yet. This is very likely also why no non-530 testers have
@@ -5414,9 +5472,56 @@ Kept deliberately, for pattern-recognition on future work:
   project) isn't a real problem at these file sizes. The redundant
   copies are annoying (terminal noise, wasted I/O) but not a resource
   concern. Batched with the other low-priority/deferred items.
-- **Keep backups of separate physical devices apart -- LOW PRIORITY
-  (requested by a tester, scoped 2026-08-15, not yet built).** A
-  tester who alternates between two Garmin Edge units wants their
+- **Keep backups of separate physical devices apart -- PROMOTED TO NEXT
+  ITEM TO BUILD (2026-09-13, Doug's call). Design-complete since
+  2026-08-15; was LOW PRIORITY on the grounds that it served a
+  hypothetical two-device user. Doug has now bought an Edge 840,
+  arriving around 2026-09-22, and is deliberately KEEPING the 530 --
+  so he becomes that user, and the feature stops being speculative.**
+
+  Keeping both units is itself load-bearing for the project, not just
+  convenient: every confirmed finding here (169 field IDs, the f10
+  table, mesg 170, the twelve-type layout survey) was established on
+  the 530. Without it there would be no way to separate "the 840
+  behaves differently" from "the toolkit regressed." The 530 is the
+  regression baseline; Garmin's trade-in offer would have consumed it.
+
+  **⚠ THE 2026-08-26 "harmless mismatch" CONCLUSION DOES NOT COVER
+  CROSS-MODEL, and must not be carried forward as if it does.** The
+  real-hardware test below deployed a profile with a FAKE serial to a
+  530 and found the device imported it cleanly, preserved every
+  screen/field/zone byte-for-byte, and silently rewrote the serial to
+  its own. That is what downgraded the planned cross-device warning to
+  an informational nudge. But that test varied the SERIAL while holding
+  the MODEL constant -- it was 530 -> 530. What it establishes is that
+  a serial mismatch is benign, which is a strictly narrower claim than
+  "a profile from another device is benign."
+
+  A 530 profile deployed to an 840 is a different question entirely: a
+  different hardware generation, plausibly a different set of supported
+  f10 screen types and field IDs. Whether the 840 gracefully ignores a
+  screen type it doesn't implement, silently drops it, or does
+  something worse is UNTESTED and does not follow from the 530 result.
+  So the nudge-versus-warning decision is REOPENED, pending a real
+  cross-model test once both devices are on the desk. Build the
+  detection and the plumbing first; decide the wording from evidence.
+
+  That test is also worth running for its own sake — it is the same
+  question as "do NAMED_SCREEN_TYPES and NAMED_SCREEN_LAYOUTS hold
+  across models," approached from the write side rather than by reading
+  the 840's own profiles. Do the read-side census first (it is
+  risk-free), and let it predict what the write-side test should show.
+
+  Sequencing note, since both are now queued: this item and the
+  offline-mode/Export work (see the Open item near the top of this
+  section) touch adjacent code but are independent. This one is smaller,
+  fully designed, and needs only hardware Doug will have. Offline mode
+  is larger and still gated on whether NewFiles is writable over MTP --
+  which the 840 will also answer directly, rather than by forum hearsay.
+
+  --- original scoping follows ---
+
+  A tester who alternates between two Garmin Edge units wants their
   backups kept separate rather than folding together into one folder.
   The base capability already exists and shipped a while back: the
   "Change..." button on `ProfileListPanel` lets a user redirect
@@ -5535,6 +5640,17 @@ Kept deliberately, for pattern-recognition on future work:
   a guess, not verified -- would need `number` checked across Doug's
   other existing profiles to say anything definite). Logged as a new,
   small, low-priority open question, not chased further right now.
+
+  **⚠ SCOPE LIMIT ON THIS TEST, added 2026-09-13 (see Doc rev 114).**
+  It varied the SERIAL and held the MODEL constant — 530 to 530. It
+  therefore establishes that a SERIAL mismatch is benign, and NOT the
+  broader claim that a profile from another device is benign. Conclusion
+  (2) below, which downgrades the cross-device warning to an
+  informational nudge on the strength of this result, is REOPENED
+  pending a real cross-MODEL test (530 profile onto the incoming Edge
+  840). A different hardware generation may support a different set of
+  f10 screen types and field IDs, and nothing here says how a receiving
+  device treats a screen type it doesn't implement.
 
   **IMPLICATIONS, Doug's own conclusions from the result:** (1) This
   is real, positive evidence for the warranty-replacement/device-
