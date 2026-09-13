@@ -43,6 +43,18 @@ dependency, and no writes to the device from us. For those users the
 toolkit becomes a profile editor rather than a device manager, which is
 the genuinely novel part regardless.
 
+**CORRECTION, same day, found while scoping that route: Import is NOT
+reachable without a device, so the cheap alternative does not currently
+work either.** `DetectPanel.on_detect()` disables its Next button when
+`find_garmin_root()` returns None, and Import Profile lives on
+`ProfileListPanel`, downstream of that gate. This was asserted in an
+earlier draft of README Doc rev 79 as a workaround users could follow
+today; it was wrong and was corrected before that draft was committed.
+Recording it because the mistake is instructive: "the feature exists"
+was checked, "the feature is reachable in the state the user will be in"
+was not. The real unlock is an offline mode, with Export as the second
+half — see Open items for the three-part scope.
+
 **Two manual-path details that fail SILENTLY**, documented in README Doc
 rev 79 because both cost real time to diagnose: the file to hand-copy is
 `working_dir/staging/<name>_staged_<ts>.fit.editing.fit`, NOT the plain
@@ -4500,6 +4512,52 @@ Kept deliberately, for pattern-recognition on future work:
 ---
 
 ## Open items
+
+- **SCOPED, NOT BUILT (2026-09-12, Doug's request) — "Export edited
+  profile to a folder of the user's choice."** Write the edited profile
+  out under its **clean original filename** (`CyclingRoad.fit`), to a
+  folder the user picks, so it can be dropped straight into the device's
+  `NewFiles/` by whatever means suits them (OpenMTP, Commander One,
+  Windows Explorer). The toolkit stops at producing a correct file; the
+  transport is the user's problem. Deferred until after 2026-09-22.
+
+  **Why it matters beyond MTP.** It also removes the need to ever explain
+  the `staging/` folder. Today a manual copy means finding
+  `staging/<name>_staged_<ts>.fit.editing.fit`, knowing to prefer it over
+  the plain `_staged_` file beside it (that one is the pristine pre-edit
+  copy), and renaming it to the original filename — because
+  `write_to_newfiles()` matches by filename on import and the device
+  silently ignores anything else. Both traps are invisible: nothing
+  errors, the profile just doesn't change. An Export button makes both
+  disappear rather than documenting them.
+
+  **⚠ THE REAL BLOCKER, and it is NOT the export itself.** An MTP user
+  cannot reach Import today. `DetectPanel.on_detect()` calls
+  `next_btn.Disable()` when `find_garmin_root()` returns None, and
+  **Import Profile lives on `ProfileListPanel`, behind that gate.** So
+  the whole "Import → edit → Export" route is unreachable on exactly the
+  devices it exists to serve. Export alone buys nothing. The work is
+  really three parts:
+
+  1. **A no-device entry path** — let the user past DetectPanel without a
+     mounted Garmin (a "Work without a device" / offline route reaching
+     Import directly). This is the actual unlock.
+  2. **Export** — the part requested above.
+  3. **Graceful degradation downstream.** Everything past DetectPanel
+     currently assumes `frame.garmin_root` is real: deploy, eject,
+     remount-wait, post-write verification, `backup_profiles()` on
+     entering the profile list, and Restore-from-Backup's device-relative
+     paths. Each needs to be either hidden or safely inert in offline
+     mode. This is the part most likely to be underestimated — it's a
+     mode the GUI has never had, not a button.
+
+  Scope it as its own release, not a patch bolted onto v1.4.x.
+
+  **Still unverified, and it decides whether any of this is worth
+  building:** is `NewFiles/` even exposed and writable over MTP? If the
+  firmware only surfaces Activities and media folders, this whole path
+  ends at "you can edit but not deploy." No MTP hardware is available to
+  this project — see Doc rev 113. Get that answer before starting.
 
 - **CLOSED, OUT OF SCOPE (2026-08-24) — "Delete an entire Activity
   Profile" (not just a screen within one).** Doug asked (2026-08-22)

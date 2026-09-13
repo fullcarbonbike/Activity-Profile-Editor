@@ -54,8 +54,8 @@ screen will run.
 
 | | |
 |---|---|
-| **Fully supported** | Edge models that use USB Mass Storage — including the **Edge 530**, the model this project is developed and tested against |
-| **Editing only, manual copy in and out** | Edge models that use **MTP** — reported for the **540, 840, 1040 and 1050** |
+| **Supported** | Edge models that use USB Mass Storage — including the **Edge 530**, the model this project is developed and tested against |
+| **Not currently usable** | Edge models that use **MTP** — reported for the **540, 840, 1040 and 1050** |
 
 Garmin moved the newer models to MTP (Media Transfer Protocol), which
 presents a firmware-controlled view of the device rather than a real
@@ -67,42 +67,37 @@ degradation — you'll get "no device detected" and go no further.
 Note this may have arrived on your device through a firmware update
 rather than being true when you bought it.
 
-### Using it as a profile editor on an MTP device
+### Using it as a profile editor on an MTP device — planned, not yet possible
 
-You can still use everything this toolkit does to a profile — it just
-can't move files on and off the device for you. You'll need an MTP file
-browser: **Windows Explorer** handles this natively, and on macOS
-[OpenMTP](https://openmtp.ganeshrvel.com/) or Commander One will.
+To be straight about the current state: **there is no working route for
+an MTP device today.** The GUI won't let you past its first screen
+without a mounted Garmin, and the Import Profile feature — which would
+otherwise let you edit a profile copied off by hand — sits behind that
+same gate. So the toolkit is currently unusable on a 540, 840, 1040 or
+1050, not merely inconvenient.
 
-1. Copy the profile you want to edit off the device. Profiles live in
-   `Garmin/Sports/` and are `.fit` files named after the profile.
-2. In the GUI, use **Import Profile** and pick that file. Edit as normal.
-3. Copy the edited file back into the device's `Garmin/NewFiles/` folder
-   yourself, then restart the Edge to make it import.
+The intended route, once built, is to let you work without a connected
+device at all:
 
-**Two things will silently waste your time if you get them wrong:**
+1. Copy the profile off the device with an MTP browser
+   ([OpenMTP](https://openmtp.ganeshrvel.com/) or Commander One on macOS,
+   Explorer on Windows). Profiles live in `Garmin/Sports/` as `.fit`
+   files named after the profile.
+2. Import it into the toolkit and edit as normal.
+3. Export the result — already correctly named — and copy it into the
+   device's `Garmin/NewFiles/` yourself, then restart the Edge.
 
-The file to copy back is in your working folder under
-`staging/`, and it's the one ending **`.editing.fit`** — for example
-`staging/CyclingRoad_staged_20260912_101500.fit.editing.fit`. The plain
-`_staged_` file next to it is the untouched original the edits were built
-from, not your result.
+That needs an offline mode and an Export function, neither of which
+exists yet. Both are scoped in `PROJECT_NOTES.md` under Open items.
 
-**Rename it to the profile's original filename** (`CyclingRoad.fit` in
-that example) when you put it in `NewFiles/`. The device matches by
-filename on import — a file with any other name is ignored, and you get
-no error to tell you why nothing changed.
-
-Back up the original `.fit` file you copied off the device before you
-start. On a mass-storage Edge the toolkit does that for you
-automatically; on this path nothing is protecting you but your own copy.
-
-Whether `NewFiles/` is actually visible and writable over MTP is
-**unverified** — this project has no MTP device to test against. If you
-try this, please
+**One question would settle whether this is worth building at all:** is
+`Garmin/NewFiles/` visible and writable over MTP on your device? If the
+firmware only exposes Activities and media folders, then even with the
+above the answer is "you could edit a profile but never install it." This
+project has no MTP device to test against, so if you have one, please
 [open a discussion](https://github.com/fullcarbonbike/Activity-Profile-Editor/discussions)
-and say whether it worked and on which model. That single data point
-would settle whether this workflow is real or theoretical.
+and say what you can see. That's a two-minute look in a file browser and
+it would directly shape whether this gets built.
 
 ## License
 
@@ -555,20 +550,22 @@ rather than a degraded experience. That was previously undocumented, so
 anyone with a current-generation Edge would reasonably have concluded the
 software was broken.
 
-The new "Which Edge models this works with" section says so plainly and
-describes the manual route for MTP devices: copy the profile off with an
-MTP browser, use Import Profile, edit normally, then copy the result into
-`Garmin/NewFiles/` yourself. Two details in there are easy to get wrong
-and fail silently — the file to copy back is the one ending
-`.editing.fit` in your working folder's `staging/`, not the plain
-`_staged_` original beside it, and it must be renamed to the profile's
-original filename, since the device matches by filename on import and
-ignores anything else without reporting an error.
+The new "Which Edge models this works with" section says so plainly. It
+also corrects a first draft of that section, written the same day, which
+described a manual workaround — copy the profile off, use Import Profile,
+copy the result back — **that cannot actually be followed today.** The
+GUI disables its Next button when no device is mounted, and Import
+Profile lives behind that gate, so an MTP user can't reach it. Publishing
+instructions that dead-end would have been worse than saying nothing, so
+the section now states plainly that these models are unusable at present
+and describes the offline-mode + Export route as planned rather than
+available. Scoped in `PROJECT_NOTES.md` under Open items.
 
-Flagged honestly in that section: whether `NewFiles/` is visible and
-writable over MTP at all is **unverified**, since this project has no MTP
-device to test against, with a request for anyone who tries it to report
-back. Prior rev (78, 2026-09-10) follows.*
+Flagged there too: whether `NewFiles/` is visible and writable over MTP
+at all is **unverified**, since this project has no MTP device to test
+against — with a request for anyone who has one to report what they can
+see, because that answer decides whether the work is worth doing.
+Prior rev (78, 2026-09-10) follows.*
 
 *Doc rev 78 — refreshed 2026-09-10.* **v1.4.0 — Garmin's special screens
 are now edited the way the device actually presents them.** Map, Segment,
