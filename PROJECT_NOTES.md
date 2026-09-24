@@ -1,5 +1,87 @@
 # Activity Profile Editor for Garmin Edge
 
+*Doc rev 116 — refreshed 2026-09-24.* **THREE CORRECTIONS TO DOC REV
+115, all from continued 840 work the same day. One of them — that the
+840's `Totals.fit` uses a different layout — was simply WRONG, and the
+way it went wrong is instructive. Doc rev 115 stands as published; this
+supersedes it.**
+
+**(1) CORRECTION — the 840's `Totals.fit` DOES match the 530's mapping.**
+Doc rev 115 states it does not, and that the 530-derived mapping "must
+not be assumed to carry over." That is wrong. Read with
+`fit_raw_walk.parse_fit()` the 840's file is an ordinary FIT totals
+message:
+
+| def_num | meaning |
+|---|---|
+| 0 | timer_time (s) |
+| **1** | **distance (uint32, plain metres)** |
+| 2 | calories |
+| 3 | sport |
+| 5 | sessions |
+| 10 | 32-byte profile NAME |
+| 12 | timestamp |
+
+`distance` at def_num 1 in metres is exactly the 530 layout, confirmed
+there against a real odometer reading. **Open item #106's mapping is
+restored**, and `f10` is a bonus the 530 work never surfaced: a totals
+record can be tied to its profile by NAME rather than by slot index.
+
+**How the wrong answer was produced, since the mechanism will recur.**
+Two artifacts stacked. The garmin-fit-sdk decoder mis-renders the
+undocumented 32-byte name field as a string array, which made the whole
+record look structurally alien; and the inspection script filtered out
+zero-valued fields, which hid every `distance` on a device that had not
+yet ridden anywhere. Neither alone would have been convincing. Together
+they produced a confident, specific, wrong conclusion about a file
+format. **Rule going forward: when a decode looks structurally strange,
+drop to `fit_raw_walk` before concluding the format changed.** The SDK
+is a convenience over documented messages, not ground truth for
+undocumented ones — which is most of what this project deals in.
+
+**(2) The post-migration odometer anomaly was TRANSIENT, and it tells us
+something useful about #106.** After setup, the Odometer data field on
+the live ROAD profile read **1,023,793.19 miles** while ROAD's stored
+`distance` was **0**. A full power cycle brought the display to 0.00,
+matching the file.
+
+So the device holds the odometer in memory and the display can diverge
+wildly from the file — but **it re-reads `Totals.fit` on boot**, since
+the power cycle resolved the disagreement in the FILE's favour rather
+than flushing the garbage back out. That is meaningfully better news for
+a patch-then-power-cycle workflow than the `flags: read` declaration
+alone suggested. It is NOT proof: what was observed is the device
+ADOPTING the file's value on boot, not the device DECLINING to overwrite
+a value it disagrees with. Any real attempt must verify by pulling the
+file back after a power cycle, never by reading the screen.
+
+Also observed: the setup migration brought PROFILES across from the 530
+(a GRAVEL profile appeared that the factory 840 lacked) but NOT their
+odometer totals — every named profile's `distance` is 0.
+
+**(3) RESOLVED — the cable was the cause, not the power cycle.** Doc rev
+115 records that the 840 finally enumerated after a cable change AND a
+power cycle, with which one responsible left deliberately unknown. Now
+isolated: **the USB-C cable supplied in the box with the Edge 840 does
+not work for data.** It has never once reached USB connected mode; a
+third-party cable works every time. Whether it is faulty or charge-only
+by design is still unestablished.
+
+This is worth carrying into user-facing docs, because the failure is
+actively misleading: **the device charges from the bad cable and boots
+normally**, so every visible sign says the connection is good while the
+host sees nothing at all. USB-C makes power contact independently of the
+data lines, so "it's charging" is evidence of nothing. The
+`ioreg -p IOUSB` before/after diff in Doc rev 115 cuts through it in
+thirty seconds and applies equally to a 530 on mass storage.
+
+**Also practical, and not obvious:** reaching USB connected mode on the
+840 takes a deliberate sequence — power the device OFF, connect the
+cable, then briefly press the power button. It does not simply appear on
+plugging in the way the 530 does.
+
+Prior rev (115, 2026-09-24) follows.*
+
 *Doc rev 115 — refreshed 2026-09-24.* **First data from a second device.
 An Edge 840 (firmware 29.22, MTP) is now on hand alongside the 530. The
 f10 table and the v1.4.0 layout model largely HOLD across models — but
@@ -6040,7 +6122,15 @@ Kept deliberately, for pattern-recognition on future work:
   does mean a write would be going against the device's own published
   capability, which is a materially worse position than "undocumented."
 
-  (2) **The 840's `Totals.fit` does NOT match the 530-derived mapping.**
+  (2) **WITHDRAWN 2026-09-24, see Doc rev 116 — this was wrong.** The
+  840's `Totals.fit` DOES match the 530-derived mapping: `distance` at
+  def_num 1, uint32, plain metres, plus a 32-byte profile NAME at
+  def_num 10 that the 530 work never surfaced. The claim below came from
+  an SDK mis-decode combined with an inspection script that hid
+  zero-valued fields on a device with no mileage. **The mapping is not a
+  blocker for this item.** Superseded text follows for the record:
+
+  (2, SUPERSEDED) **The 840's `Totals.fit` does NOT match the 530-derived mapping.**
   The 530 work located `distance` at def_num 1 (uint32, plain meters)
   and confirmed it exactly against a real odometer reading. The 840's
   file decodes with undocumented fields 10/11/12, profile NAMES embedded
@@ -6048,6 +6138,19 @@ Kept deliberately, for pattern-recognition on future work:
   profile slot, does match. So the mapping is model-specific at best and
   would need redoing per device -- and properly mapping it needs a unit
   with real accumulated mileage, which a new 840 does not have.
+
+  (3) **NEW EVIDENCE, and it cuts in this item's FAVOUR (2026-09-24,
+  Doc rev 116).** After the 840's setup migration the on-screen Odometer
+  read 1,023,793.19 miles while the stored `distance` was 0; a full
+  power cycle brought the display to 0.00, matching the file. So the
+  device **re-reads `Totals.fit` on boot** and resolved the
+  disagreement in the FILE's favour rather than flushing its in-memory
+  value back out. That is what a patch-then-power-cycle workflow
+  depends on, and it is better than `flags: read` alone implied.
+  Carefully: what was observed is the device ADOPTING the file's value,
+  not DECLINING to overwrite one it disagrees with. Verify any real
+  attempt by pulling the file back after a power cycle, never by
+  reading the screen.
   Doug wanted a toolkit way to set a profile's lifetime mileage total to
   a known-accurate figure (e.g. Strava YTD/all-time), or reset it to
   zero, rather than relying only on the on-device "History > Totals >
