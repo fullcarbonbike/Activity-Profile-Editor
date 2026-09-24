@@ -1,5 +1,296 @@
 # Activity Profile Editor for Garmin Edge
 
+*Doc rev 115 — refreshed 2026-09-24.* **First data from a second device.
+An Edge 840 (firmware 29.22, MTP) is now on hand alongside the 530. The
+f10 table and the v1.4.0 layout model largely HOLD across models — but
+not entirely, and the data_screen message itself differs. Three new
+screen types identified (Power Guide, Stamina, GroupRide), and one of
+them breaks a layout generalisation the twelve-type survey had earned.
+Read-only findings; no code changed yet.**
+
+---
+
+### Getting connected at all — MTP, and a long false start
+
+The 840 arrived on **firmware 29.22** (current is 31.33; MTP landed in
+25.24), so no mass-storage window existed. Expected.
+
+What wasn't expected: **the Mac did not enumerate the device at all for
+some time.** `ioreg -p IOUSB -w 0` diffed before and after connecting was
+byte-identical — no USB device appeared, while the Edge charged and ran
+normally. That ruled out every software-layer explanation, including
+Garmin Express, OpenMTP and MTP itself: nothing in userspace can see a
+device the kernel never enumerated. Worth keeping as the first
+diagnostic for any "device not found" report, on either transport:
+
+```
+ioreg -p IOUSB -w 0 > /tmp/a   # unplugged
+ioreg -p IOUSB -w 0 > /tmp/b   # plugged
+diff /tmp/a /tmp/b             # empty = no electrical enumeration
+```
+
+(On current macOS the `system_profiler` data type is
+**`SPUSBHostDataType`**, not `SPUSBDataType`; the old name returns
+nothing at all, which reads misleadingly like "no devices".)
+
+It eventually enumerated after a **cable change AND a power cycle with
+the device connected**. Both were changed at once, so **which one fixed
+it is unknown** — flagged rather than guessed, because whichever gets
+written down becomes the advice given to other people, and "try another
+cable" and "power-cycle while plugged in" send users down very different
+paths. Worth isolating if the situation recurs.
+
+Once enumerated, `NewFiles/` IS present and visible over MTP — the
+blocking question for the offline-mode/Export work (Doc rev 113) is
+answered in the affirmative for existence. Writability still untested.
+
+**Transfer hazard, confirmed the hard way:** dragging a file from
+OpenMTP's device pane directly into Finder produced a 3560-byte file
+named `download.svg` containing `<?xml version="1` — OpenMTP's own UI
+asset, not the profile. Wrong name AND wrong contents, silently. Using
+OpenMTP's own split-pane transfer works correctly. Any file pulled off
+an MTP device should be verified before use: a real profile has the
+ASCII `.FIT` at byte offset 8.
+
+---
+
+### `Device.fit` publishes the device's own limits
+
+This file is more valuable than previously appreciated — the device
+DECLARES capabilities this project had been inferring:
+
+- **`mesg_num 14, num_per_file: 31`** — 31 data_screen slots per sport
+  file. Confirmed against the bytes: the 840's three factory profiles
+  AND the 530's RoadClone each contain exactly 31 mesg-14 records. The
+  slot ceiling is now device-stated rather than observed.
+- **`mesg 14, field_num 7, count 10`** — independently confirms
+  `MAX_FIELDS_PER_SCREEN = 10`.
+- Per-sport-file counts for other messages too: mesg 16 (13), 17 (4),
+  70 (3), 71 (13), `speed_zone` (11), `met_zone` (22).
+- **`Totals` is declared `flags: read`** — READ-ONLY. Directly relevant
+  to the odometer Open item; see the amendment there.
+- A full authoritative directory list (Settings, Sports, Activities,
+  Workouts, Courses, Totals, Segments, PowerGuide, GroupRide, Coach and
+  more). **`NewFiles` is NOT among them**, consistent with it being an
+  import staging area rather than a storage type.
+
+---
+
+### The data_screen message is NOT identical across models
+
+Comparing raw field definitions in mesg 14:
+
+| field | 530 | 840 |
+|---|---|---|
+| 5 | 10 bytes (`uint8[10]`) | **absent** |
+| 14 | absent | **20 bytes (`uint16[10]`)** |
+
+Everything else (1, 3, 4, 6, 7, 8, 9, 10, 11, 12, 254) matches. So the
+840 **replaced field 5 with a widened field 14**, and `Device.fit`
+confirms the intent: `mesg 14, field_num 14, count 10` — a second
+ten-slot array running parallel to the field-ID array in f7.
+
+Its value is **`0xFFFF` in every slot of every screen** on all three
+factory profiles — present but unset, exactly the pattern the v1.4.0
+survey found for fields 5 and 6 on the 530. Purpose unknown.
+
+**No code change is needed for this yet, but the reason is worth
+recording:** `patch_screen()` patches specific field byte ranges in
+place rather than rebuilding the record, so a field it has never heard
+of is preserved untouched. The architecture already tolerates this. That
+should be verified explicitly with a real 840 round-trip before it is
+relied on.
+
+---
+
+### Seven unknown f10 screen types on the 840 — three now NAMED
+
+Confirmed from raw bytes, and appearing with byte-identical field
+templates across all three factory profiles — Garmin-authored named
+types, not user screens:
+
+| f10 | f3 | fields | identified as |
+|---|---|---|---|
+| 30 | 2 | Timer, Distance | *unknown* |
+| 64 | 2 | Lights Connected, Light Mode | *unknown* (near-certainly Lights) |
+| 125 | 2 | Distance, Elevation (ft) | **Power Guide** |
+| 127 | 2 | Power Graph, Heart Rate Graph | **Stamina** |
+| 128 | 2 | Speed, Distance — **INDOOR only** | *unknown* |
+| 162 | 0 | *(none)* | **GroupRide** |
+| 223 | 5 | Timer, Speed, Distance, Percent Grade, TOD | *unknown* |
+
+**How the three were identified, and why the method matters.** Reading
+the on-device editor's screen list for ROAD gave eleven names against
+the file's seventeen orderable screens. The six missing from the editor
+were exactly the sensor-gated ones (Cycling Dynamics, f10=64/lights,
+STEPS, eBike) plus f10=30 and 223, so the remaining names lined up
+against the file's POS order positionally. That alone would be an
+inference that shifts if a single assumption about which screens are
+omitted is wrong.
+
+So each was then **confirmed by CONTENT**, which is independent of
+ordering: GroupRide shows no data fields (f3=0), Stamina shows Power
+Graph and Heart Rate Graph, Power Guide shows Distance and Elevation —
+each matching what the file stores for that f10. Two of the three are
+corroborated a third way: `Device.fit`'s directory list declares
+`PowerGuide` (type 63) and `GroupRide` (type 76) as file types.
+
+All three are Edge 840-era features with no 530 equivalent, which is
+why they were unknown rather than mis-mapped.
+
+**GroupRide (162) belongs in `NO_FIELD_EDIT_TYPES`, not
+`NAMED_SCREEN_LAYOUTS`.** The on-device editor offers no data fields for
+it at all — the same standard of evidence that put GroupTrack List,
+Virtual Partner and Workout there, and precisely the distinction Doc rev
+111 established cannot be inferred from `f3=0` alone.
+
+Doug's own note, recorded as the plausible reading rather than as
+established: GroupRide appears to be an enhanced successor to
+GroupTrack, and both it AND GroupTrack List (f10=57) being present on
+the same profile may be backward compatibility with older units.
+
+### ⚠ Stamina breaks a layout generalisation the survey had earned
+
+Stamina's on-device editor offers counts **0, 2/A, 2/B, 4, 5, 6** — no
+1, no 3. That fits none of the four groups from the twelve-type survey:
+it has a zero state like Map and Segment, an A/B pair at 2, and an ODD
+count at 5.
+
+More importantly, at **2/A the two fields are stacked FULL WIDTH** —
+Power Graph mid-screen with Heart Rate Graph full width below it — not
+the side-by-side half-width pair used by every other named 2-field type.
+So Stamina needs `{2: [[0], [1]]}` where Compass, Elevation, Cycling
+Dynamics, ClimbPro and Power Guide all use `{2: [[0, 1]]}`.
+
+"A named type with 2 fields renders them half-width side by side" held
+across all twelve types on the 530 and was a fair generalisation from
+that evidence. It is not a rule.
+
+**Power Guide (125) does join the fixed-2 group** cleanly: fixed at 2,
+half-width, fields at the bottom with the content area above —
+structurally identical to Compass and friends.
+
+**Stamina offering 5 has a bearing on the eBike question below.** It
+shows the 840 genuinely supports field counts the 530's layout set never
+offered, which makes eBike Metrics shipping 5 fields look like a real
+capability rather than a clamp artifact. Shifts the odds; does not
+settle it.
+
+All ten previously-known named types (Map, Lap Summary, Elevation,
+Compass, GroupTrack List, Workout, Segment, Cycling Dynamics, STEPS,
+eBike Metrics, ClimbPro) resolved correctly on the 840. **The f10 table
+transfers across generations**, which is the single most reassuring
+result here.
+
+Three new unmapped FIELD ids as well: **520, 578** (both in Workout) and
+**579** (in both STEPS and eBike Metrics). `KNOWN_UNRESOLVED_IDS` has
+been empty for the life of this project; it should not be now.
+
+---
+
+### ⚠ Two direct conflicts with the v1.4.0 layout model
+
+Both consistent across all three 840 factory profiles, so neither is an
+artifact:
+
+- **eBike Metrics (f10=58) stores 5 fields.** `_FLEX4_STATES` says 1-4.
+  The stored array is real content (`[491, 579, 494, 56, 6]` = Assist
+  Mode, id579, Travel Range, Timer, Distance), not padding.
+- **Workout (f10=38) stores 6 fields** — and is in
+  `NO_FIELD_EDIT_TYPES`. The content is genuinely workout-specific
+  (`[56, 6, 522, 520, 511, 578]` = Timer, Distance, Duration, id520,
+  Workout Comparison, id578), unlike the 530 where Workout carried a
+  verbatim copy of Cycling Dynamics' two fields.
+
+Both need the **840's own on-device editor** to resolve, and the answer
+decides the shape of the fix. If its editor offers those options, then
+`NAMED_SCREEN_LAYOUTS` and `NO_FIELD_EDIT_TYPES` are **per-model**, not
+global, and v1.4.0's central assumption needs revisiting. If the editor
+does NOT offer them while the device ships them, that is the clamp
+scenario and far more interesting.
+
+Note the Workout case cuts against Doc rev 111's reasoning, which
+promoted 38 to a hard block on the strength of the 530's editor. That
+evidence stands for the 530; it was never evidence about other models.
+This is the third time in a month a conclusion has proven scoped to the
+one device this project owned.
+
+---
+
+### What the 840 CONFIRMS about v1.4.0
+
+The model was built entirely on 530 observation, so these matter:
+
+- **`LAYOUT_GRIDS[6][1]`** — Doug's on-device view of the 6-field
+  layout-B screen shows two half-width, full, full, two half-width,
+  matching `[[0,1],[2],[3],[4,5]]` exactly.
+- **Lap Summary content sits at the BOTTOM**, with its data fields
+  above — and the content area carries a **live user-selectable metric
+  with scroll arrows**, which is precisely the lap-table column the
+  survey established is not stored in the profile at all. Seeing it
+  behave as a live selector on a different model corroborates that.
+- **Elevation's content area carries its own metrics.** The on-device
+  screen shows Total Ascent and Ascent Remaining above the graph, while
+  the file stores only two fields (Percent Grade, Elevation). So content
+  areas render their own readouts that never appear in the file — the
+  same principle as Lap Summary's lap table, now seen on a second type.
+- **Map ships with 0 fields** on every factory profile, confirming the
+  zero-field layout v1.4.0 made reachable was always a real state.
+
+---
+
+### `f12 = 0` does NOT mean "visible"
+
+The 840's ROAD profile has **all 17 configured screens at f12=0** — none
+user-hidden — yet only **four** appear when scrolling the active
+profile: Screen 1, Lap Summary, Map, Elevation.
+
+The other thirteen are **runtime-gated**, and on a device with no
+sensors paired that accounts for nearly all of them (Cycling Dynamics
+needs a power meter, f10=64 needs lights, STEPS/eBike need those
+drivetrains, GroupTrack needs a group, Workout needs a running workout,
+Segment needs a segment, ClimbPro needs a climb).
+
+This sharpens the SCREEN STATE MODEL: **f12 records whether the USER has
+hidden a screen; actual visibility is f12 AND the runtime precondition.**
+The project already knew this for ClimbPro and Segment individually;
+this is the first time it has been seen across most of a profile at
+once, and it is worth stating plainly so a future report of "my screens
+are missing" is not read as damage.
+
+---
+
+### Smaller findings
+
+- **The `startup.txt` UTF-8 BOM is Garmin's.** The 840 ships the file
+  with a leading `EF BB BF`. `garmin_device.py` v0.12.4 fixed a
+  self-perpetuating three-`?` corruption caused by that BOM but recorded
+  its origin as "unknown/unconfirmed." **Now confirmed: the device ships
+  it.** The strip-BOM fix was necessary, not defensive. The 840's
+  `<display = 0>` (with spaces) parses correctly — the existing regex
+  already allows whitespace.
+- **`file_id.serial_number` equals the USB descriptor serial.** The 840
+  reports `0xd87fcb12` in its USB descriptor and `3632253714` in
+  `Device.fit` and in all three profiles — the same number. **This gives
+  a route to device identity on an MTP device without reading any file
+  at all**, which is directly useful to the per-device-serial Open item,
+  where reading `Device.fit` over MTP would otherwise be a prerequisite.
+- **`file_id.number` looks like a profile index** — ROAD=0, MOUNTAIN=1,
+  INDOOR=2 on the 840. Doc rev 85 logged an unexplained `0 -> 6` change
+  in this field after a NewFiles import; a device-assigned slot counter
+  fits both observations. Strengthened hypothesis, still not proof.
+- **`Totals.fit` does not match the 530's mapping.** Eleven
+  `totals_mesgs`, one per profile slot — that part matches. But the
+  decode shows undocumented fields 10/11/12 with profile names embedded
+  in field 10 and no clean `distance`. The 530-derived mapping must not
+  be assumed to carry over.
+- **Compass ships Removed by default** on all three 840 profiles.
+- **Display wart:** `f10 = 255` is the uint8 unset sentinel, but
+  `screen_type_name()` renders it as "Screen 256" via its `f10+1`
+  fallback. Harmless, misleading, trivial to fix.
+
+Prior rev (114, 2026-09-13) follows.*
+
 *Doc rev 114 — refreshed 2026-09-13.* **A second device is coming: an
 Edge 840 (MTP), arriving ~2026-09-22, with the 530 deliberately KEPT.
 "Keep backups of separate physical devices apart" is PROMOTED to the
@@ -4571,6 +4862,58 @@ Kept deliberately, for pattern-recognition on future work:
 
 ## Open items
 
+- **OPEN, READ-ONLY DATA GATHERED (2026-09-24) — Edge 840 model
+  divergences.** See Doc rev 115 for the full findings. Nothing here is
+  built or decided; this is the to-do list the 840 generated. Ordered by
+  cost, cheapest first — the top three are all read-only and need only
+  the device's own editor.
+
+  1. **Name the unknown f10 types.** THREE DONE (2026-09-24): 125 =
+     **Power Guide**, 127 = **Stamina**, 162 = **GroupRide**, each
+     confirmed by matching the editor's field list against what the file
+     stores, not by position alone. **Four remain: 30, 64, 128, 223.**
+     f10=64 is near-certainly the Lights screen (it stores Lights
+     Connected + Light Mode) but is gated on lights being paired.
+     f10=128 is Indoor-only. f10=30 and 223 sit after Power Guide in the
+     file but did not appear in the ROAD editor list at all, so
+     something gates them too — possibly a loaded course or active
+     navigation. Pairing sensors should surface several of these.
+
+     When these are added: **162 goes in `NO_FIELD_EDIT_TYPES`** (its
+     editor offers no fields at all), and **127 needs its own
+     `NAMED_SCREEN_LAYOUTS` entry** — states 0, 2/A, 2/B, 4, 5, 6, with
+     `{2: [[0], [1]]}` STACKED FULL WIDTH, unlike every other named
+     2-field type. 125 joins the fixed-2 group unchanged.
+  2. **Does the 840's editor offer field editing for Workout (f10=38)?**
+     If yes, `NO_FIELD_EDIT_TYPES` is per-model and the v1.3.1 hard
+     block is wrong here. Doc rev 111's evidence was the 530's editor
+     and says nothing about this one.
+  3. **What field counts does the 840 offer for eBike Metrics
+     (f10=58)?** It ships 5; `_FLEX4_STATES` allows 1-4. Either the
+     table is per-model, or the device ships a count its own editor
+     won't offer (the clamp case).
+  4. **Resolve field IDs 520, 578 (Workout) and 579 (STEPS/eBike)** —
+     same on-device placement method as every prior batch. Note
+     `KNOWN_UNRESOLVED_IDS` should be repopulated; it has been empty for
+     the life of this project and no longer reflects reality.
+  5. **Verify `patch_screen()` preserves mesg-14 field 14** on a real
+     840 round-trip. The byte-range patching design should leave an
+     unknown field untouched, but that is reasoning, not a test.
+  6. **Is `NewFiles/` WRITABLE over MTP?** Existence is confirmed;
+     writability is not. This is the remaining gate on the
+     offline-mode/Export work in the Open item below.
+  7. Trivial: `screen_type_name()` renders the unset sentinel `f10=255`
+     as "Screen 256".
+
+  **Cross-cutting question this raises, and the reason it matters more
+  than the individual items:** v1.4.0 assumed named-screen rules are
+  GLOBAL. Two of the findings above suggest they may be per-model. If
+  so, `NAMED_SCREEN_LAYOUTS` and `NO_FIELD_EDIT_TYPES` need a model
+  dimension — which is a structural change, not a table edit. Do NOT
+  start that until items 2 and 3 have real answers; the wrong guess here
+  is expensive, and the toolkit currently has exactly two devices' worth
+  of evidence to generalise from.
+
 - **SCOPED, NOT BUILT (2026-09-12, Doug's request) — "Export edited
   profile to a folder of the user's choice."** Write the edited profile
   out under its **clean original filename** (`CyclingRoad.fit`), to a
@@ -5685,6 +6028,26 @@ Kept deliberately, for pattern-recognition on future work:
 - **Set/reset a profile's odometer total (`Totals.fit`) -- UNDER
   CONSIDERATION, LOW PRIORITY (raised and scoped 2026-08-28, Doug's own
   call: not building for now, riskier than he wants to take on).**
+
+  **TWO NEW CAUTIONS from the Edge 840, 2026-09-24 (Doc rev 115), both
+  arguing for leaving this alone:**
+
+  (1) **The device DECLARES `Totals` read-only.** The 840's `Device.fit`
+  lists `{'directory': 'Totals', 'type': 'totals', 'flags': 'read'}` --
+  read, with no write or erase bit, unlike `Settings` and `Sports` which
+  carry write. That is Garmin stating the intended access, not this
+  project inferring it. It does not prove a write would fail, but it
+  does mean a write would be going against the device's own published
+  capability, which is a materially worse position than "undocumented."
+
+  (2) **The 840's `Totals.fit` does NOT match the 530-derived mapping.**
+  The 530 work located `distance` at def_num 1 (uint32, plain meters)
+  and confirmed it exactly against a real odometer reading. The 840's
+  file decodes with undocumented fields 10/11/12, profile NAMES embedded
+  in field 10, and no clean `distance`. Eleven `totals_mesgs`, one per
+  profile slot, does match. So the mapping is model-specific at best and
+  would need redoing per device -- and properly mapping it needs a unit
+  with real accumulated mileage, which a new 840 does not have.
   Doug wanted a toolkit way to set a profile's lifetime mileage total to
   a known-accurate figure (e.g. Strava YTD/all-time), or reset it to
   zero, rather than relying only on the on-device "History > Totals >
