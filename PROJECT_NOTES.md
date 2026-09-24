@@ -1,5 +1,157 @@
 # Activity Profile Editor for Garmin Edge
 
+## State of play
+
+> **This block is REWRITTEN IN PLACE and is the only part of this file
+> that is.** It exists so that picking the project up after a gap takes
+> one read rather than an archaeology session. Everything below it — the
+> Doc rev stack — is append-only history and is never edited once
+> committed. If this block and a Doc rev disagree, the newest Doc rev
+> wins and this block is stale; fix it.
+>
+> *Last updated 2026-09-24, at Doc rev 117.*
+
+**Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
+named screens. `fit_dump.py` 2.8.0, `fit_patch.py` 1.17.0, `gui_app.py`
+0.22.0, `garmin_device.py` 0.12.8. Docs at PROJECT_NOTES rev 116,
+README Changelog rev 79.
+
+**Hardware on hand:** Edge **530** (USB mass storage) — the regression
+baseline every confirmed finding rests on, deliberately kept. Edge
+**840** (firmware 29.22, **MTP**, no mass-storage mode) — second model,
+acquired 2026-09-22.
+
+**Next to build:** Open item **"Keep backups of separate physical
+devices apart"** — per-device-serial `working_dir` switching plus a
+cross-device profile check. Design-complete since 2026-08-15, promoted
+2026-09-13 now that two devices exist. Do the
+`save_working_dir()` read-modify-write fix FIRST or a `Change...` click
+wipes the serial map. Decide the nudge-vs-warning wording from a real
+cross-MODEL test, not from Doc rev 85 (which was 530→530).
+
+**Then:** offline mode + Export (Doc rev 113). Three parts — a no-device
+entry path (the real unlock), Export under the clean original filename,
+and making every device-dependent GUI path inert. The BACKEND ALREADY
+SUPPORTS THIS: `gui_app.py` is the only module importing
+`garmin_device`; `fit_dump`/`fit_patch` are pure file-in/file-out. This
+is what makes the toolkit usable on MTP devices at all.
+
+**Blocked on pairing the 840's phone and sensors** — all read-only once
+unblocked, all cheap:
+- Naming the four remaining unknown f10 types (**30, 64, 128, 223**)
+- Does the 840's editor offer field editing for **Workout** (f10=38)?
+- What field counts does it offer for **eBike Metrics** (f10=58)?
+
+**The decision those last two gate, and why not to pre-empt it:** v1.4.0
+assumes named-screen rules are GLOBAL. The 840 ships eBike Metrics with
+5 fields (table says 1–4), Workout with 6 real fields while it sits in
+`NO_FIELD_EDIT_TYPES`, and Stamina with a 2-field layout that renders
+STACKED where every other named type renders side-by-side. If the 840's
+editor offers those states, `NAMED_SCREEN_LAYOUTS` and
+`NO_FIELD_EDIT_TYPES` need a per-model dimension — a structural change,
+not a table edit. Two devices is a thin basis to generalise from; get
+the answers first.
+
+**Parked, ready to resume:**
+- ~~530 field-522 label test~~ **DONE 2026-09-24, Doc rev 117** — 522 is
+  correctly labelled "Duration"; 520/578/579 are absent from the 530 and
+  render as a silent "Speed" fallback; the device does not sanitise
+  unknown ids; `file_id.number` is a device-assigned profile index.
+  Follow-ups it created: repopulate `KNOWN_UNRESOLVED_IDS` with
+  520/578/579, and consider a read-side advisory for ids absent from
+  `FIELD_ID_NAMES`.
+- Open item **#106** odometer (`Totals.fit`) — mapping confirmed, and the
+  840 re-reads the file on boot, which helps; still unbuilt
+- MTP transport inside the toolkit — deliberately NOT next; see the
+  offline-mode reasoning above
+
+**Standing rules that bite if forgotten:**
+- Doc revs are **superseded, never rewritten** once committed. Check
+  `git log` before amending a recent rev — that mistake was made at rev
+  115/116.
+- **No personal ride statistics** in `PROJECT_NOTES.md` or `README.md`;
+  the repo is public.
+- For **undocumented** FIT messages, trust `fit_raw_walk.parse_fit()`,
+  not the garmin-fit-sdk decoder. The SDK mis-rendered `Totals.fit` and
+  produced a confident wrong conclusion (Doc rev 116).
+
+---
+
+*Doc rev 117 — refreshed 2026-09-24.* **Field 522 CONFIRMED correct,
+three 840-era field IDs confirmed absent from the 530, and
+`file_id.number` finally pinned down as a device-assigned profile index.
+Also corrects an inference from Doc rev 115 that was wrong.**
+
+Run via a purpose-built test profile (`FLDTEST`, cloned from RoadClone
+with two screens rewritten), deployed to the real 530 through NewFiles
+and then pulled back for a round-trip comparison.
+
+**Field 522 is "Duration" — the existing label is RIGHT.** Screen 1 was
+built as Timer above 522, both full width, Timer as a position control.
+The device rendered Timer / Duration exactly as the table says.
+
+**Which means Doc rev 115's "Step Distance" inference was WRONG.** That
+entry reasoned that the full-width field on the 840's active Workout
+screen was array position 2 = field 522, and therefore that 522 might be
+mislabelled. The reasoning had an unverified link at the front — whether
+the screen being rendered was even f10=38 with its stored array — and
+that link is the one that broke. **Whatever displays as "Step Distance"
+on the 840 is still unidentified.** It is one of 520/578, or a field the
+840 labels differently, or the position mapping was wrong.
+
+**Fields 520, 578 and 579 are NOT supported on the Edge 530.** All three
+were placed on one screen with Timer as a control. The device rendered
+Timer correctly and **all three unknowns as "Speed"** — identically.
+That uniformity is the informative part: partial firmware support would
+have produced three different results, or some blank. This is a silent
+fallback, not selective support.
+
+Note this is a DIFFERENT fallback from the Connect IQ case. An unclaimed
+CIQ marker (216) falls back to **Timer**; an unrecognised ordinary field
+ID falls back to **Speed**. Consistent with 216 being
+recognised-but-unresolvable while 520 is simply absent from the device's
+table.
+
+**The hazard this exposes: deploying a field ID a device doesn't support
+produces NO error and NO blank — it shows something plausible and
+wrong.** A user would have no way to tell "Speed" from a real Speed
+field. Worth a read-side advisory when a screen carries an id absent
+from `FIELD_ID_NAMES`; `KNOWN_UNRESOLVED_IDS` already exists as the
+place to track them and should be repopulated with 520/578/579.
+
+**The device does NOT sanitise unknown field IDs.** After a full
+NewFiles import and restart, the pulled-back profile still reads
+`f7 = [56, 520, 578, 579, ...]`. The file stays truthful; only the
+screen lies. That is the benign outcome and the one that matters — the
+toolkit can write an id the device doesn't know without the device
+quietly rewriting the array underneath, so `fit_dump` output always
+reflects reality.
+
+**`file_id.number` is a DEVICE-ASSIGNED PROFILE INDEX, rewritten on
+import.** The full round-trip diff of the whole profile showed **exactly
+one changed field**: `number` 4 → 3. Everything else, including every
+screen record, came back identical.
+
+That closes a question logged as an unexplained oddity in Doc rev 85
+(where `number` went 0 → 6 after an import) and left as a "strengthened
+hypothesis, still not proof" in rev 115 (where the 840's factory
+profiles carry 0/1/2). Three independent observations now agree.
+
+Also confirming rev 85 from the other direction: `serial_number` was
+**not** rewritten here (3356943454 on both sides) because it already
+matched the device. Rev 85 saw it corrected only because that test used
+a deliberately faked value. The device corrects it when wrong and leaves
+it alone when right.
+
+**Practical consequence, worth knowing before someone chases it as a
+bug:** `number` is device-owned, so ANY byte-level or field-level
+comparison between what this toolkit writes and what comes back off the
+device will always show a `number` difference. It is noise. Same class
+as `serial_number`. Anything doing round-trip verification should treat
+both as device-owned rather than as evidence of a failed write.
+
+Prior rev (116, 2026-09-24) follows.*
+
 *Doc rev 116 — refreshed 2026-09-24.* **THREE CORRECTIONS TO DOC REV
 115, all from continued 840 work the same day. One of them — that the
 840's `Totals.fit` uses a different layout — was simply WRONG, and the
