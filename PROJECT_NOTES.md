@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-09-27, at Doc rev 120.*
+> *Last updated 2026-09-27, at Doc rev 121.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens. `fit_dump.py` 2.8.0, `fit_patch.py` 1.17.0, `gui_app.py`
@@ -193,18 +193,19 @@ Claude:
    through a toolkit that misclassifies the device's named screens
    repeats the field-ID transposition incident. Raw dumps are safe
    meanwhile; the classified view is not.
-2. **`(f3, f8)` pairs from 840 profiles already pulled** — pure read,
-   free, answers directly whether `f8=2` occurs and at which counts.
-   Every real profile is evidence about its own device (rev 120 §4).
+2. ~~**`(f3, f8)` pairs from 840 profiles already pulled**~~ **DONE
+   2026-09-27, Doc rev 121 — NEGATIVE.** `f8` never exceeds 1 on the
+   840's factory profiles, so the C layout cannot be found in existing
+   files and step 4 is now REQUIRED. Tool built: `fit_census.py`.
 3. **Connect app enumeration** — the option space per count, including
    combinations no current profile happens to use. Count 10 is still
    unread.
-4. **A/B/C → `f8` mapping** (rev 120 §2 — the letters are UI naming,
-   not stored values). Cheapest safe method: **let Garmin write and
-   have the toolkit read.** Set a screen's layout in the Connect app or
-   the on-device editor, pull the profile, read `f8`. No `NewFiles/`,
-   no CRC work, no risk — the reverse of how the 530 was surveyed, and
-   far cheaper.
+4. **A/B/C → `f8` mapping — now the critical path** (rev 120 §2: the
+   letters are UI naming, not stored values). Method: **let Garmin write
+   and have the toolkit read.** Set the layout in the Connect app or the
+   on-device editor, pull the profile, read `f8`. No `NewFiles/`, no CRC
+   work, no risk. The purpose-built profile for this is specified under
+   "840 census profile" below.
 5. Field IDs for the 840-only fields (Map and Compass data fields, Vert
    Speed, the three new ids) — same Garmin-writes/toolkit-reads trick.
    Lower priority: field ids don't weaken guards.
@@ -229,6 +230,53 @@ v1.5.0.
 **Interim safety, do before the 840 is used in anger:** gate v1.4.0's
 read-side "state the device doesn't offer" flag on *model surveyed*, or
 it cries wolf on every legitimate 840 profile (rev 120 §1).
+
+### 840 census profile — spec (agreed 2026-09-27)
+
+One purpose-built profile, created and edited **entirely in Garmin's own
+editor** (Connect app or on-device), then pulled and read with
+`fit_census.py`. The toolkit must not write to it: the whole value is
+that the device is the sole author (rev 121 §6).
+
+**Two disciplines that decide whether the data is usable at all:**
+
+1. **Write down what you set, as you set it** — screen position, field
+   count, and the letter the menu showed. `f8` values are
+   UNINTERPRETABLE without that record, and a second session cannot
+   reconstruct it. This is the single thing that makes or breaks the run.
+2. **Make each screen's FIRST data field unique** (Speed on one,
+   Distance on the next, Cadence, Temperature, …). It turns `f7_active`
+   into a screen name tag, so a dump can be matched to the notes even if
+   display order shifts. Cheap insurance against exactly the
+   transposition that corrupted the 2026-08-17 batch.
+
+**Build screens UP rather than shrinking them.** Shrinking leaves stale
+ids in `f7`'s trailing slots (rev 121 §3); note any screen that was
+shrunk so the residue isn't read as content.
+
+**The experiment, in priority order:**
+
+- **A/B/C at one fixed count.** Three screens, all at **count 5**, set
+  to A, B and C. Count held constant, letter the only variable — the
+  cleanest possible read of letter→`f8`.
+- **Is C's `f8` count-dependent?** Also set **count 3 → C** and
+  **count 8 → C**. Same number at 3/5/8 means `f8` is a plain variant
+  index; different numbers mean it encodes geometry, which would change
+  how `NAMED_SCREEN_LAYOUTS` has to be keyed.
+- **Variants where the 530 has none.** **Count 8 → B** and **count 9 →
+  B or C**. The 530 offers no variant at 8 or 9 at all, so any value
+  here is new information.
+- **Count 10.** Does the app offer variants at 10? Still unread.
+- **Field IDs.** Place the **Map** and **Compass** data fields (neither
+  is in `FIELD_ID_NAMES`) and put one of them in a **half-width slot** —
+  a 4-field A layout has them — to see whether they degrade like the
+  Graph/Bars fields do.
+- **`f11`, if convenient.** Base it on a NON-indoor sport and include a
+  Map screen: rev 121 §1 found `f11=2` only on INDOOR Map screens, so
+  `f11=1` here would say f11 follows the sport, not the screen type.
+
+Give it a distinct display name AND a new filename — the device matches
+profiles by filename and will otherwise overwrite an existing one.
 
 **Parked, ready to resume:**
 - ~~530 field-522 label test~~ **DONE 2026-09-24, Doc rev 117** — 522 is
@@ -262,6 +310,122 @@ it cries wolf on every legitimate 840 profile (rev 120 §1).
   that established it go in the code comment beside it (Doc rev 119).
 
 ---
+
+*Doc rev 121 — refreshed 2026-09-27.* **First census run, via the new
+`fit_census.py`: 372 screen records off the 530 and 217 off the 840's
+pre-setup profiles. Four findings. THREE mesg-14 fields that this
+project has never decoded — f4, f6, f11 — present on BOTH models. The
+f5/f14 model split confirmed from complete data rather than inference.
+`f7`'s trailing slots proven to be STALE RESIDUE, which is a live trap
+for the field-ID census. And a NEGATIVE result that redirects the
+census: `f8=2` does not occur anywhere on the 840's factory profiles.**
+
+All raw values; `fit_census.py` reports no interpretation on purpose
+(its docstring says why). Evidence is the two CSVs, not this summary.
+
+### 1. ⚠ Three undecoded `mesg 14` fields — f4, f6, f11
+
+Absent from this file's `## The data_screen message` section entirely.
+They surfaced because the census routes any def_num it doesn't have a
+column for into an `extra` column — the same way the 840's f14 would
+have announced itself.
+
+| Field | On a configured screen | Unconfigured |
+|---|---|---|
+| `f4` | `1 2 3 4 5 6 7 8 9 10` | all `255` |
+| `f6` | 16 zero bytes | 16 zero bytes |
+| `f11` | `1` | `255` |
+
+Present on the 530 AND the 840, so this is a long-standing documentation
+gap, **not** an 840 discovery. With `extra` now empty across all 372
+530 records, mesg 14 is fully accounted for at 13 fields on that model.
+
+`f4` reading as a sequential 1-10 run is suggestive of a per-slot
+position or order array, which would make it the field-level analogue of
+f9. NOT investigated and NOT decoded — recorded so the next person does
+not rediscover it.
+
+**The one anomaly: `f11 = 2` on exactly three records**, all of them the
+Map screen (`f10=25`) in the three INDOOR profiles — including the
+untouched factory original, so it is device-authored rather than a clone
+artifact. Same screen type, different sport, different value. One type
+in one sport on one model is not enough to name it; the obvious next
+test is whether f11 follows the SPORT or the SCREEN TYPE.
+
+**Method note on how that count was nearly wrong:** the first pass
+reported 84 records, because the filter matched the substring `f11=2`,
+which is also a prefix of `f11=255`. A prefix match on a field whose
+unset sentinel is 255, in a project where almost every field has a 255
+sentinel. Caught by the result being implausibly large.
+
+### 2. The f5/f14 split — now confirmed, not inferred
+
+Doc rev 115 observed the 530 carrying `f5` (uint8[10]) where the 840
+carries `f14` (uint16[10]). Complete counts: 530 has `f5` on **372/372**
+records and `f14` on none; 840 has `f14` on **217/217** (every value
+`0xFFFF`) and `f5` on none. Clean per-model substitution, no overlap.
+
+### 3. ⚠ `f7`'s trailing slots are STALE RESIDUE — a census trap
+
+68 records showed `f3` disagreeing with the number of non-empty `f7`
+slots. `f7` is a fixed 10-slot array; **only the first `f3` entries are
+read by the device**, and slots past that hold ids left behind when a
+screen was shrunk.
+
+Two pieces of proof that it is residue rather than content: an 840 Map
+screen with `f3=0` still carries ten plausible-looking ids; and `f10=57`
+(GroupTrack List) and `f10=162` (GroupRide) carry **the same eight ids**
+as each other, which is template residue, not two screens' contents.
+
+**This matters directly for the field-ID half of the census:** treating
+trailing slots as real content would inject junk ids into
+`FIELD_ID_NAMES`, which is the mechanism by which the 2026-08-17 batch
+went wrong. `fit_census.py` now reports `f7_active` (the first `f3`
+entries) separately from `f7_nonempty`, with the reasoning inline.
+
+### 4. NEGATIVE result: no `f8=2` on the 840, so the C layout must be made
+
+Distinct `f8` values on the 840's pre-setup profiles: **`{0, 1}`** —
+identical to the 530. The factory profiles never use a C layout, so the
+A/B/C→`f8` mapping CANNOT be settled from files already on hand, and
+census step 4 (set a C in the Connect app, pull, read `f8`) is required
+rather than optional. Knowing this before searching further for it in
+existing pulls is the result's value.
+
+Counts observed on the 840: `0, 2, 4, 5, 6`, with `f8=1` at 5 and 6 —
+**all inside the 530's permitted set.** So the toolkit does not
+currently mis-validate the 840's factory profiles; the A/B/C divergence
+of Doc rev 120 is LATENT, triggered only by a C layout a user chooses.
+That lowers the urgency of gating the read-side flag. It does not touch
+#146, which is wrong today.
+
+### 5. Other 840 facts worth having on the record
+
+- `f10=38` **Workout is configured at `(6,0)`** on the 840, versus unset
+  `(255,255)` on the 530 — the 840 actually ships it populated.
+- `f10=162` **GroupRide sits at `(0,0)`** — zero fields, the same
+  signature as `f10=57` GroupTrack List, which is already in
+  `NO_FIELD_EDIT_TYPES`. Candidate for the same treatment; its field
+  array is residue (see SS3).
+- `f10=125` Power Guide and `f10=127` Stamina both at `(2,0)`.
+- `f10=58` eBike Metrics is **absent from Test4 entirely**, so the
+  "840 ships it with 5 fields" note in State of play came from a
+  different pull. Not contradicted — simply not evidenced here.
+- `f12` is `0` on every active screen in every factory profile; nothing
+  ships user-hidden.
+
+### 6. Provenance rule for census evidence
+
+Test4 mixes device-authored factory profiles with clones the TOOLKIT
+wrote during test-plan steps. **A file is evidence about a device only
+if the device authored it.** The first 530 run made the point: two
+records showed `f10=63` and `f10=35` holding `f3=3` against a table
+that locks those types to 2 — and both were in `CyclingRoadCNTTEST*.fit`,
+this toolkit's own count tests reading back. For model tables, use
+factory profiles and fresh pulls; for anything set deliberately, set it
+in Garmin's own editor and let the toolkit only READ.
+
+Prior rev (120, 2026-09-27) follows.*
 
 *Doc rev 120 — refreshed 2026-09-27.* **The per-model question raised at
 rev 119's State of play is now SETTLED: layout rules are per-model, not
