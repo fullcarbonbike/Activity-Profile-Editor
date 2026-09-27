@@ -839,6 +839,42 @@ NAMED_SCREEN_LAYOUTS = {
 DEFAULT_FILLER_FIELD_ID = 56
 
 
+def is_profile_file(path):
+    """
+    True if `path` is an Activity Profile (a FIT "sport" file), False
+    for anything else -- `Device.fit`, `Totals.fit`, `Settings.fit`, an
+    activity recording, a workout, or a file that doesn't decode at all.
+
+    Added v2.9.0 for OFFLINE MODE. When the source of profiles is a
+    mounted device, the device's own Sports/ folder guarantees that
+    every .fit in it is a profile. An ordinary folder guarantees
+    nothing: a user may point the toolkit at a whole `Garmin/` pull, or
+    at a directory where `Device.fit` and `Totals.fit` sit beside real
+    profiles. Both decode fine as FIT and neither is editable as a
+    screen layout, so offering them in a profile list would be actively
+    misleading.
+
+    Decided by `file_id_mesgs[0].type`, which is the field the format
+    itself uses to say what a file is -- the 840's own `Device.fit`
+    reports 'device', its `Totals.fit` reports 'totals', and every
+    Activity Profile on both devices this project has examined reports
+    'sport'.
+
+    NEVER raises. An unreadable or non-FIT file returns False rather
+    than propagating, because the caller is typically enumerating a
+    folder of unknown provenance and one bad file should not take out
+    the listing.
+    """
+    try:
+        messages = decode_file(path)
+    except Exception:
+        return False
+    file_ids = messages.get('file_id_mesgs') or []
+    if not file_ids:
+        return False
+    return file_ids[0].get('type') == 'sport'
+
+
 def named_layout(f10):
     """
     The NAMED_SCREEN_LAYOUTS entry for this screen type, or None for an

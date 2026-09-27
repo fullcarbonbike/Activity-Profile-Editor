@@ -9,48 +9,226 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-09-24, at Doc rev 117.*
+> *Last updated 2026-09-27, at Doc rev 120.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens. `fit_dump.py` 2.8.0, `fit_patch.py` 1.17.0, `gui_app.py`
 0.22.0, `garmin_device.py` 0.12.8. Docs at PROJECT_NOTES rev 116,
 README Changelog rev 79.
 
+### ⚠ READ FIRST — uncommitted work lives on a branch
+
+**v1.5.0 work is parked on local branch `v1.5.0-wip`. `main` is clean at
+`v1.4.0` / rev 117 and must stay that way until v1.5.0 is tested.**
+Nothing is pushed; the branch is local only.
+
+**Version strings are deliberately NOT bumped** — `gui_app.py` still
+reads 0.22.0, `garmin_device.py` 0.12.8, while both contain v1.5.0 work.
+In this project a bumped version means shipped, so the mismatch IS the
+"untested" marker. #143 bumps them when the release is real.
+
+**When v1.5.0 is actually ready, in this order:**
+
+1. Finish and test the unbuilt pieces (#141, #142, #145) on hardware.
+2. Bump the four `__version__` strings; write `RELEASE_NOTES_v1.5.0.md`;
+   add the README `## Changelog` entry; refresh this block.
+3. `git checkout main` then `git merge v1.5.0-wip` (fast-forward if main
+   hasn't moved).
+4. **Tag on `main`, never on the branch** — a tag on `v1.5.0-wip` points
+   at a commit that isn't on main and makes the GitHub Release show a
+   detached history.
+5. `git push origin main` then push the tag, or
+   `git push origin main --follow-tags` for both.
+6. `git branch -d v1.5.0-wip` once merged.
+
+If the branch is ever abandoned instead, `main` needs nothing done — it
+never saw any of it. That is the point of the branch.
+
 **Hardware on hand:** Edge **530** (USB mass storage) — the regression
 baseline every confirmed finding rests on, deliberately kept. Edge
 **840** (firmware 29.22, **MTP**, no mass-storage mode) — second model,
 acquired 2026-09-22.
 
-**Next to build:** Open item **"Keep backups of separate physical
+**Next to build — OFFLINE MODE, target v1.5.0** (Doug's call
+2026-09-25, promoted ahead of the per-device-serial work). Not mainly
+for MTP users: **it is what unblocks this project's own research loop.**
+Every 840 profile currently goes OpenMTP → CLI by hand, so the GUI — the
+layout picker, the diagram, the advisories, the field views — is
+unavailable on exactly the device generating all the new findings.
+
+Decisions taken (Doug, 2026-09-25): the offline source is a **FOLDER of
+`.fit` files** (mirrors the device profile list, so `ProfileListPanel`
+is reused nearly unchanged, and it can be pointed straight at an 840
+pull or at `Garmin_840_BU/Sports/`); **Export asks each time** with a
+save dialog pre-filled with the clean original filename, defaulting to
+the last location used; **`startup.txt` gets full offline import/export**
+rather than being hidden, since the machinery is already file-based and
+hiding it would cost 840 owners a feature the 530 has; and **the
+serial-keyed backup folder half of Open item #78 is folded in**, while
+its cross-device-warning half stays deferred.
+
+**Why the serial work rides along rather than following.** If offline
+mode ships without it, the 530's and 840's backups start mixing
+immediately and the later fix has to untangle an existing store.
+Offline mode also makes serial keying MORE feasible, not less: there is
+no connected device to ask, but every profile embeds
+`file_id.serial_number`, confirmed in Doc rev 117 to match the device
+exactly. Verified 2026-09-25 — all three 840 factory profiles plus its
+`Totals.fit` and `Device.fit` report 3632253714, the 530's RoadClone
+reports 3356943454, so a folder mixing two devices is detectable by
+reading the files alone.
+
+**One honest limitation to carry into the UI:** `startup.txt` is plain
+text and carries NO device identity. Every `.fit` can be attributed to
+a device; a boot message cannot. Offline it can only be filed under
+whichever device context is active, or the user has to say.
+
+**BACKEND DONE and verified headlessly (2026-09-25),
+`garmin_device.py` + `fit_dump.py`:** `list_profiles_in_folder()`,
+`backup_profiles_from_folder()` (same `{filename: backup_path}` return
+shape, so `stage_for_edit()` consumed it UNCHANGED — lineage sidecar and
+all), `export_profile()` with the same read-back byte-compare
+`write_to_newfiles()` does (verified to actually fire: a sabotaged copy
+was refused), and `fit_dump.is_profile_file()` which correctly separated
+three real profiles from `Device.fit` and `Totals.fit` in one folder.
+Device-mode `backup_profiles()` re-verified after the refactor; both
+paths now share `_backup_from_dir()`.
+
+Two design calls made while building: `garmin_device.py` stays
+**stdlib-only** as it has always been, so telling a profile from
+`Device.fit` (which needs FIT decoding) went into `fit_dump.py`
+instead — the folder lister returns everything and callers filter. And
+offline mode **still takes backups** despite the user already owning the
+files, because `stage_for_edit()` needs a backup path to copy from and
+records it in the lineage sidecar; that keeps "which pulled copy was
+this built on" answerable offline, keeps Restore-from-Backup working,
+and means the user's own pulled originals are never edited in place.
+
+**Serial-keyed backups — layout DECIDED (Doug, 2026-09-25):**
+`backups/<serial>/<timestamp>/` inside ONE working folder. Existing
+pre-serial backups are LEFT IN PLACE and Restore-from-Backup searches
+both locations, so nothing currently restorable becomes unreachable and
+no existing file is moved.
+
+This deliberately REPLACES the Doc rev 49 design (separate working
+folders per device, auto-selected via a serial-keyed map in the JSON
+config). That shape needed a config mapping, a way to assign a folder to
+a newly-seen device, and the `save_working_dir()` read-modify-write fix
+to stop a `Change...` click wiping the map. The subfolder layout needs
+none of those — there is no map — while solving the same problem. **The
+`save_working_dir()` fix is therefore NO LONGER a prerequisite**, though
+it remains a latent bug worth fixing on its own merits.
+
+Rejected with reasons: migrating the ~1098 existing backups into serial
+folders (the data supports it — every profile embeds its serial — but it
+is a bulk move of the only restore points that exist, and `startup.txt`
+backups carry no serial so they would have to be guessed at); and
+merely labelling backups without separating them (smallest change, but
+leaves the two devices intermingled, which was the thing to fix).
+
+**`startup.txt` will NOT carry an embedded serial.** Doug raised putting
+one in the comment header, which the parser preserves byte-for-byte and
+the device never displays. Rejected after discussion, for reasons worth
+keeping: it would write TOOLKIT BOOKKEEPING into a file that goes onto
+hardware, where everything this project writes today is the user's own
+content edited in place; the device's tolerance for an extra header line
+is untested and this file renders at boot; a user tidying the comments
+in a text editor would silently destroy the provenance; and people post
+boot messages publicly, so a serial would travel with them. The existing
+`.lineage.json` sidecar pattern gives identical provenance with no
+device-side risk. Also worth the perspective: a `startup.txt` on the
+wrong device is self-evident and trivially fixed, unlike a profile on
+the wrong device, which fails silently.
+
+**REMAINING: the GUI half**, which cannot be exercised in the build
+environment (no wx) and will need the same on-hardware pass v1.3.1 and
+v1.4.0 got. This release touches more of the app than either did, since
+it adds a MODE rather than changing a panel.
+
+**Testing progress (see `TEST_PLAN_v1.5.0.md`, which is the live
+record):** section A fully passes after six bugs found and fixed. Section
+B passes B1-B5; **B6 is BLOCKED, not failed** — device options, Review &
+Deploy and "Write to Device" all remain reachable in offline mode
+because #142 is unbuilt. It refuses cleanly with a no-device dialog
+rather than a traceback, which is itself the negative test C3 exists to
+check, so record it as a pass of the guard and a gap in the feature.
+B6's editor behaviour cannot be judged until #146 lands (rev 120 §3).
+B7 Export is unbuilt.
+
+Smaller than Doc rev 113 estimated, because the pipeline after staging
+is ALREADY device-free: `stage_for_edit()` copies from a BACKUP PATH,
+not from the device, and everything downstream works on the staged file.
+The device is needed at only three points — listing profiles, making the
+initial copy, and deploying. So the work is: a folder-source variant of
+`list_profiles()`/`backup_profiles()` returning the same
+filename→backup_path dict; `export_profile()` with the same read-back
+byte-compare `write_to_newfiles()` does; a "Work Without a Device"
+button on `DetectPanel`; Export in place of Deploy; and making the
+device-only paths inert.
+
+**Deferred (was next):** Open item **"Keep backups of separate physical
 devices apart"** — per-device-serial `working_dir` switching plus a
-cross-device profile check. Design-complete since 2026-08-15, promoted
-2026-09-13 now that two devices exist. Do the
-`save_working_dir()` read-modify-write fix FIRST or a `Change...` click
-wipes the serial map. Decide the nudge-vs-warning wording from a real
-cross-MODEL test, not from Doc rev 85 (which was 530→530).
+cross-device profile check. Design-complete since 2026-08-15. Still
+wanted; just behind offline mode now. Do the `save_working_dir()`
+read-modify-write fix FIRST or a `Change...` click wipes the serial map.
+Decide the nudge-vs-warning wording from a real cross-MODEL test — and
+note that a cross-model deploy has now been done successfully
+(FLDTEST, a 530 profile, onto the 840), so that test is partly answered.
 
-**Then:** offline mode + Export (Doc rev 113). Three parts — a no-device
-entry path (the real unlock), Export under the clean original filename,
-and making every device-dependent GUI path inert. The BACKEND ALREADY
-SUPPORTS THIS: `gui_app.py` is the only module importing
-`garmin_device`; `fit_dump`/`fit_patch` are pure file-in/file-out. This
-is what makes the toolkit usable on MTP devices at all.
+### NEXT UP — the 840 census, ahead of the remaining GUI work
 
-**Blocked on pairing the 840's phone and sensors** — all read-only once
-unblocked, all cheap:
-- Naming the four remaining unknown f10 types (**30, 64, 128, 223**)
-- Does the 840's editor offer field editing for **Workout** (f10=38)?
-- What field counts does it offer for **eBike Metrics** (f10=58)?
+**Sequencing decided 2026-09-27 (Doug), reasoning in Doc rev 120 §5:**
+the census comes BEFORE #141/#142, because building Export's validation
+against the 530's layout table would encode 530 rules into the one
+feature meant for a device that doesn't follow them. The phone app is
+now paired, which unblocks most of what was waiting on it.
 
-**The decision those last two gate, and why not to pre-empt it:** v1.4.0
-assumes named-screen rules are GLOBAL. The 840 ships eBike Metrics with
-5 fields (table says 1–4), Workout with 6 real fields while it sits in
-`NO_FIELD_EDIT_TYPES`, and Stamina with a 2-field layout that renders
-STACKED where every other named type renders side-by-side. If the 840's
-editor offers those states, `NAMED_SCREEN_LAYOUTS` and
-`NO_FIELD_EDIT_TYPES` need a per-model dimension — a structural change,
-not a table edit. Two devices is a thin basis to generalise from; get
-the answers first.
+Cheapest first. Items 1-3 need no device write and barely involve
+Claude:
+
+1. **Patch `NAMED_SCREEN_TYPES` first, before any GUI census** (open
+   item #146) — three named 840 codes (125 Power Guide, 127 Stamina,
+   162 GroupRide) plus placeholders for 30, 64, 128, 223 so they are
+   excluded from the user-screen count even unlabelled. Censusing
+   through a toolkit that misclassifies the device's named screens
+   repeats the field-ID transposition incident. Raw dumps are safe
+   meanwhile; the classified view is not.
+2. **`(f3, f8)` pairs from 840 profiles already pulled** — pure read,
+   free, answers directly whether `f8=2` occurs and at which counts.
+   Every real profile is evidence about its own device (rev 120 §4).
+3. **Connect app enumeration** — the option space per count, including
+   combinations no current profile happens to use. Count 10 is still
+   unread.
+4. **A/B/C → `f8` mapping** (rev 120 §2 — the letters are UI naming,
+   not stored values). Cheapest safe method: **let Garmin write and
+   have the toolkit read.** Set a screen's layout in the Connect app or
+   the on-device editor, pull the profile, read `f8`. No `NewFiles/`,
+   no CRC work, no risk — the reverse of how the 530 was surveyed, and
+   far cheaper.
+5. Field IDs for the 840-only fields (Map and Compass data fields, Vert
+   Speed, the three new ids) — same Garmin-writes/toolkit-reads trick.
+   Lower priority: field ids don't weaken guards.
+6. **Still blocked on sensor pairing** (phone no longer blocks these):
+   naming f10 30, 64, 128, 223; whether the 840's editor offers field
+   editing for **Workout** (f10=38); what counts it offers for **eBike
+   Metrics** (f10=58).
+
+**The per-model question is now SETTLED, not pending.** It used to read
+"if the 840's editor offers those states, a per-model dimension is
+needed." Doc rev 120 answers it: the 840 offers A/B/C for counts 3-9
+against the 530's A/B for 3-7, so `LAYOUT_GRIDS`,
+`COUNTS_WITH_B_VARIANT`, `NAMED_SCREEN_LAYOUTS` and
+`NO_FIELD_EDIT_TYPES` all need a model dimension. Supporting evidence
+already on hand: the 840 ships eBike Metrics with 5 fields (table says
+1–4), Workout with 6 real fields while it sits in
+`NO_FIELD_EDIT_TYPES`, and Stamina with a 2-field layout rendering
+STACKED where every other named type renders side-by-side. The
+structural change is a **v1.6.0** conversation; do not start it inside
+v1.5.0.
+
+**Interim safety, do before the 840 is used in anger:** gate v1.4.0's
+read-side "state the device doesn't offer" flag on *model surveyed*, or
+it cries wolf on every legitimate 840 profile (rev 120 §1).
 
 **Parked, ready to resume:**
 - ~~530 field-522 label test~~ **DONE 2026-09-24, Doc rev 117** — 522 is
@@ -60,8 +238,13 @@ the answers first.
   Follow-ups it created: repopulate `KNOWN_UNRESOLVED_IDS` with
   520/578/579, and consider a read-side advisory for ids absent from
   `FIELD_ID_NAMES`.
-- Open item **#106** odometer (`Totals.fit`) — mapping confirmed, and the
-  840 re-reads the file on boot, which helps; still unbuilt
+- Open item **#106** odometer (`Totals.fit`) — **substantially
+  de-risked 2026-09-26 (Doc rev 118).** A hand-modified file carrying
+  real YTD figures was written via `NewFiles/` over MTP and ACCEPTED;
+  the odometer reads what this toolkit computed. Format, write path and
+  the device's willingness to take a file it didn't author are all now
+  demonstrated. Both cautions that argued against building it are
+  withdrawn. Still unbuilt; see the Open item for what to settle first.
 - MTP transport inside the toolkit — deliberately NOT next; see the
   offline-mode reasoning above
 
@@ -74,8 +257,322 @@ the answers first.
 - For **undocumented** FIT messages, trust `fit_raw_walk.parse_fit()`,
   not the garmin-fit-sdk decoder. The SDK mis-rendered `Totals.fit` and
   produced a confident wrong conclusion (Doc rev 116).
+- **No provenance in user-facing strings.** A dialog says what will
+  happen and why it matters to the reader; the test, date and hardware
+  that established it go in the code comment beside it (Doc rev 119).
 
 ---
+
+*Doc rev 120 — refreshed 2026-09-27.* **The per-model question raised at
+rev 119's State of play is now SETTLED: layout rules are per-model, not
+global. The 840's editor offers A/B/C variants for field counts 3-9
+where the 530 offers A/B for 3-7 and nothing for 8-9. Separately,
+`NAMED_SCREEN_TYPES` still contains none of the 840's seven f10 codes,
+so every guard keyed on that table currently misreads an 840 profile.
+Census sequenced AHEAD of the v1.5.0 GUI work as a result. Nothing
+shipped; v1.5.0 work parked on a local `v1.5.0-wip` branch.**
+
+### 1. Layout variants are per-model — CONFIRMED, from a new source
+
+Doug now has the Garmin Connect iPhone app's profile editor paired to
+the 840, which enumerates the layout options the device offers WITHOUT
+needing a deploy cycle. It reports **A, B and C for counts 3 through 9.**
+
+Against the 530's measured table:
+
+| Count | 530 | 840 (Connect app) |
+|---|---|---|
+| 1-2 | A only | A only |
+| 3-7 | A, B | **A, B, C** |
+| 8-9 | **A only** | **A, B, C** |
+| 10 | A only | not yet read |
+
+Two independent divergences: a THIRD variant on 3-7, and variants
+appearing at all on 8-9. `COUNTS_WITH_B_VARIANT = {3,4,5,6,7}` and
+`LAYOUT_GRIDS` are both 530 measurements stored as universal facts.
+
+**What breaks today.** Validation would refuse `f8=1` on an 8- or
+9-field screen and `f8=2` on any ordinary screen — all legal on an 840.
+Worse, v1.4.0's read-side "stored state the device doesn't offer" flag
+would fire on legitimate 840 profiles, reporting that the device will
+render something other than what is stored when in truth the toolkit
+just has no table for that model. **A false alarm indistinguishable
+from a real finding is worse than no check**, and that flag must be
+gated on "model surveyed" before the 840 is used in anger.
+
+### 2. ⚠ A/B/C is the app's UI naming, NOT a stored value
+
+The count RANGE is solid new information. The letter-to-`f8` mapping is
+not: "A/B/C" is what the app's menu shows, and `fit_patch.py`'s own
+error messages already record that those letters are positional in the
+device's menu and not derivable from the stored number. Assuming C
+stores as `f8=2` would be exactly the rev 118 error — an undocumented
+value read as though its meaning were obvious. It needs observation.
+
+### 3. `NAMED_SCREEN_TYPES` is missing all seven 840 codes
+
+Found while answering why a new screen on an 840 profile was labelled
+**"Screen 164"**. The label is `f10 + 1`, so `next_available_field10()`
+had chosen `f10=163`, meaning it found an existing screen at `f10=162`
+and counted up from it. 162 is **GroupRide** — a named type it is
+supposed to skip entirely. It skipped nothing: the table still holds
+only the 13 codes from the 530 survey (25, 26, 32, 35, 38, 44, 56, 57,
+58, 63, 74, 95, 104). All seven 840 codes — 125, 127, 162 named, and
+30, 64, 128, 223 unnamed — are absent. **The census went into this file
+and never into the code.**
+
+This is not confined to the counter. Everything keyed on that table
+misreads an 840 profile:
+
+- `screen_type_name(162)` returns "Screen 163" instead of "GroupRide" —
+  the Screens view mislabels the device's own named screens as user
+  screens.
+- The **last-visible-user-screen guard** counts named screens as user
+  screens, so on the 840 it will permit hiding the genuinely last user
+  screen. The guard is weakest on the device whose named set is largest.
+- `NO_SHOW_TOGGLE_TYPES`, the field-edit refusals and per-type layout
+  validation all fall through to ordinary-user-screen geometry.
+- The new screen received `f10=163`, one above a named code, in a range
+  where 223 also lives. Collision-free against the 530's table,
+  unverified against the 840's — and a colliding f10 is the state the
+  device merges or discards on restart (2026-08-05 finding).
+
+Raw `f10`/`f8`/`f3` VALUES are unaffected, so a census read from raw
+dumps is trustworthy; a census read through the classified view is not.
+
+### 4. The design answer: preserve-and-report, not validate-and-refuse
+
+The current posture is *"I know the layout rules; refuse what violates
+them."* That is only honest for a surveyed model. The posture to move
+to:
+
+> Refuse only when the model is **known** AND the state is
+> **known-illegal**. For an unsurveyed model, or a combination absent
+> from that model's table: allow it, say plainly that it is unverified,
+> and never rewrite what was not explicitly edited.
+
+Byte-preserving what isn't understood needs no per-model knowledge and
+is already how `patch_screen()` works — the only reason the 840 worked
+at all before anything was known about its layouts. That invariant is
+what to lean on as models multiply.
+
+**And the move that solves owning-only-two-devices: treat profile files
+as evidence.** A real profile off a device PROVES what is legal on that
+device — an 840 file holding `(count=8, f8=1)` settles that combination
+with no table and no guessing. This scales to hardware Doug will never
+own, because a user can send a profile file far more easily than run a
+test protocol. One file per model, not one device per model. It keeps
+the project's existing standard: observation, not inference.
+
+### 5. Why the census now precedes the build
+
+Building Export and its validation against the 530's layout table would
+encode 530 rules into the one feature whose entire purpose is serving a
+device that does not follow them — `COUNTS_WITH_B_VARIANT`'s error made
+fresh, in new code. The 840's real `(count, variant)` space changes what
+#141 and #142 should do, so it comes first.
+
+Also recorded because it inverts the obvious assumption: **offline mode
+is NOT on the census critical path.** `fit_dump.py` reads any `.fit`
+from disk with no device and no GUI; offline mode is a GUI convenience
+over capability the CLI already has. The census is available today.
+
+Prior rev (119, 2026-09-26) follows.*
+
+*Doc rev 119 — refreshed 2026-09-26.* **Provenance does not belong in a
+dialog box. A sweep of every user-facing string in `gui_app.py` found
+twelve that told the user how the project came to know something
+instead of what was about to happen. New standing rule, and a note on
+why this class of wording accumulates without anything catching it.**
+
+Doug, testing v1.5.0, hit the Restore-from-Backup confirmation and
+reported that part of it read as "old confirming data or diagnostics" —
+the dialog ended with a parenthetical naming a specific on-device test
+and its date. Reading it fresh, he was right; his own description of
+why he hadn't flagged it earlier is the useful part: *"too close to the
+problem — I was reading those as informational instead of extra
+baggage."*
+
+### The rule
+
+> **Provenance belongs in comments and in this file, never in a dialog.**
+> A user-facing string says **what will happen** and **why it matters to
+> the person reading it**. How the project came to know it — the test,
+> the date, the hardware, who ran it, which Doc rev records it — goes in
+> the code comment beside the string.
+
+Applies to `wx.MessageBox` text, `SetLabel`, static text, tooltips,
+status lines and warning builders. Does NOT apply to docstrings or
+comments, where provenance is exactly right and should stay.
+
+### Why it accumulated
+
+Each of these strings was written in the session where the confirmation
+*was* the news. At write time the provenance was load-bearing: it
+justified why a guard was a hard block rather than an overridable
+warning, and it was the freshest thing in the author's head. Once the
+guard shipped and stopped being contentious, the justification stayed
+behind as residue. The strings did not become wrong — they became
+irrelevant, which is harder to notice.
+
+The structural reason nothing caught it: **this file is append-only and
+is *supposed* to accumulate provenance, so there is no back-pressure
+against writing it.** Dialogs have the opposite requirement and no
+equivalent review step. Nothing in the workflow was ever going to
+surface these except a user reading one and flinching — which is what
+eventually happened, five weeks later.
+
+### What was changed
+
+Twelve strings, no logic touched. Representative before/after:
+
+- *"Confirmed via real on-device testing that Garmin's own editor
+  refuses to hide or remove a profile's last remaining user screen …
+  this isn't a guess, so it can't be overridden here either"* →
+  *"Garmin's own editor refuses to hide or remove a profile's last
+  remaining user screen even while other named screens are still
+  visible, so this can't be overridden here either."*
+- *"hard-blocks a 16th character (confirmed directly: typing past 15
+  just switches to the checkmark/complete control …)"* → *"won't accept
+  a 16th character."*
+- *"(developer-documented reference limits, not confirmed on real
+  hardware by this toolkit)"* → *"(reference limits, not verified on the
+  device)."* — the uncertainty is kept, because whether a limit is
+  enforced changes what the user should do; only the attribution went.
+
+Note the third case: the test is not "does the string mention
+evidence," it is **"does this change what the reader does next."** A
+caveat that affects the user's decision stays. A citation that only
+establishes the project's credibility goes.
+
+### Method note — how the sweep was run
+
+A regex over `wx.MessageBox(` / `SetLabel(` / `label=` found nine. An
+AST pass over **every non-docstring string constant in the module**
+found three more, all built in intermediate variables (`warning = (…)`,
+`dropped_note = (…)`) and never appearing on the same line as the call
+that displays them. Grep finds strings where they are *used*; the ones
+that hide are the ones assembled somewhere else first. For a
+completeness claim about user-visible text, parse the module — do not
+grep the call sites.
+
+### ⚠ Amendment flagged — rev 118, uncommitted
+
+While writing this entry, rev 118's "What was done" paragraph was found
+to quote **specific personal ride statistics** (distance, activity
+count, elapsed time, calories) — a direct violation of this file's own
+standing rule two sections up, in a public repo. Rev 118 had not been
+committed, so it was amended in place to describe the four fields
+generically; the technical claim is unchanged and nothing else in the
+entry was touched. Flagged here rather than silently fixed, per the
+amendment discipline.
+
+Worth noting the rule was written in this file and then broken in this
+file, three sections apart, in the same working session. Standing rules
+are not self-enforcing just because they are written down near the
+thing they govern — the same failure mode this whole entry is about.
+
+Prior rev (118, 2026-09-26) follows.*
+
+*Doc rev 118 — refreshed 2026-09-26.* **A hand-modified `Totals.fit`
+was written to the Edge 840 through `NewFiles/` over MTP and ACCEPTED —
+the odometer now reads the value this toolkit computed. Four separate
+uncertainties resolved in one test, two standing cautions refuted, and
+the last blocker on the v1.5.0 offline-mode work removed.**
+
+**What was done.** A set of year-to-date Garmin Connect figures for
+Cycling (Road) — distance, activity count, elapsed time and calories —
+were written into the ROAD record of the 840's own `Totals.fit` using
+`fit_raw_walk` + `field_byte_range()` + a recomputed CRC, the same
+locate-and-patch approach every other write in this project uses. ONLY
+`message_index=4` (ROAD) was touched, in exactly four fields; GRAVEL,
+INDOOR, MOUNTAIN and the unnamed `idx=0` record came through
+byte-identical. The file was copied into `Garmin/NewFiles/` with
+OpenMTP, the device disconnected and power-cycled, and the Odometer data
+field then showed the expected distance.
+
+### 1. The `Totals.fit` mapping is confirmed by WRITING, not just reading
+
+Doc rev 116 established `distance` at def_num 1 as plain uint32 metres
+by reading. This closes the loop the other way: a value computed here,
+packed here, written here, and rendered correctly by the device. Field
+sizes as used, all little-endian: `f0` timer_time uint32 (s), **`f1`
+distance uint32 (metres)**, `f2` calories uint32, `f3` sport uint8,
+**`f5` sessions uint16**, `f9` uint8 (255/unset), `f10` 32-byte name,
+`f11` uint32, `f12` uint32 timestamp.
+
+**Note what CANNOT be stored.** The totals message has no fields for
+ascent, descent, speed, heart rate, cadence or power. Of the twenty
+columns Garmin Connect reports, exactly four have anywhere to go. Any
+future odometer feature should say so rather than implying a fuller
+restore than the format supports.
+
+### 2. The device accepts a file it did not author
+
+Doc rev 116 could only show the 840 re-reading `Totals.fit` on boot and
+adopting its value over stale in-memory state — and explicitly flagged
+that "adopting the file's value" is NOT the same claim as "accepting a
+value it disagrees with." That distinction is now settled in the
+stronger direction: a hand-modified file was imported and its contents
+became the device's own totals.
+
+### 3. ⚠ CORRECTION — `flags: 'read'` does NOT mean "cannot be restored"
+
+Doc rev 115 recorded that the 840's `Device.fit` declares
+`{'directory': 'Totals', 'type': 'totals', 'flags': 'read'}` — read,
+with no write or erase bit, unlike `Sports` at read|write — and drew
+from that a caution against ever writing there. Open item #106 carries
+the same caution. **That inference was wrong.**
+
+Garmin's own support documentation lists `Totals.fit` among the files
+restored via `NewFiles/`, alongside Courses, Locations, Records,
+Settings, Sports and Weight, and says the folder routes each into place
+on disconnect and power-on. Doug found that page; the hardware then
+agreed with it. Whatever that flag describes, it is not "restorable."
+
+Recorded as a method note, because the shape recurs in this project:
+**an undocumented flag field was read as though its meaning were
+obvious.** The reasoning was plausible and internally consistent and
+simply wrong, in the same family as the `Totals.fit`-format error
+corrected in Doc rev 116. Vendor documentation and a hardware test both
+beat a confident reading of an unlabelled byte.
+
+### 4. `NewFiles/` is WRITABLE over MTP — the v1.5.0 blocker is gone
+
+Doc rev 113 recorded `NewFiles/` as present on the 840 but its
+writability as unverified, and named that as the remaining gate on the
+offline-mode/Export work. **It is writable**, via OpenMTP, and the
+device imports what lands there.
+
+That matters well beyond the odometer: the entire v1.5.0 design rests on
+"the toolkit produces a correctly-named file, the user moves it to
+`NewFiles/` themselves." That round trip has now completed end-to-end on
+an MTP device. The offline-mode work is no longer building toward an
+unverified destination.
+
+Also newly evident from Garmin's documentation and consistent with what
+happened: **`NewFiles/` routes by FILE TYPE, not only by filename.** The
+patched file's `file_id.type` reads `totals`, which is what told the
+device where it belonged. Profile imports additionally match by
+filename to decide WHICH profile is replaced — the two mechanisms are
+complementary, not alternatives.
+
+### Consequences for the open items
+
+**Open item #106 (odometer) is substantially de-risked**, from "riskier
+than Doug wants to take on" to a demonstrated round trip with a known
+format and a known-good write path. Its two recorded cautions are now
+both withdrawn or refuted. It is still unbuilt, and the follow-up below
+should be answered first.
+
+**Still open, and worth one cheap test:** pull `Totals/Totals.fit` back
+off the 840 and diff it against what was sent. Profiles come back with
+`file_id.number` rewritten by the device (Doc rev 117); whether totals
+are similarly touched is unknown, and the answer determines how any
+future feature verifies its own writes — by byte-compare, or by
+comparing only the fields it set.
+
+Prior rev (117, 2026-09-24) follows.*
 
 *Doc rev 117 — refreshed 2026-09-24.* **Field 522 CONFIRMED correct,
 three 840-era field IDs confirmed absent from the 530, and
@@ -5133,9 +5630,12 @@ Kept deliberately, for pattern-recognition on future work:
   5. **Verify `patch_screen()` preserves mesg-14 field 14** on a real
      840 round-trip. The byte-range patching design should leave an
      unknown field untouched, but that is reasoning, not a test.
-  6. **Is `NewFiles/` WRITABLE over MTP?** Existence is confirmed;
-     writability is not. This is the remaining gate on the
-     offline-mode/Export work in the Open item below.
+  6. ~~**Is `NewFiles/` WRITABLE over MTP?**~~ **ANSWERED YES,
+     2026-09-26 (Doc rev 118).** A hand-modified `Totals.fit` was
+     copied into `Garmin/NewFiles/` with OpenMTP and the 840 imported
+     it on the next power cycle. This was the last gate on the
+     offline-mode/Export work — the Export → copy-to-NewFiles round
+     trip now completes end-to-end on an MTP device.
   7. Trivial: `screen_type_name()` renders the unset sentinel `f10=255`
      as "Screen 256".
 
@@ -6263,10 +6763,33 @@ Kept deliberately, for pattern-recognition on future work:
   CONSIDERATION, LOW PRIORITY (raised and scoped 2026-08-28, Doug's own
   call: not building for now, riskier than he wants to take on).**
 
-  **TWO NEW CAUTIONS from the Edge 840, 2026-09-24 (Doc rev 115), both
-  arguing for leaving this alone:**
+  **⚠ STATUS CHANGED 2026-09-26 (Doc rev 118) — SUBSTANTIALLY
+  DE-RISKED. Both cautions below are now WITHDRAWN.** A hand-modified
+  `Totals.fit` carrying real YTD figures was written to the 840 through
+  `NewFiles/` over MTP and accepted: the odometer reads the value this
+  toolkit computed. That demonstrates the format, the write path and the
+  device's willingness to adopt a file it did not author — the three
+  things this item was blocked on.
 
-  (1) **The device DECLARES `Totals` read-only.** The 840's `Device.fit`
+  What remains before building it: (a) pull the file back and diff it,
+  to learn whether the device rewrites anything on import the way it
+  rewrites `file_id.number` on profiles (Doc rev 117) — that decides
+  whether verification is a byte-compare or a field-compare; (b) decide
+  how the UI sets a value, since only FOUR of the twenty columns Garmin
+  Connect reports have anywhere to live (distance, timer_time, calories,
+  sessions — there are no ascent/speed/HR/cadence/power fields in the
+  totals message); (c) decide whether it writes via `NewFiles/` (the
+  documented, device-processed path, which is what worked) or by direct
+  overwrite (untested, and relies on the device noticing on next boot).
+
+  **TWO CAUTIONS from the Edge 840, 2026-09-24 (Doc rev 115) — BOTH
+  SINCE WITHDRAWN, kept for the record:**
+
+  (1) **WITHDRAWN 2026-09-26.** The `flags: 'read'` declaration does NOT
+  mean the file cannot be restored. Garmin's own support documentation
+  lists `Totals.fit` among the files `NewFiles/` restores, and the
+  hardware agrees. The superseded reasoning follows: **The device
+  DECLARES `Totals` read-only.** The 840's `Device.fit`
   lists `{'directory': 'Totals', 'type': 'totals', 'flags': 'read'}` --
   read, with no write or erase bit, unlike `Settings` and `Sports` which
   carry write. That is Garmin stating the intended access, not this

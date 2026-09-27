@@ -138,6 +138,7 @@ from fit_dump import (
     GRAPH_OR_BARS_FIELD_IDS,
     FIELD_EDIT_UNCERTAIN_TYPES,
     NO_FIELD_EDIT_TYPES,
+    is_profile_file,
     # Layout geometry, consolidated into fit_dump.py in v0.22.0 -- see
     # the comment where LAYOUT_GRIDS used to be defined in this file.
     LAYOUT_GRIDS,
@@ -323,6 +324,30 @@ MAX_USER_SCREENS = 10
 # stores f8=2. With one table in one module, that can't recur.
 
 
+def profile_serial_number(path):
+    """
+    The Garmin serial number embedded in a profile's `file_id` record,
+    or None if unreadable.
+
+    CONFIRMED (PROJECT_NOTES.md Doc rev 84 and 117) to match the serial
+    the device itself reports: the Edge 840 returns 3632253714 from its
+    USB descriptor, its `Device.fit` AND every one of its profiles; the
+    530 returns 3356943454. That equivalence is what makes per-device
+    backup separation possible OFFLINE, where there is no device to
+    interrogate -- the files carry their own provenance.
+
+    Never raises: callers are enumerating folders of unknown contents.
+    """
+    try:
+        messages = decode_file(path)
+    except Exception:
+        return None
+    file_ids = messages.get('file_id_mesgs') or []
+    if not file_ids:
+        return None
+    return file_ids[0].get('serial_number')
+
+
 def graph_bars_warnings(field_ids, layout_variant, f10=None):
     """
     Return a list of human-readable warning strings, one per field in
@@ -381,6 +406,13 @@ def graph_bars_warnings(field_ids, layout_variant, f10=None):
             )
     return warnings
 
+
+# Wrap width for BackupCleanupDialog's labels. Wider than
+# GRAPH_WARNING_WRAP_WIDTH because a dialog has more room than a panel's
+# advisory strip, but it MUST exist: that dialog fits itself to its
+# content (v0.23.2), so its longest unwrapped line sets its width. See
+# the comment on its header label.
+BACKUP_DIALOG_WRAP = 56
 
 # Character width (not pixels) used to HARD-WRAP graph_bars_warnings()'
 # text before it ever reaches a wx.StaticText -- see
@@ -455,16 +487,15 @@ def field_edit_uncertain_warning_text(f10):
     if f10 not in FIELD_EDIT_UNCERTAIN_TYPES:
         return ""
     warning = (
-        f"⚠ The on-device screen editor doesn't offer field editing for "
-        f"this type at all -- these field slots likely aren't consulted "
-        f"by whatever actually renders this screen on the device (e.g. "
-        f"\"Workout\" is probably Garmin's own structured-workout step "
-        f"display, only active during a running Workout, not a normal "
-        f"field-based screen). Editing here may have no visible effect "
-        f"on the ride. Not independently confirmed either way -- the "
-        f"write itself is the same safe, proven mechanism used for "
-        f"every other screen, so nothing will be damaged, but the "
-        f"result may just look the same on-device as before."
+        "⚠ The on-device screen editor doesn't offer field editing for "
+        "this type at all -- these field slots likely aren't consulted "
+        "by whatever actually renders this screen on the device (e.g. "
+        "\"Workout\" is probably Garmin's own structured-workout step "
+        "display, only active during a running Workout, not a normal "
+        "field-based screen). Editing here may have no visible effect "
+        "on the ride. The write itself is safe -- nothing will be "
+        "damaged -- but the result may just look the same on-device "
+        "as before."
     )
     return textwrap.fill(warning, GRAPH_WARNING_WRAP_WIDTH)
 
@@ -568,6 +599,22 @@ class DetectPanel(wx.Panel):
         self.startup_txt_btn.Bind(wx.EVT_BUTTON, self.on_startup_txt)
         button_row.Add(self.startup_txt_btn, 0, wx.RIGHT, 8)
 
+        # v0.23.0: OFFLINE MODE entry point, and the single most
+        # important button added in this release -- it is what makes the
+        # toolkit usable at all on an Edge that connects over MTP (540,
+        # 840, 1040, 1050), where find_garmin_root() can never succeed.
+        #
+        # ALWAYS ENABLED, deliberately, rather than appearing only when
+        # detection fails. Two reasons: on an MTP device detection
+        # always fails, so a failure-triggered button would be the only
+        # way in and would look like an error path rather than a
+        # supported mode; and it is genuinely useful WITH a device
+        # attached, for editing an archive or a folder of pulled
+        # profiles without involving the device at all.
+        self.offline_btn = wx.Button(self, label="Work Without a Device...")
+        self.offline_btn.Bind(wx.EVT_BUTTON, self.on_offline)
+        button_row.Add(self.offline_btn, 0, wx.RIGHT, 8)
+
         self.about_btn = wx.Button(self, label="About")
         self.about_btn.Bind(wx.EVT_BUTTON, self.on_about)
         button_row.Add(self.about_btn, 0)
@@ -613,7 +660,11 @@ class DetectPanel(wx.Panel):
             self.frame._relayout()
             return
 
-        self.frame.garmin_root = root
+        # v0.23.0: routed through enter_device_mode() rather than
+        # assigning garmin_root directly, so offline_dir is cleared and
+        # the title bar updates. The serial is filled in below once
+        # get_device_info() has run.
+        self.frame.enter_device_mode(root)
 
         if root is None:
             self.status_text.SetLabel("No Garmin device connected.")
@@ -664,6 +715,10 @@ class DetectPanel(wx.Panel):
             self.info_text.SetLabel(
                 "\n".join(lines) if lines else "(no device info fields present)"
             )
+            # v0.23.0: remember the serial -- it keys the per-device
+            # backup subfolder so two Edges stop sharing one store.
+            self.frame.device_serial = info.get("serial_number")
+            self.frame.update_title()
 
         self.next_btn.Enable()
         self.startup_txt_btn.Enable()
@@ -675,6 +730,85 @@ class DetectPanel(wx.Panel):
 
     def on_startup_txt(self, event):
         self.frame.show_panel("startup_txt")
+
+    def on_offline(self, event):
+        """
+        Enter OFFLINE MODE against a folder of .fit profiles the user
+        picks -- an MTP pull, a pre-setup archive, anything.
+
+        Validates the folder BEFORE switching mode, so a mis-pick (the
+        Garmin root instead of Sports/, say, or a folder of activity
+        recordings) produces a clear explanation while still in a known
+        state, rather than an empty profile list that looks like a bug.
+        """
+        dlg = wx.DirDialog(
+            self, "Choose a folder containing Garmin Activity Profiles (.fit)",
+            style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST,
+        )
+        if dlg.ShowModal() != wx.ID_OK:
+            dlg.Destroy()
+            return
+        folder = dlg.GetPath()
+        dlg.Destroy()
+
+        try:
+            all_fit = garmin_device.list_profiles_in_folder(folder)
+        except OSError as e:
+            wx.MessageBox(f"Couldn't read that folder:\n\n{e}",
+                          "Folder not readable", wx.OK | wx.ICON_ERROR)
+            return
+
+        # Separate real Activity Profiles from other .fit files that may
+        # be sitting alongside them. A whole-device pull will contain
+        # Device.fit and Totals.fit, both of which decode perfectly well
+        # as FIT and neither of which is an editable screen layout --
+        # listing them would be actively misleading.
+        profiles = [f for f in all_fit
+                    if is_profile_file(os.path.join(folder, f))]
+
+        if not profiles:
+            extra = ""
+            if all_fit:
+                extra = (f"\n\nThere are {len(all_fit)} .fit file(s) here, but "
+                         f"none of them is an Activity Profile — they may be "
+                         f"activity recordings, or files like Device.fit and "
+                         f"Totals.fit.")
+            wx.MessageBox(
+                f"No Activity Profiles found in:\n{folder}{extra}\n\n"
+                f"On a Garmin device these live in the Garmin/Sports/ folder.",
+                "No profiles found", wx.OK | wx.ICON_WARNING)
+            return
+
+        # Read the device serial out of the profiles themselves. There
+        # is no device to ask, but every profile embeds
+        # file_id.serial_number and it matches the unit it came from
+        # exactly (PROJECT_NOTES.md Doc rev 117). That is what lets
+        # per-device backup separation work offline.
+        serials = set()
+        for f in profiles:
+            s = profile_serial_number(os.path.join(folder, f))
+            if s is not None:
+                serials.add(s)
+
+        if len(serials) > 1:
+            # Legitimate -- someone may deliberately keep two devices'
+            # profiles together -- so this is advisory, not a block.
+            wx.MessageBox(
+                f"Heads up: this folder holds profiles from "
+                f"{len(serials)} different Garmin devices "
+                f"(serials: {', '.join(str(s) for s in sorted(serials))}).\n\n"
+                f"That's fine to work with, but backups will be filed under "
+                f"whichever device each profile came from, and a profile is "
+                f"only meant for the device it originated on.",
+                "Profiles from more than one device", wx.OK | wx.ICON_INFORMATION)
+
+        self.frame.enter_offline_mode(
+            folder, serial=(serials.pop() if len(serials) == 1 else None))
+        self.frame.offline_profiles = profiles
+        self.frame.needs_backup = True
+        self.frame.SetStatusText(
+            f"Offline: {len(profiles)} profile(s) in {os.path.basename(folder)}")
+        self.frame.show_panel("profiles")
 
 
 class ProfileListPanel(wx.Panel):
@@ -747,7 +881,12 @@ class ProfileListPanel(wx.Panel):
         self.status_text = wx.StaticText(self, label="")
         outer.Add(self.status_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
 
-        outer.Add(wx.StaticText(self, label="On Device:"), 0, wx.LEFT | wx.RIGHT | wx.EXPAND, 12)
+        # v0.23.1: mode-aware (Doug's report -- it read "On Device:" while
+        # working from a folder, which is simply untrue and undermines the
+        # whole point of making the mode obvious). Set for real by
+        # _refresh_list(); this is just the device-mode default.
+        self.source_label = wx.StaticText(self, label="On Device:")
+        outer.Add(self.source_label, 0, wx.LEFT | wx.RIGHT | wx.EXPAND, 12)
         self.profile_list = wx.ListBox(self, style=wx.LB_SINGLE)
         self.profile_list.Bind(wx.EVT_LISTBOX, self.on_profile_selected)
         outer.Add(self.profile_list, 1, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
@@ -864,9 +1003,29 @@ class ProfileListPanel(wx.Panel):
         profile backups."
         """
         root = self.frame.garmin_root
-        if root is None:
+        # v0.23.0: in OFFLINE mode there is no device and garmin_root is
+        # deliberately None -- the source is a folder instead. Both
+        # branches produce the same {filename: backup_path} dict, which
+        # is the entire reason nothing downstream of here needed
+        # changing: stage_for_edit() copies from a backup path, not
+        # from a device.
+        offline = self.frame.offline_mode
+
+        # v0.23.1: say where these profiles actually come from. "Target"
+        # was considered and rejected -- offline the folder is the
+        # SOURCE being read and edited, not a destination; nothing is
+        # written back to it (Export always asks where to go). Naming it
+        # a target would misdescribe the direction of travel.
+        if offline:
+            folder = os.path.basename(os.path.normpath(self.frame.offline_dir or ""))
+            self.source_label.SetLabel(f"In folder \"{folder}\" (offline — no device):")
+        else:
+            self.source_label.SetLabel("On Device:")
+
+        if not offline and root is None:
             self.status_text.SetLabel(
-                "No device connected -- go Back and click Detect Garmin first."
+                "No device connected -- go Back and click Detect Garmin first, "
+                "or use \"Work Without a Device...\" to open a folder."
             )
             self.profile_list.Clear()
             self.deleted_list.Clear()
@@ -881,10 +1040,41 @@ class ProfileListPanel(wx.Panel):
         do_backup = force_backup or self.frame.needs_backup or not self.backup_paths
         if do_backup:
             try:
-                self.backup_paths = garmin_device.backup_profiles(root, self.frame.working_dir)
+                if offline:
+                    # v0.23.1 BUG FIX (Doug, first real use): RE-SCAN the
+                    # folder here rather than reusing the list captured
+                    # when it was first picked. A folder on disk is not a
+                    # snapshot -- files get added to it while the GUI is
+                    # open, which is exactly what happens when you clone
+                    # profiles into the folder you're already viewing.
+                    # Reusing the original list made "Refresh (re-backup
+                    # + re-list)" quietly re-list the same set forever,
+                    # which is the opposite of what the button says.
+                    #
+                    # A device folder can change under you too, but the
+                    # device path re-reads Sports/ on every backup call
+                    # and so never had this problem -- the bug was
+                    # introduced by caching, not inherited.
+                    self.frame.offline_profiles = [
+                        f for f in garmin_device.list_profiles_in_folder(
+                            self.frame.offline_dir)
+                        if is_profile_file(os.path.join(self.frame.offline_dir, f))
+                    ]
+                    self.backup_paths = garmin_device.backup_profiles_from_folder(
+                        self.frame.offline_dir, self.frame.working_dir,
+                        only_filenames=set(self.frame.offline_profiles),
+                        device_serial=self.frame.device_serial,
+                    )
+                else:
+                    self.backup_paths = garmin_device.backup_profiles(
+                        root, self.frame.working_dir,
+                        device_serial=self.frame.device_serial,
+                    )
             except OSError as e:
                 self.status_text.SetLabel(
-                    f"Backup failed: {e} -- is the device still connected?"
+                    f"Backup failed: {e} -- "
+                    + ("is that folder still available?" if offline
+                       else "is the device still connected?")
                 )
                 self.profile_list.Clear()
                 self.deleted_list.Clear()
@@ -920,7 +1110,17 @@ class ProfileListPanel(wx.Panel):
         # its own separate refresh trigger. This is a plain directory
         # scan, not a device call, so it's cheap enough to always redo
         # regardless of do_backup.
-        backed_up = garmin_device.list_backed_up_profile_filenames(self.frame.working_dir)
+        # v0.23.1: SCOPED TO THE CURRENT DEVICE. This list was always a
+        # whole-store scan, which was harmless while the store held one
+        # device's backups. It is not harmless now: with a 530 and an
+        # 840 backed up side by side, an unscoped scan offers you the
+        # OTHER device's profiles as "deleted, restore me" -- and
+        # restoring one onto the wrong Edge is exactly the mistake the
+        # per-device separation exists to prevent. Surfaced by Doug's
+        # report about the folder heading; same root cause, different
+        # symptom.
+        backed_up = garmin_device.list_backed_up_profile_filenames(
+            self.frame.working_dir, device_serial=self.frame.device_serial)
         deleted = sorted(backed_up - set(self.backup_paths.keys()))
         self.deleted_list.Set(deleted)
 
@@ -1767,11 +1967,11 @@ class ViewScreensPanel(wx.Panel):
             wx.MessageBox(
                 f"This screen has a device-dependent Connect IQ data field "
                 f"on it (ID {blocked}), so it can't be saved as a favorite.\n\n"
-                f"CONFIRMED on real hardware: a favorite carrying one of "
-                f"these fields does NOT reproduce it on the new screen -- the "
-                f"field renders as \"Timer\" on the device, regardless of what "
-                f"this file or the GUI shows. Only Garmin's own on-device "
-                f"editor can place a Connect IQ data field.\n\n"
+                f"A favorite carrying one of these fields doesn't reproduce "
+                f"it on the new screen -- the field renders as \"Timer\" on "
+                f"the device, regardless of what this file or the GUI shows. "
+                f"Only Garmin's own on-device editor can place a Connect IQ "
+                f"data field.\n\n"
                 f"A favorite saved from a screen WITHOUT one of these fields "
                 f"works normally.",
                 "Can't save favorite -- Connect IQ field present",
@@ -1814,11 +2014,10 @@ class ViewScreensPanel(wx.Panel):
         unsupported_type = hide_unsupported_screen_type(working_path, slot)
         if unsupported_type is not None:
             wx.MessageBox(
-                f"This is a '{unsupported_type}' screen. CONFIRMED via "
-                f"direct on-device inspection that this screen type has "
-                f"no Remove option at all in the Data Screens editor -- "
-                f"there's nothing to force here, because that state has "
-                f"no on-device equivalent to compare it against.",
+                f"This is a '{unsupported_type}' screen. Garmin's own Data "
+                f"Screens editor offers no Remove option for this screen "
+                f"type, so there's nothing to force here -- that state has "
+                f"no on-device equivalent.",
                 f"Can't remove {unsupported_type}",
                 wx.OK | wx.ICON_ERROR,
             )
@@ -1828,13 +2027,12 @@ class ViewScreensPanel(wx.Panel):
             wx.MessageBox(
                 "This is currently the only visible USER screen on this "
                 "profile -- Garmin-named screens (Map, Elevation, etc.) "
-                "don't count toward this. Confirmed via real on-device "
-                "testing that Garmin's own editor refuses to hide or "
-                "remove a profile's last remaining user screen even "
-                "while other named screens are still visible -- this "
-                "isn't a guess, so it can't be overridden here either. "
-                "Show or add another user screen first if you want to "
-                "remove this one.",
+                "don't count toward this. Garmin's own editor refuses to "
+                "hide or remove a profile's last remaining user screen "
+                "even while other named screens are still visible, so "
+                "this can't be overridden here either. Show or add "
+                "another user screen first if you want to remove this "
+                "one.",
                 "Can't remove the last visible user screen",
                 wx.OK | wx.ICON_ERROR,
             )
@@ -2810,12 +3008,10 @@ class EditScreenPanel(wx.Panel):
             unsupported_type = hide_unsupported_screen_type(self.frame.editing_path, self.slot)
             if unsupported_type is not None:
                 wx.MessageBox(
-                    f"This is a '{unsupported_type}' screen. CONFIRMED via "
-                    f"direct on-device inspection that this screen type has "
-                    f"no Show Screen toggle at all in the Data Screens "
-                    f"editor, on any profile -- there's nothing to force "
-                    f"here, because that state has no on-device equivalent "
-                    f"to compare it against.",
+                    f"This is a '{unsupported_type}' screen. Garmin's own "
+                    f"Data Screens editor offers no Show Screen toggle for "
+                    f"this screen type, on any profile -- so there's nothing "
+                    f"to force here; that state has no on-device equivalent.",
                     f"Can't hide {unsupported_type}",
                     wx.OK | wx.ICON_ERROR,
                 )
@@ -2829,11 +3025,10 @@ class EditScreenPanel(wx.Panel):
                 wx.MessageBox(
                     "This is currently the only visible USER screen on this "
                     "profile -- Garmin-named screens (Map, Elevation, etc.) "
-                    "don't count toward this. Confirmed via real on-device "
-                    "testing that Garmin's own editor refuses to hide or "
-                    "remove a profile's last remaining user screen even "
-                    "while other named screens are still visible -- this "
-                    "isn't a guess, so it can't be overridden here either. "
+                    "don't count toward this. Garmin's own editor refuses "
+                    "to hide or remove a profile's last remaining user "
+                    "screen even while other named screens are still "
+                    "visible, so this can't be overridden here either. "
                     "Show another user screen first if you want to hide "
                     "this one.",
                     "Can't hide the last visible user screen",
@@ -3376,9 +3571,9 @@ class AddScreenPanel(wx.Panel):
             dropped_note = (
                 f"\n\nNOTE: {len(dropped)} device-dependent Connect IQ data "
                 f"field(s) (ID {dropped}) in that favorite were DROPPED. "
-                f"CONFIRMED on real hardware that these don't carry over -- "
-                f"they render as \"Timer\" on the device. Only Garmin's own "
-                f"on-device editor can place one."
+                f"These don't carry over -- they render as \"Timer\" on "
+                f"the device. Only Garmin's own on-device editor can "
+                f"place one."
             )
 
         source = favorite["source_profile"]
@@ -3387,7 +3582,7 @@ class AddScreenPanel(wx.Panel):
                 f"Loaded {len(field_ids)} field(s) from your saved favorite, "
                 f"originally captured from a different profile ({source}). "
                 f"If that profile is a different sport type than this one, "
-                f"these fields haven't been confirmed to work here -- worth "
+                f"these fields may not be valid here -- worth "
                 f"a look before deploying.{dropped_note}",
                 "Favorite loaded", wx.OK | wx.ICON_INFORMATION,
             )
@@ -3440,10 +3635,9 @@ class AddScreenPanel(wx.Panel):
                 f"This new screen's field list contains a device-dependent "
                 f"Connect IQ data field (ID {blocked}), which this toolkit "
                 f"can't place.\n\n"
-                f"CONFIRMED on real hardware: the field renders as \"Timer\" "
-                f"on the device no matter what this file or the GUI shows. "
-                f"Only Garmin's own on-device editor can place a Connect IQ "
-                f"data field.\n\n"
+                f"The field renders as \"Timer\" on the device no matter what "
+                f"this file or the GUI shows. Only Garmin's own on-device "
+                f"editor can place a Connect IQ data field.\n\n"
                 f"Remove that field from the list above, then create the "
                 f"screen.",
                 "Can't create -- Connect IQ field present",
@@ -3454,7 +3648,7 @@ class AddScreenPanel(wx.Panel):
         if self._count_user_screens() >= MAX_USER_SCREENS:
             wx.MessageBox(
                 f"This profile already has {MAX_USER_SCREENS} user-definable "
-                f"screens -- the confirmed on-device cap. Remove or hide an "
+                f"screens -- the on-device cap. Remove or hide an "
                 f"existing one first.",
                 "At the screen cap", wx.OK | wx.ICON_ERROR,
             )
@@ -4205,17 +4399,43 @@ class BackupCleanupDialog(wx.Dialog):
     """
 
     def __init__(self, parent, frame):
-        super().__init__(parent, title="Clean Up Old Backups", size=(480, 260))
+        # v0.23.2 (Doug's report): the fixed 260px height was sized for
+        # a one-line preview. Now that the preview LISTS the snapshots
+        # it can run to a dozen lines, which overflowed and drew
+        # underneath the Cancel / Clean Up Now buttons. Height is no
+        # longer fixed -- _refresh_preview() re-fits the dialog after
+        # every content change; only the WIDTH is pinned, so the
+        # hard-wrapped text keeps a predictable line length.
+        super().__init__(parent, title="Clean Up Old Backups")
+        self.SetMinSize((520, 300))
         self.frame = frame
 
         outer = wx.BoxSizer(wx.VERTICAL)
 
+        # v0.23.2 REGRESSION FIX (Doug's report: the dialog opened
+        # almost the full width of his screen). Every label in here must
+        # be HARD-WRAPPED now, and the reason is a direct consequence of
+        # the v0.23.2 height fix: while the dialog had a fixed size, an
+        # over-long label was simply clipped, so nothing forced the
+        # issue. Now that it fits itself to its content, the longest
+        # unwrapped line in it DICTATES the width.
+        #
+        # Same failure this codebase has hit six times now (v0.16.2,
+        # v0.16.3, v0.16.16, v0.19.18, v0.21.1, and here) -- dynamic or
+        # long text driving a container's size. The standing rule is
+        # textwrap.fill() before the text ever reaches a wx control, and
+        # I broke it by adding prose without wrapping it.
         outer.Add(wx.StaticText(
             self,
-            label="Deletes entire backups/<timestamp>/ folders older than "
-                  "the window below. Each folder is a full snapshot of "
-                  "every profile at that moment -- deleting one doesn't "
-                  "affect any other backup.",
+            label=textwrap.fill(
+                "Deletes whole backup snapshots older than the window "
+                "below. Snapshots live in backups/<device serial>/"
+                "<timestamp>/, plus backups/<timestamp>/ for any made "
+                "before per-device separation. Each is a complete set "
+                "of every profile at that moment -- deleting one never "
+                "affects another.",
+                BACKUP_DIALOG_WRAP,
+            ),
         ), 0, wx.ALL | wx.EXPAND, 12)
 
         days_row = wx.BoxSizer(wx.HORIZONTAL)
@@ -4226,6 +4446,12 @@ class BackupCleanupDialog(wx.Dialog):
         days_row.Add(self.days_text, 0, wx.RIGHT, 6)
         days_row.Add(wx.StaticText(self, label="day(s)"), 0, wx.ALIGN_CENTER_VERTICAL)
         outer.Add(days_row, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
+
+        # v0.23.1: always-visible summary of the WHOLE store, so today's
+        # backups are visible even though no sane day count includes
+        # them -- see _store_summary().
+        self.store_text = wx.StaticText(self, label="")
+        outer.Add(self.store_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
 
         self.preview_text = wx.StaticText(self, label="")
         outer.Add(self.preview_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
@@ -4239,7 +4465,7 @@ class BackupCleanupDialog(wx.Dialog):
         button_row.Add(self.clean_btn, 0)
         outer.Add(button_row, 0, wx.ALL, 12)
 
-        self.SetSizer(outer)
+        self.SetSizerAndFit(outer)
         self._refresh_preview()
 
     def _days_value(self):
@@ -4253,28 +4479,100 @@ class BackupCleanupDialog(wx.Dialog):
     def on_days_changed(self, event):
         self._refresh_preview()
 
+    def _store_summary(self):
+        """
+        One line describing the WHOLE backup store, independent of the
+        day filter.
+
+        Doug's report: backups made today never appear in the preview at
+        any sensible day count, so there's no way to see what the store
+        actually holds -- you can only ever see the part you're about to
+        delete. Deliberately NOT solved by allowing a day count of 0:
+        that would put "delete every restore point I have" one keystroke
+        away, which is the wrong trade in a tool whose entire posture is
+        that backups are cheap and irreplaceable.
+        """
+        by_device = {}
+        total = 0
+        for _timestamp, folder in garmin_device.iter_backup_folders(self.frame.working_dir):
+            parent = os.path.basename(os.path.dirname(folder))
+            key = ("pre-serial" if os.path.dirname(folder) ==
+                   os.path.join(self.frame.working_dir, "backups") else parent)
+            by_device[key] = by_device.get(key, 0) + 1
+            total += 1
+        if not total:
+            return "Backup store is empty."
+        bits = ", ".join(f"{k}: {v}" for k, v in sorted(by_device.items()))
+        return f"Store holds {total} snapshot(s) — {bits}"
+
     def _refresh_preview(self):
         days = self._days_value()
+        summary = self._store_summary()
+        self.store_text.SetLabel(textwrap.fill(summary, BACKUP_DIALOG_WRAP))
         if days is None:
             self.preview_text.SetLabel("Enter a positive whole number of days.")
             self.clean_btn.Disable()
+            self._refit()
             return
 
         candidates = garmin_device.prune_old_backups(self.frame.working_dir, days, dry_run=True)
         if not candidates:
-            self.preview_text.SetLabel(
-                f"Nothing to clean up -- no backup folders older than {days} day(s)."
-            )
-            self.clean_btn.Disable()
-        else:
-            total_bytes = sum(size for _, size in candidates)
             self.preview_text.SetLabel(textwrap.fill(
-                f"{len(candidates)} backup folder(s) older than {days} "
-                f"day(s), {garmin_device._format_bytes(total_bytes)} total, "
-                f"would be deleted.",
-                GRAPH_WARNING_WRAP_WIDTH,
+                f"Nothing to clean up -- no backup snapshots older than "
+                f"{days} day(s).", BACKUP_DIALOG_WRAP))
+            self.clean_btn.Disable()
+            self._refit()
+        else:
+            # v0.23.1: LIST what would go, not just how many. Doug's
+            # report: "where would I see the list of backups to be
+            # cleaned up?" -- there wasn't one, only a count and a size,
+            # which asks the user to authorise a deletion they can't
+            # inspect. With per-device folders the identity matters even
+            # more: a snapshot now belongs to a specific Edge.
+            #
+            # Capped and hard-wrapped. This codebase has hit the
+            # dynamic-text-widens-the-window bug five times (v0.16.2,
+            # v0.16.3, v0.16.16, v0.19.18, v0.21.1), and an uncapped
+            # list of a thousand folders is exactly how it happens
+            # again.
+            total_bytes = sum(size for _, size in candidates)
+            SHOW = 8
+            lines = [
+                f"{len(candidates)} snapshot(s) older than {days} day(s), "
+                f"{garmin_device._format_bytes(total_bytes)} total, would be "
+                f"deleted:",
+                "",
+            ]
+            for rel, size in candidates[:SHOW]:
+                parts = rel.split(os.sep)
+                where = (f"{parts[0]} / {parts[1]}" if len(parts) > 1
+                         else f"{parts[0]} (pre-serial)")
+                lines.append(f"    {where}  ({garmin_device._format_bytes(size)})")
+            if len(candidates) > SHOW:
+                lines.append(f"    ...and {len(candidates) - SHOW} more")
+            self.preview_text.SetLabel("\n".join(
+                textwrap.fill(l, BACKUP_DIALOG_WRAP) if not l.startswith("    ")
+                else l[:BACKUP_DIALOG_WRAP]
+                for l in lines
             ))
             self.clean_btn.Enable()
+            self._refit()
+
+    def _refit(self):
+        """
+        Re-lay-out and GROW the dialog to fit whatever the preview now
+        says, never shrinking it.
+
+        Same "only grow" rule as MainFrame._relayout(), and for the same
+        reason: a dialog that resized downward every time the day count
+        changed would jitter under the cursor while typing. Called after
+        every preview change, because the preview's height varies with
+        how many snapshots are in scope.
+        """
+        self.Layout()
+        best = self.GetBestSize()
+        cur = self.GetSize()
+        self.SetSize((max(cur.width, best.width), max(cur.height, best.height)))
 
     def on_cancel(self, event):
         self.EndModal(wx.ID_CANCEL)
@@ -4479,10 +4777,19 @@ class RestorePanel(wx.Panel):
         if profile in self.frame.known_profiles:
             verb_line = f"REPLACING what's currently on it as \"{profile}\"."
         else:
+            # v0.23.3 (Doug's report): the reassurance that recreating a
+            # deleted profile had been confirmed by an on-device test,
+            # with its date, used to be in this string. That is
+            # provenance for the DEVELOPER -- it belongs in a comment
+            # and in PROJECT_NOTES, not in a dialog someone reads while
+            # deciding whether to press Yes. It answered a question the
+            # user never asked and made the toolkit sound unsure of
+            # itself. (The fact itself stands: a real NewFiles test on
+            # 2026-08-11 confirmed the device recreates a profile
+            # deleted from Sports/, which is why this path exists.)
             verb_line = (
-                f"RECREATING \"{profile}\" on the device -- it isn't currently "
-                f"present in Sports/. Confirmed possible via a real on-device "
-                f"NewFiles test (2026-08-11)."
+                f"RECREATING \"{profile}\" on the device -- it isn't "
+                f"currently there."
             )
 
         answer = wx.MessageBox(
@@ -4752,11 +5059,8 @@ class ClonePanel(wx.Panel):
         if len(name) > PROFILE_NAME_MAX_CHARS:
             return (
                 f"Profile name is {len(name)} characters -- Garmin's own "
-                f"on-device editor hard-blocks a 16th character (confirmed "
-                f"directly: typing past {PROFILE_NAME_MAX_CHARS} just switches "
-                f"to the checkmark/complete control instead of accepting more "
-                f"input). Shorten it to {PROFILE_NAME_MAX_CHARS} characters "
-                f"or fewer."
+                f"on-device editor won't accept a 16th character. Shorten "
+                f"it to {PROFILE_NAME_MAX_CHARS} characters or fewer."
             )
         return None
 
@@ -5068,6 +5372,7 @@ class StartupTxtPanel(wx.Panel):
         self.original_display = None
         self.original_message = ""
         self._baseline_display = 3  # see on_show()'s comment -- kept in sync with original_display, never None
+        self._baseline_message = ""  # v0.23.2: what the CONTROL held after loading -- _is_dirty() compares against this, not original_message
         self.backup_path = None
 
         outer = wx.BoxSizer(wx.VERTICAL)
@@ -5085,13 +5390,54 @@ class StartupTxtPanel(wx.Panel):
         display_row = wx.BoxSizer(wx.HORIZONTAL)
         display_row.Add(wx.StaticText(self, label="Show for at least (seconds):"), 0,
                          wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
-        self.display_spin = wx.SpinCtrl(self, min=1, max=60, initial=3)
+        # v0.23.1 BUG FIX (Doug's report): min was 1, but GARMIN ITSELF
+        # SHIPS `<display = 0>` -- the 840's factory startup.txt has
+        # exactly that. A control that can't hold 0 silently clamped it
+        # to 1 on load, so _is_dirty() then compared 1 against a
+        # baseline of 0 and reported unsaved changes on a file the user
+        # had not touched. Opening the panel and pressing Back warned
+        # about losing edits that never existed.
+        #
+        # 0 is a legitimate value in Garmin's own files, so the control
+        # has to be able to represent it. See also the defensive clamp
+        # in on_show(): any baseline the control cannot hold would
+        # reproduce this same class of bug.
+        self.display_spin = wx.SpinCtrl(self, min=0, max=60, initial=3)
         self.display_spin.Bind(wx.EVT_SPINCTRL, self.on_field_change)
         display_row.Add(self.display_spin, 0)
         outer.Add(display_row, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
 
         outer.Add(wx.StaticText(self, label="Message:"), 0, wx.LEFT | wx.RIGHT, 12)
         self.message_text = wx.TextCtrl(self, style=wx.TE_MULTILINE)
+        # v0.23.3 ROOT-CAUSE FIX (Doug's diagnostic output, 2026-09-26).
+        # macOS backs wx.TextCtrl with NSTextView, which by default
+        # applies "smart" substitutions -- three periods become one
+        # U+2026 ellipsis, straight quotes become curly, a double hyphen
+        # becomes an em dash.
+        #
+        # garmin_device.py v0.12.3 already diagnosed this, but recorded
+        # it as happening "as you type" and fixed only the SAVE side by
+        # reversing the substitutions before the ASCII encode. Two
+        # things were missed, both visible in Doug's report of a file
+        # containing "Location sent to...":
+        #
+        #   1. it applies to text set PROGRAMMATICALLY too -- loading a
+        #      file was enough to corrupt it, no typing required;
+        #   2. it happens ASYNCHRONOUSLY, after the event-loop turn.
+        #
+        # (2) is what defeated two attempted fixes: a baseline captured
+        # immediately after SetValue() still held the original 93-char
+        # text, the substitution landed later, and the Back button then
+        # correctly reported a difference the USER had not made.
+        #
+        # Disabling the substitutions stops the corruption at source,
+        # which is better than reversing it afterwards -- it also means
+        # what the user types is what gets written. The v0.12.3
+        # normalisation stays as a safety net for anything that slips
+        # through. hasattr-guarded: this method exists only on macOS
+        # builds of wxWidgets.
+        if hasattr(self.message_text, "OSXDisableAllSmartSubstitutions"):
+            self.message_text.OSXDisableAllSmartSubstitutions()
         self.message_text.Bind(wx.EVT_TEXT, self.on_field_change)
         # Real bug, Doug's report (2026-08-19): this control has proportion=1
         # in a vertical BoxSizer, so its visible height is whatever's left
@@ -5156,6 +5502,7 @@ class StartupTxtPanel(wx.Panel):
             self._baseline_display = 3
             self.display_spin.SetValue(3)
             self.message_text.SetValue("")
+            self._baseline_message = ""  # v0.23.2: keep every reset path in step with _is_dirty()
             self.message_text.Disable()
             self.display_spin.Disable()
             self.save_btn.Disable()
@@ -5170,8 +5517,8 @@ class StartupTxtPanel(wx.Panel):
         if content is None:
             self.status_text.SetLabel(
                 f"No {garmin_device.STARTUP_TXT_FILENAME} found on this device -- "
-                f"nothing to show or edit. (Not every device/firmware is confirmed "
-                f"to have one.)"
+                f"nothing to show or edit. (Not every device or firmware "
+                f"version has one.)"
             )
             self.header = ""
             self.original_display = None
@@ -5179,6 +5526,7 @@ class StartupTxtPanel(wx.Panel):
             self._baseline_display = 3
             self.display_spin.SetValue(3)
             self.message_text.SetValue("")
+            self._baseline_message = ""  # v0.23.2: keep every reset path in step with _is_dirty()
             self.message_text.Disable()
             self.display_spin.Disable()
             self.save_btn.Disable()
@@ -5195,17 +5543,85 @@ class StartupTxtPanel(wx.Panel):
         # unparseable file) -- avoids a None-vs-actual-value comparison
         # bug where a spin-value change would never register as dirty.
         self._baseline_display = self.original_display if self.original_display is not None else 3
+        # v0.23.1: CLAMP the baseline to what the control can actually
+        # represent, then read it back. A SpinCtrl silently clamps
+        # SetValue() to its own min/max, so any file carrying a value
+        # outside that range would leave the baseline and the control
+        # permanently disagreeing -- which is precisely the false
+        # "unsaved changes" bug Doug hit with `<display = 0>` against a
+        # minimum of 1. Widening the minimum fixed that specific value;
+        # this makes the whole class of mismatch impossible, including
+        # for some future file with a value above the maximum.
         self.display_spin.SetValue(self._baseline_display)
+        self._baseline_display = self.display_spin.GetValue()
         self.message_text.SetValue(self.original_message)
+        # v0.23.2: SAME TREATMENT FOR THE TEXT CONTROL, which the
+        # v0.23.1 fix missed -- widening the spin's minimum cured one
+        # symptom and left the identical flaw next to it, so Doug still
+        # got "unsaved changes" on a file he hadn't touched.
+        #
+        # parse_startup_txt() does `.lstrip("\n")` on the message: it
+        # strips LEADING newlines but not trailing ones, so
+        # original_message carries the file's final newline. Whether a
+        # multiline wx.TextCtrl hands that back byte-identically is a
+        # round-trip question about Cocoa, and this project has already
+        # been bitten twice by assuming wx.TextCtrl round-trips cleanly
+        # (v0.12.1's CRLF blank lines, v0.12.3's smart quotes).
+        #
+        # So don't assume. The question the Back button actually asks is
+        # "has the user changed anything since this loaded" -- so
+        # baseline against what the CONTROL holds after loading, not
+        # against what the file said. That is immune to any round-trip
+        # quirk, present or future. original_message stays as the
+        # authoritative value for SAVING; only the dirty comparison
+        # moves.
+        self._baseline_message = self.message_text.GetValue()
         self.message_text.Enable()
         self.display_spin.Enable()
         self._refresh()
 
+    def _dirty_reason(self):
+        """
+        Describe what the user has changed since this panel loaded, or
+        None if nothing has.
+
+        Both comparisons are against baselines read back OUT OF THE
+        CONTROLS after loading (see on_show()), never against the raw
+        file values. A control can silently transform what it is given
+        -- a SpinCtrl clamps to its own range, a TextCtrl may not
+        preserve a trailing newline -- and comparing a transformed
+        display value against the untransformed source reports a change
+        the user never made.
+
+        Returns a REASON rather than a bare boolean, and the warning
+        dialog shows it. That is partly good manners -- "you have
+        unsaved changes" is more useful when it says which -- and partly
+        hard-won: this check has now produced a false positive twice,
+        and each round of diagnosis cost a test cycle because the
+        symptom carried no information about its cause. A check that
+        explains itself is debuggable by the person hitting it.
+        """
+        # v0.23.3: compare SMART-CHARACTER-NORMALISED forms. Disabling
+        # the substitutions at the control (see __init__) should make
+        # this redundant on macOS, but OSXDisableAllSmartSubstitutions()
+        # doesn't exist on every wx build, and a substitution that
+        # arrives asynchronously would otherwise report a change the
+        # user never made -- which is the exact bug this has been three
+        # times. Reuses garmin_device's own table so the GUI and the
+        # save path agree on what counts as equivalent.
+        norm = garmin_device._normalize_smart_chars
+        msg_now = norm(self.message_text.GetValue())
+        msg_was = norm(self._baseline_message)
+        if msg_now != msg_was:
+            return (f"message text ({len(msg_was)} chars -> {len(msg_now)}; "
+                    f"was {msg_was[:40]!r}, now {msg_now[:40]!r})")
+        spin_now, spin_was = self.display_spin.GetValue(), self._baseline_display
+        if spin_now != spin_was:
+            return f"display seconds ({spin_was} -> {spin_now})"
+        return None
+
     def _is_dirty(self):
-        return (
-            self.message_text.GetValue() != self.original_message
-            or self.display_spin.GetValue() != self._baseline_display
-        )
+        return self._dirty_reason() is not None
 
     def _update_warning(self):
         msg = self.message_text.GetValue()
@@ -5215,8 +5631,7 @@ class StartupTxtPanel(wx.Panel):
 
         parts = [f"{n_chars} / {garmin_device.STARTUP_TXT_MAX_CHARS} characters, "
                  f"{n_lines} / {garmin_device.STARTUP_TXT_MAX_LINES} lines typed "
-                 f"(developer-documented reference limits, not confirmed on real "
-                 f"hardware by this toolkit)."]
+                 f"(reference limits, not verified on the device)."]
         if n_chars > garmin_device.STARTUP_TXT_MAX_CHARS:
             parts.append("Over the reference character limit.")
         if n_lines > garmin_device.STARTUP_TXT_MAX_LINES:
@@ -5339,10 +5754,12 @@ class StartupTxtPanel(wx.Panel):
         self.frame.show_panel("detect")
 
     def on_back(self, event):
-        if self.stage == "ready" and self._is_dirty():
+        reason = self._dirty_reason() if self.stage == "ready" else None
+        if reason is not None:
             answer = wx.MessageBox(
-                "You have unsaved changes to the startup message. If you go "
-                "back you will lose them.\n\nGo back anyway?",
+                f"You have unsaved changes to the startup message. If you go "
+                f"back you will lose them.\n\nChanged: {reason}\n\n"
+                f"Go back anyway?",
                 "Unsaved changes", wx.YES_NO | wx.ICON_WARNING,
             )
             if answer != wx.YES:
@@ -5383,6 +5800,38 @@ class MainFrame(wx.Frame):
         self.import_pending = False  # v0.19.17 FIX: True from ImportPanel.on_import() until deploy completes (DeployPanel.on_done()) or the staged import is abandoned (frame.discard_edits()) -- lets PreflightPanel treat a freshly-imported, zero-edits profile as valid to deploy (bytes identical to staged_path is the CORRECT state for an unedited import, not "nothing to deploy"), and lets ViewScreensPanel.on_discard()/on_back() give import-accurate wording instead of talking about "edits"
         self.needs_backup = True  # v0.19.1: set True whenever device state MAY have changed (DetectPanel.on_detect() confirming a connection, DeployPanel.on_check() confirming reconnect) -- ProfileListPanel._refresh_list() only does a real backup_profiles() call when this is True (or the Refresh button forces one regardless), avoiding a redundant re-backup+status-message on every ordinary re-visit to the profile list. Starts True so the very first visit always backs up.
 
+        # --- OFFLINE MODE (v0.23.0) --------------------------------------
+        # The app now has two MODES, and this pair of attributes is the
+        # single source of truth for which one is active:
+        #
+        #   offline_mode False  -- DEVICE mode. garmin_root is a real
+        #                          mounted path. Deploy/eject/remount all
+        #                          apply. This is the original behaviour
+        #                          and is unchanged in every respect.
+        #   offline_mode True   -- OFFLINE mode. garmin_root is None and
+        #                          MUST STAY None. Profiles are sourced
+        #                          from offline_dir, a plain folder the
+        #                          user picked, and results leave via
+        #                          Export rather than Deploy.
+        #
+        # Why a mode flag rather than just "is garmin_root set": because
+        # the dangerous failure here is silent, not loud. Every panel
+        # downstream of Detect was written assuming garmin_root is real.
+        # A device-only path that isn't properly inert won't raise a
+        # clean error -- it will reach for None and fail in whatever way
+        # that particular code happens to fail, possibly after doing
+        # half of something. An explicit flag lets each such path ASK
+        # the question and refuse up front.
+        #
+        # The invariant both directions, asserted rather than assumed:
+        # offline_mode True implies garmin_root is None, and entering
+        # device mode clears offline_dir. See assert_mode().
+        self.offline_mode = False
+        self.offline_dir = None    # folder of .fit profiles, offline mode only
+        self.offline_profiles = []  # filenames in offline_dir confirmed to BE Activity Profiles (is_profile_file), set by DetectPanel.on_offline()
+        self.last_export_dir = None  # remembered between exports within a session
+        self.device_serial = None  # from Device.fit in device mode, or read out of the profiles offline -- keys the backup subfolder
+
         self.container = wx.Panel(self)
         self.container_sizer = wx.BoxSizer(wx.VERTICAL)
         self.container.SetSizer(self.container_sizer)
@@ -5410,6 +5859,7 @@ class MainFrame(wx.Frame):
 
         self.CreateStatusBar()
         self.SetStatusText("Ready.")
+        self.update_title()
 
         self.current_panel_name = None
         self.show_panel("detect")
@@ -5418,6 +5868,82 @@ class MainFrame(wx.Frame):
         # awkwardly cramped size -- Fit() calls after this still
         # respect it as a lower bound.
         self.SetMinSize((480, 320))
+
+    # --- mode handling (v0.23.0) -----------------------------------------
+
+    def enter_device_mode(self, garmin_root, serial=None):
+        """Switch to DEVICE mode. Clears every offline-only attribute."""
+        self.offline_mode = False
+        self.offline_dir = None
+        self.garmin_root = garmin_root
+        self.device_serial = serial
+        self.update_title()
+
+    def enter_offline_mode(self, folder, serial=None):
+        """
+        Switch to OFFLINE mode against `folder`.
+
+        garmin_root is forced to None deliberately, not merely left
+        alone. If a device happens to be plugged in, offline mode must
+        not touch it -- and the surest way to guarantee that is for
+        there to be no path to reach for. Any device-only code that
+        slips through the mode checks will then fail loudly on None
+        rather than quietly writing to hardware the user didn't mean
+        to involve.
+        """
+        self.offline_mode = True
+        self.offline_dir = folder
+        self.garmin_root = None
+        self.device_serial = serial
+        self.update_title()
+
+    def assert_mode(self, expect_offline, what):
+        """
+        Guard for any path that only makes sense in one mode. Returns
+        True if it's safe to proceed; otherwise explains and returns
+        False.
+
+        This exists because of how this class of bug fails. A device
+        operation attempted offline doesn't produce a tidy error -- it
+        reaches for garmin_root=None somewhere deep in a path that has
+        never seen None in its life. Calling this FIRST turns that into
+        a sentence the user can act on.
+        """
+        if self.offline_mode == expect_offline:
+            return True
+        if expect_offline:
+            msg = (f"{what} is only available when working from a folder "
+                   f"(offline mode). You're currently working with a "
+                   f"connected device.")
+        else:
+            msg = (f"{what} needs a connected Garmin device, and you're "
+                   f"currently working offline from a folder.\n\n"
+                   f"Export the profile instead, then copy it to the "
+                   f"device's Garmin/NewFiles/ folder yourself.")
+        wx.MessageBox(msg, "Not available in this mode", wx.OK | wx.ICON_INFORMATION)
+        return False
+
+    def mode_label(self):
+        """Short human description of the current mode, for the title bar."""
+        if self.offline_mode:
+            folder = os.path.basename(os.path.normpath(self.offline_dir or "")) or "folder"
+            return f"Offline — {folder}"
+        if self.garmin_root is not None:
+            return "Device connected"
+        return "No device"
+
+    def update_title(self):
+        """
+        Keep the window title showing which mode is active.
+
+        Doug's request (2026-09-25), and it earns its place: with two
+        modes and two physical devices, "which one am I actually
+        working on" stops being obvious. The title bar is the one piece
+        of chrome visible from every panel, so it's where this belongs
+        rather than on any single screen.
+        """
+        self.SetTitle(f"Activity Profile Editor for Garmin Edge "
+                      f"v{__version__}  [{self.mode_label()}]")
 
     def get_working_path(self):
         """

@@ -199,10 +199,29 @@ def is_device_connected():
 
 # --- Profile listing ---------------------------------------------------
 
+def list_profiles_in_folder(folder):
+    """
+    Return a sorted list of .fit filenames directly inside `folder`
+    (top level only -- never descends).
+
+    Added v0.13.0 for OFFLINE MODE, where the source of profiles is an
+    ordinary folder the user picked rather than a mounted device: a
+    pull off an MTP Edge, a pre-setup archive, anything.
+
+    DELIBERATELY does NOT filter to real Activity Profiles. Any .fit is
+    returned, including `Device.fit`, `Totals.fit` or an activity
+    recording that happens to be sitting in the same folder. Deciding
+    what IS a profile requires decoding the file, which is FIT-format
+    knowledge that belongs in fit_dump.py -- this module is deliberately
+    stdlib-only. Callers that need the distinction should filter with
+    fit_dump.is_profile_file(); the GUI does.
+    """
+    return sorted(f for f in os.listdir(folder) if f.lower().endswith(".fit"))
+
+
 def list_profiles(garmin_root):
     """Return a sorted list of .fit profile filenames in Sports/ (live device, not a backup)."""
-    sports_dir = os.path.join(garmin_root, SPORTS_SUBDIR)
-    return sorted(f for f in os.listdir(sports_dir) if f.lower().endswith(".fit"))
+    return list_profiles_in_folder(os.path.join(garmin_root, SPORTS_SUBDIR))
 
 
 DEVICE_INFO_FILENAME = "Device.fit"  # sits at garmin_root top level, NOT inside Sports/
@@ -502,26 +521,214 @@ def write_startup_txt(garmin_root, content, working_dir):
 
 # --- Backup -------------------------------------------------------------
 
-def backup_profiles(garmin_root, working_dir):
+UNKNOWN_SERIAL_DIR = "unknown-device"
+BACKUP_TIMESTAMP_FMT = "%Y%m%d_%H%M%S"
+
+
+def _is_backup_timestamp(name):
+    """True if `name` is one of our "%Y%m%d_%H%M%S" snapshot folders."""
+    try:
+        datetime.strptime(name, BACKUP_TIMESTAMP_FMT)
+        return True
+    except ValueError:
+        return False
+
+
+def iter_backup_folders(working_dir):
     """
-    Copy every profile in Sports/ (top-level only -- does NOT descend
-    into the device's own Sports/Backups/) to a fresh timestamped
-    folder under working_dir/backups/. Returns {profile_filename: backup_path}.
+    Yield (timestamp_str, folder_path) for every backup snapshot under
+    working_dir, ACROSS BOTH LAYOUTS:
+
+        backups/<timestamp>/            -- pre-v0.13.0, flat
+        backups/<serial>/<timestamp>/   -- v0.13.0 onward, per device
+
+    This exists so introducing per-device separation did not orphan a
+    single existing restore point. Backups made before the change stay
+    exactly where they are -- nothing was moved, which on a store of
+    roughly a thousand files is the difference between a safe change
+    and a risky one -- and every reader goes through here instead of
+    assuming a shape.
+
+    The two are told apart by whether the folder name parses as a
+    timestamp: if it does it IS a snapshot, if it doesn't it's treated
+    as a serial directory and descended into one level. Anything that
+    is neither (a stray file, a folder someone else put there) is
+    skipped rather than guessed at, matching prune_old_backups()'s
+    long-standing "not one of ours -- don't touch" posture.
+
+    Order is not guaranteed; callers that care sort by timestamp_str,
+    which sorts correctly as a plain string.
     """
-    sports_dir = os.path.join(garmin_root, SPORTS_SUBDIR)
+    backups_root = os.path.join(working_dir, "backups")
+    if not os.path.isdir(backups_root):
+        return
+    for entry in sorted(os.listdir(backups_root)):
+        path = os.path.join(backups_root, entry)
+        if not os.path.isdir(path):
+            continue
+        if _is_backup_timestamp(entry):
+            yield entry, path
+            continue
+        try:
+            subentries = sorted(os.listdir(path))
+        except OSError:
+            continue
+        for sub in subentries:
+            subpath = os.path.join(path, sub)
+            if os.path.isdir(subpath) and _is_backup_timestamp(sub):
+                yield sub, subpath
+
+
+def backup_root_for(working_dir, device_serial):
+    """
+    Where backups for `device_serial` live:
+    working_dir/backups/<serial>/ -- or .../unknown-device/ when the
+    serial couldn't be determined.
+
+    NEW in v0.13.0, for users with more than one Edge. Before this,
+    every device's backups landed in one flat working_dir/backups/
+    store, so two units' profiles interleaved and Restore-from-Backup
+    offered you both without distinction.
+
+    DELIBERATELY a subfolder inside ONE working directory, rather than
+    a separate working directory per device selected from a
+    serial-keyed config map (the shape originally sketched in
+    PROJECT_NOTES.md Doc rev 49). The subfolder approach needs no
+    config map, no "assign a folder to this device" step, and nothing
+    for the user to set up or remember -- while separating exactly the
+    same data.
+
+    Backups made BEFORE this version sit directly in
+    working_dir/backups/<timestamp>/ with no serial layer. Those are
+    deliberately left where they are and are still found by
+    list_backup_history(), which searches both shapes -- see its own
+    docstring. Nothing already restorable becomes unreachable, and no
+    existing file is moved.
+    """
+    serial_dir = str(device_serial) if device_serial else UNKNOWN_SERIAL_DIR
+    return os.path.join(working_dir, "backups", serial_dir)
+
+
+def _backup_from_dir(source_dir, working_dir, only_filenames=None,
+                     device_serial=None):
+    """
+    Shared implementation behind backup_profiles() and
+    backup_profiles_from_folder(). Copies every .fit directly inside
+    `source_dir` into a fresh timestamped folder under
+    working_dir/backups/<serial>/, and returns {filename: backup_path}.
+
+    `only_filenames`, if given, restricts the copy to that set -- used
+    by the offline path so a folder holding Device.fit/Totals.fit
+    alongside real profiles doesn't fill the backup store with files
+    that are not profiles.
+
+    `device_serial` selects the per-device subfolder; see
+    backup_root_for(). In device mode it comes from Device.fit via
+    get_device_info(); OFFLINE it is read out of the profiles
+    themselves, which carry the same value (PROJECT_NOTES.md Doc rev
+    117). None is tolerated and files under unknown-device/.
+
+    The RETURN SHAPE is the point of this function. stage_for_edit()
+    consumes {filename: backup_path} and copies FROM the backup, which
+    is why the entire staging/editing pipeline needs no knowledge of
+    whether a device was involved -- see this module's docstring.
+    """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_dir = os.path.join(working_dir, "backups", timestamp)
+    backup_dir = os.path.join(backup_root_for(working_dir, device_serial),
+                              timestamp)
     os.makedirs(backup_dir, exist_ok=True)
 
     result = {}
-    for filename in list_profiles(garmin_root):
-        src = os.path.join(sports_dir, filename)
+    for filename in list_profiles_in_folder(source_dir):
+        if only_filenames is not None and filename not in only_filenames:
+            continue
+        src = os.path.join(source_dir, filename)
         dst = os.path.join(backup_dir, filename)
         shutil.copy2(src, dst)
         result[filename] = dst
 
     print(f"Backed up {len(result)} profile(s) to {backup_dir}", file=sys.stderr)
     return result
+
+
+def backup_profiles(garmin_root, working_dir, device_serial=None):
+    """
+    Copy every profile in Sports/ (top-level only -- does NOT descend
+    into the device's own Sports/Backups/) to a fresh timestamped
+    folder under working_dir/backups/<serial>/.
+    Returns {profile_filename: backup_path}.
+
+    `device_serial` is optional and backward-compatible: omitting it
+    files under unknown-device/ rather than failing, so existing
+    callers and scripts keep working.
+    """
+    return _backup_from_dir(os.path.join(garmin_root, SPORTS_SUBDIR), working_dir,
+                            device_serial=device_serial)
+
+
+def backup_profiles_from_folder(folder, working_dir, only_filenames=None,
+                                device_serial=None):
+    """
+    OFFLINE-MODE sibling of backup_profiles(): same behaviour, same
+    return shape, but sourced from an ordinary folder instead of a
+    mounted device's Sports/.
+
+    Backing up in offline mode may look redundant -- the user already
+    has the files -- but it is doing real work. stage_for_edit()
+    requires a backup path to copy from and records it in the staged
+    file's .lineage.json sidecar, so this is what keeps "which pulled
+    copy was this patch built on" answerable offline exactly as it is
+    on-device. It also means Restore-from-Backup keeps working, and it
+    protects the user's own pulled originals: every edit happens on a
+    staged copy, never on the file they picked.
+    """
+    return _backup_from_dir(folder, working_dir, only_filenames=only_filenames,
+                            device_serial=device_serial)
+
+
+def export_profile(patched_path, dest_path):
+    """
+    OFFLINE-MODE counterpart to write_to_newfiles(): copy the edited
+    profile to a destination the user chose, then READ IT BACK and
+    byte-compare before reporting success. Returns dest_path; raises
+    GarminDeviceError on a mismatch.
+
+    The verification is not ceremony. write_to_newfiles() has always
+    done this because a silently corrupt profile is the worst thing
+    this toolkit can produce, and the offline path arguably needs it
+    MORE: the user's next step is an MTP transfer, and MTP has already
+    been observed in this project handing a mature, dedicated client
+    the wrong file entirely (a 3560-byte `download.svg` in place of a
+    profile). Catching a bad copy here, while the source is still on
+    hand, is far better than discovering it after the file has been
+    moved to a device.
+
+    The CALLER is responsible for dest_path ending in the profile's
+    exact original filename. The device matches by filename on import
+    and silently ignores anything else -- no error, no indication, the
+    profile simply doesn't change.
+    """
+    with open(patched_path, "rb") as f:
+        intended_bytes = f.read()
+
+    dest_dir = os.path.dirname(dest_path)
+    if dest_dir:
+        os.makedirs(dest_dir, exist_ok=True)
+    shutil.copy2(patched_path, dest_path)
+
+    with open(dest_path, "rb") as f:
+        written_bytes = f.read()
+
+    if written_bytes != intended_bytes:
+        raise GarminDeviceError(
+            f"Export verification FAILED -- {dest_path} does not match what "
+            f"was written. The copy is not trustworthy; do not put it on a "
+            f"device. Try exporting again, ideally to a different location."
+        )
+
+    print(f"Exported and verified {os.path.basename(dest_path)} -> {dest_path} "
+          f"({len(written_bytes)} bytes, byte-for-byte confirmed)", file=sys.stderr)
+    return dest_path
 
 
 def list_backup_history(working_dir, profile_filename):
@@ -550,15 +757,13 @@ def list_backup_history(working_dir, profile_filename):
     "%Y%m%d_%H%M%S" folder name -- sorts correctly as a plain string,
     no parsing needed for ordering.
     """
-    backups_root = os.path.join(working_dir, "backups")
-    if not os.path.isdir(backups_root):
-        return []
-
+    # v0.13.0: iterates BOTH the legacy flat layout and the per-device
+    # serial layout, so backups predating the change stay restorable.
     candidates = []
-    for entry in os.listdir(backups_root):
-        path = os.path.join(backups_root, entry, profile_filename)
+    for timestamp, folder in iter_backup_folders(working_dir):
+        path = os.path.join(folder, profile_filename)
         if os.path.isfile(path):
-            candidates.append((entry, path))
+            candidates.append((timestamp, path))
     candidates.sort(key=lambda t: t[0], reverse=True)  # newest first
 
     deduped = []
@@ -572,7 +777,7 @@ def list_backup_history(working_dir, profile_filename):
     return deduped
 
 
-def list_backed_up_profile_filenames(working_dir):
+def list_backed_up_profile_filenames(working_dir, device_serial=None):
     """
     Return the set of every .fit profile filename that appears in ANY
     backup folder under working_dir/backups/ -- i.e. every profile
@@ -589,16 +794,36 @@ def list_backed_up_profile_filenames(working_dir):
     this filter a boot-message backup would get mistaken for a deleted
     profile.
     """
-    backups_root = os.path.join(working_dir, "backups")
-    if not os.path.isdir(backups_root):
-        return set()
-
+    # v0.13.0: both layouts -- see iter_backup_folders().
+    #
+    # `device_serial`, when given, restricts the scan to that device's
+    # own backups PLUS the legacy flat ones (which predate per-device
+    # separation and can't be attributed to either unit). Without it
+    # the scan spans every device in the store, which was harmless
+    # while a store held one device's backups and actively wrong once
+    # it holds two: the caller uses this to offer "deleted, available
+    # to restore", and offering the OTHER Edge's profiles invites
+    # restoring a profile onto hardware it was never meant for.
+    #
+    # Legacy folders are deliberately INCLUDED rather than excluded.
+    # They may well belong to the device in question -- on a
+    # single-device history they certainly do -- and silently dropping
+    # them would orphan restore points, which is the one thing the
+    # both-layouts design exists to avoid.
     names = set()
-    for entry in os.listdir(backups_root):
-        folder = os.path.join(backups_root, entry)
-        if not os.path.isdir(folder):
+    want = str(device_serial) if device_serial else None
+    backups_root = os.path.join(working_dir, "backups")
+    for _timestamp, folder in iter_backup_folders(working_dir):
+        if want is not None:
+            parent = os.path.basename(os.path.dirname(folder))
+            is_legacy = os.path.dirname(folder) == backups_root
+            if not is_legacy and parent != want:
+                continue
+        try:
+            entries = os.listdir(folder)
+        except OSError:
             continue
-        for filename in os.listdir(folder):
+        for filename in entries:
             if filename.lower().endswith(".fit"):
                 names.add(filename)
     return names
@@ -662,20 +887,16 @@ def prune_old_backups(working_dir, older_than_days, dry_run=True):
     unit (shutil.rmtree) -- it's a self-contained point-in-time
     snapshot, so there's no partial-folder bookkeeping to get wrong.
     """
-    backups_root = os.path.join(working_dir, "backups")
-    if not os.path.isdir(backups_root):
-        return []
-
+    # v0.13.0: walks BOTH layouts via iter_backup_folders(), which does
+    # the "is this name one of our timestamps" test that used to live
+    # inline here -- so a per-device serial folder is descended into
+    # rather than skipped, and pruning keeps working on old flat
+    # backups too. The full PATH is carried alongside the name now,
+    # because a timestamp alone no longer locates a folder.
     cutoff = datetime.now() - timedelta(days=older_than_days)
     candidates = []
-    for entry in os.listdir(backups_root):
-        path = os.path.join(backups_root, entry)
-        if not os.path.isdir(path):
-            continue
-        try:
-            folder_time = datetime.strptime(entry, "%Y%m%d_%H%M%S")
-        except ValueError:
-            continue  # not one of ours -- skip, don't touch
+    for timestamp, path in iter_backup_folders(working_dir):
+        folder_time = datetime.strptime(timestamp, BACKUP_TIMESTAMP_FMT)
         if folder_time >= cutoff:
             continue  # not old enough yet
         size = sum(
@@ -683,15 +904,19 @@ def prune_old_backups(working_dir, older_than_days, dry_run=True):
             for dirpath, _, filenames in os.walk(path)
             for f in filenames
         )
-        candidates.append((entry, size))
+        # Report the path RELATIVE to backups/ so a serial-keyed folder
+        # is distinguishable from a legacy one in the preview -- with
+        # two devices, "20260925_120342" alone no longer says which.
+        rel = os.path.relpath(path, os.path.join(working_dir, "backups"))
+        candidates.append((rel, size, path))
 
-    candidates.sort(key=lambda t: t[0])  # oldest first
+    candidates.sort(key=lambda t: os.path.basename(t[0]))  # oldest first, by timestamp
 
     if not dry_run:
-        for entry, _ in candidates:
-            shutil.rmtree(os.path.join(backups_root, entry))
+        for _rel, _size, path in candidates:
+            shutil.rmtree(path)
 
-    return candidates
+    return [(rel, size) for rel, size, _path in candidates]
 
 
 # --- Staging for edit (with lineage tracking) ---------------------------
