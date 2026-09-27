@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-09-27, at Doc rev 121.*
+> *Last updated 2026-09-27, at Doc rev 122.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens. `fit_dump.py` 2.8.0, `fit_patch.py` 1.17.0, `gui_app.py`
@@ -197,15 +197,23 @@ Claude:
    2026-09-27, Doc rev 121 — NEGATIVE.** `f8` never exceeds 1 on the
    840's factory profiles, so the C layout cannot be found in existing
    files and step 4 is now REQUIRED. Tool built: `fit_census.py`.
-3. **Connect app enumeration** — the option space per count, including
-   combinations no current profile happens to use. Count 10 is still
-   unread.
-4. **A/B/C → `f8` mapping — now the critical path** (rev 120 §2: the
-   letters are UI naming, not stored values). Method: **let Garmin write
-   and have the toolkit read.** Set the layout in the Connect app or the
-   on-device editor, pull the profile, read `f8`. No `NewFiles/`, no CRC
-   work, no risk. The purpose-built profile for this is specified under
-   "840 census profile" below.
+3. ~~**Connect app enumeration**~~ **substantially DONE 2026-09-27, Doc
+   rev 122** — option sets recorded for Map, Lap Summary, Segment,
+   Stamina, the fixed-2 types and Workout; count 10 read (no alternates).
+4. ~~**A/B/C → `f8` mapping**~~ **DONE 2026-09-27, Doc rev 122 §1 —
+   A=0, B=1, C=2 for ordinary user screens, count-independent.** The
+   Garmin-writes/toolkit-reads method worked exactly as intended.
+
+   **What replaces it as the critical path (rev 122 §2): the SAME
+   mapping for NAMED types, starting with Segment.** The 530's Segment
+   is a known counterexample — 4/A stores `f8=2`, 4/B stores `f8=1`,
+   inverted against every ordinary screen — and the 840 now offers a
+   third variant there. Whether the inversion survives decides how a
+   per-model `NAMED_SCREEN_LAYOUTS` gets keyed. Second target: Lap
+   Summary's new B variants at counts 1 and 2.
+
+   Pending from the same session: confirm the screen re-saved as 5/C
+   reads `f8=2` (rev 122 §7).
 5. Field IDs for the 840-only fields (Map and Compass data fields, Vert
    Speed, the three new ids) — same Garmin-writes/toolkit-reads trick.
    Lower priority: field ids don't weaken guards.
@@ -310,6 +318,143 @@ profiles by filename and will otherwise overwrite an existing one.
   that established it go in the code comment beside it (Doc rev 119).
 
 ---
+
+*Doc rev 122 — refreshed 2026-09-27.* **The A/B/C layout letters DECODE:
+for ordinary user screens, A=`f8`0, B=`f8`1, C=`f8`2. Confirmed from two
+purpose-built 840 profiles that Garmin's own editor authored. Also:
+three new field IDs (240 Location, 529 Compass, 725 Map), `FIELD_ID_NAMES`
+validated ten-for-ten on a second device model, Compass and Map proven NOT
+to degrade in half-width slots, 520/578 confirmed as real 840 Workout
+fields — and a CORRECTION to rev 121 SS1 on what f4/f11 actually track.**
+
+Method: `CyclingRoadCensus1.fit` (untouched default Road) and
+`CyclingRoadCensus2.fit` (same, plus seven screens added **in the
+device's own editor**), with a written record of the count and menu
+letter set for each screen, then pulled and read with `fit_census.py`.
+The device was the sole author throughout (rev 121 SS6). Doug's screen
+numbering matched `f9` display order exactly, so screen identification
+rests on data rather than assumption.
+
+### 1. The letter-to-f8 mapping, for ORDINARY user screens
+
+| Set in Garmin's editor | Stored |
+|---|---|
+| 5 fields, A | `f3=5, f8=0` |
+| 5 fields, B | `f3=5, f8=1` |
+| 3 fields, C | `f3=3, f8=2` |
+| 8 fields, C | `f3=8, f8=2` |
+| 10 fields (no alternates offered) | `f3=10, f8=0` |
+| 4 fields, B | `f3=4, f8=1` |
+
+So the letters are the plain ordinal A=0, B=1, C=2, and **C's value does
+not vary with count** (2 at both 3 and 8) — `f8` is a variant index, not
+a geometry code. Doc rev 120 SS2's caution against assuming C=2 was the
+right caution to hold; this is what discharging it looks like.
+
+**Counts 8 and 9 carry variants on the 840**, where the 530 offers none
+at all — confirming the Connect-app enumeration in rev 120 from stored
+bytes.
+
+### 2. ⚠ DO NOT generalise SS1 to NAMED screen types
+
+The 530's own table is a counterexample: Segment (`f10=56`) has menu
+order 4/A → `f8=2`, 4/B → `f8=1` — **inverted** relative to every
+ordinary screen. So letter-to-f8 is PER TYPE, and SS1 licenses nothing
+beyond `f10` 0-7.
+
+The 840 now offers Segment 4/A, 4/B **and** 4/C, and no values are known
+for any of them. **This is the highest-value open question left**, because
+whether the inversion survives on the 840 decides how a per-model
+`NAMED_SCREEN_LAYOUTS` has to be keyed. Lap Summary is the second
+target: the 840 offers a count-0 state and B variants at counts 1 and 2,
+where the 530 has no variants whatsoever.
+
+### 3. Three new field IDs, read positionally against a known anchor
+
+Screen 8 (4 fields, layout B) stores `f7 = 529, 725, 240, 56`. Doug's
+description reads: two half-width fields at top holding Compass and Map,
+then Location, then Timer at the bottom. **Slot 3 landing on id 56, which
+`FIELD_ID_NAMES` already holds as Timer, is what makes the positional
+read trustworthy** rather than an assumed alignment:
+
+- **240 = Location** (GPS coordinates)
+- **529 = Compass**
+- **725 = Map**
+
+**And the half-width question is answered for these two:** they render as
+a miniature compass gauge and a small map area. They do **NOT** fall back
+to text. That is different behaviour from the Graph/Bars family, so the
+existing half-width advisory should not be extended to them by analogy.
+
+### 4. FIELD_ID_NAMES validated ten-for-ten on a second model
+
+Screen 7 (10 fields) stores `6, 56, 55, 58, 59, 9, 11, 60, 48, 49`
+against a recorded order of Distance, Timer, Elapsed, Lap Time, TOD,
+Elevation, Grade, Ascent, Speed, Avg Speed. **All ten agree.** The table
+was built entirely from 530 observations; this is the first independent
+confirmation of it on different hardware.
+
+### 5. 520 and 578 are real 840 Workout fields
+
+The 840's Workout screen (`f10=38`, `f3=6`) stores
+`56, 6, 522, 520, 511, 578`. With 522 Duration and 511 Workout
+Comparison already known, **520 and 578 are genuine 840 fields** — and
+rev 117 found they render as a silent "Speed" fallback on the 530. So
+they are model-specific rather than invalid. `KNOWN_UNRESOLVED_IDS` is
+currently EMPTY and should take 520, 578, 579 (rev 117's outstanding
+follow-up).
+
+### 6. ⚠ CORRECTION to rev 121 SS1 — what f4 and f11 actually track
+
+Rev 121 described `f4` as `1..10` on "configured" screens and 255 on
+"unconfigured". **Wrong.** All seven screens added here are fully
+configured and active, and every one carries `f4=255, f11=255`, while
+every factory screen carries `f4=1..10, f11=1`.
+
+The real split is **authored-with-the-profile vs added afterwards — even
+when Garmin's own editor does the adding.** Useful consequence: those
+fields are not required for a screen to function, so this toolkit
+leaving them alone is correct rather than a latent gap.
+
+Superseding rather than amending, because rev 121 was already committed
+(`0c16307`) — the rule from rev 115/116.
+
+### 7. Resolved, and worth recording as a non-finding
+
+The first pass appeared to show two count-5 screens (menu B and menu C)
+storing byte-identical records, differing only in `f9`/`f10`/`f254`. A
+message-type diff of Census1 against Census2 showed **no message type
+growing with the seven added screens** (`mesg 14` holds 31 preallocated
+slots throughout), which ruled out layout data hiding in another message
+keyed per screen.
+
+Doug then identified the cause: the screen had been SAVED as 5/B, and his
+note recorded the intended 5/C. No device anomaly, and the reassuring
+reading — **`f8` fully describes an ordinary screen's layout, so nothing
+about an 840 layout is stored beyond what this toolkit already patches.**
+Export is not threatened. Confirmation of the corrected screen is
+pending a later device session.
+
+Recorded because the near-miss is the argument for the notes discipline:
+the mismatch surfaced in the first comparison instead of being absorbed
+into a table as a phantom device behaviour, which is exactly what the
+2026-08-17 field batch did.
+
+### Also on the record, from the on-device menus
+
+840 option sets observed, for the eventual per-model tables. Map matches
+the 530 exactly; the others do not:
+
+- **Map (25):** 0/A, 0/B, 1, 2 — identical to the 530
+- **Lap Summary (74):** 0, 1/A, 1/B, 2/A, 2/B, 3, 4
+- **Segment (56):** 0, 2, 4/A, 4/B, 4/C, 6/A, 6/B
+- **Stamina (127):** 0, 2/A, 2/B, 4, 5, 6
+- **Elevation, ClimbPro, Power Guide:** fixed 2 fields, no layout choice
+- **Workout (38):** `f3=6`, but only two render as ordinary data fields
+  at the bottom of the screen; no layout option is offered, though
+  scrolling does reach the other four and allows changing them
+
+Prior rev (121, 2026-09-27) follows.*
 
 *Doc rev 121 — refreshed 2026-09-27.* **First census run, via the new
 `fit_census.py`: 372 screen records off the 530 and 217 off the 840's
