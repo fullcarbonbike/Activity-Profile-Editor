@@ -120,9 +120,27 @@ Phase 0 as something to run and found no script to run it with.
 
 - **[CODE]** -- Claude writes it. Nothing for Doug to do until it exists.
 - **[BENCH]** -- Doug, on the device or in the Connect app. Cannot be
-  done from a file.
-- **[CHECK]** -- run after the matching [CODE] lands, by either of us;
-  these are commands, not code.
+  done from a file, which is exactly why it is his.
+- **[LAB]** -- Claude verifies it headlessly against files already on
+  disk. No device, no GUI, nothing for Doug to run.
+- **[GUI TEST]** -- Doug, running the app against real hardware. The
+  build environment has no wx and no Edge attached, so this is the one
+  kind of verification that CANNOT be automated here.
+
+### So what does Doug actually do, start to finish?
+
+Only two things. Everything else is mine.
+
+1. **[BENCH]** -- look at the device or the app and report what it
+   offers. Currently: the three lock checks below, and Segment 4/A/B/C.
+2. **[GUI TEST]** -- run the app on hardware and work through
+   `TEST_PLAN_v1.5.0.md`. That file is the live record; tick results
+   there rather than relaying passes through chat.
+
+If a step involves reading a `.fit` file, running a toolkit command
+against one, or comparing bytes, it is **[LAB]** and it is mine -- even
+when it is listed under "Verify". Doug never needs to synthesise test
+files.
 
 ---
 
@@ -159,7 +177,7 @@ and offline folders:
 - [x] **[CODE]** `fit_census.py` gains a **model** column, so a whole
       folder of backups is attributable in one command.
 
-**How to use it -- [CHECK], nothing to build**
+**How to use it -- for Doug, whenever it is useful. Not a required step.**
 
 One profile, with the model on the first line:
 
@@ -173,7 +191,7 @@ then read the `model` column. Files the toolkit doesn't recognise show
 an empty `model` with the raw id still in `product` -- that id is what
 to report so a new device can be added.
 
-**Verified 2026-09-28**
+**[LAB] Verified 2026-09-28**
 
 - [x] Sweep of `ClaudeCowork` + the Census uploads: 1178 records Edge
       530 (3121), 217 Edge 840 (4062), nothing unrecognised.
@@ -230,19 +248,30 @@ is in scope because the data exists and the alternative is knowingly
 shipping no validation for the 840; it is NOT licence to start
 inferring per-model rules that have not been measured.
 
-**Verify**
+**Verify -- ALL [LAB], nothing here for Doug**
 
-- [ ] 530 profiles: every existing refusal still fires. This is the
-      regression that matters -- Phase 1 must not loosen the 530 path.
-- [ ] 840 Compass accepts 0, 1 and 2 without a refusal.
-- [ ] 840 Workout allows field edits; 530 Workout still refuses them.
-- [ ] 840 eBike Metrics accepts 5-8; 530 still refuses above 4.
-- [ ] An 840 profile produces no read-side out-of-range flag, including
-      the factory eBike Metrics screen that ships at 5 fields.
-- [ ] A profile from neither model (fake `file_id.product`) refuses
-      nothing and advises instead.
-- [ ] `fit_census.py` output unchanged (it does no validation, so any
-      change here means something leaked).
+Every one of these runs against files already on disk. The "fake
+product id" case is a copy of a real profile with two bytes patched by
+a throwaway script -- a lab fixture, not something to create by hand.
+
+- [ ] **[LAB]** 530 profiles: every existing refusal still fires. This
+      is the regression that matters -- Phase 1 must not loosen the 530
+      path.
+- [ ] **[LAB]** 840 Compass accepts 0, 1 and 2 without a refusal.
+- [ ] **[LAB]** 840 Workout allows field edits; 530 Workout still
+      refuses them.
+- [ ] **[LAB]** 840 eBike Metrics accepts 5-8; 530 still refuses above 4.
+- [ ] **[LAB]** An 840 profile produces no read-side out-of-range flag,
+      including the factory eBike Metrics screen that ships at 5 fields.
+- [ ] **[LAB]** A profile from neither model (fake `file_id.product`)
+      refuses nothing and advises instead.
+- [ ] **[LAB]** `fit_census.py` output unchanged (it does no validation,
+      so any change here means something leaked).
+
+**Then, and only then, [GUI TEST]:** Doug confirms on real hardware that
+an 840 Compass screen can actually be edited to 0, 1 or 2 fields through
+the GUI and deployed. The lab checks prove the rules changed; only the
+device proves the result renders.
 
 ---
 
@@ -264,9 +293,20 @@ then the smaller piece, then release mechanics.
       bumps, `RELEASE_NOTES_v1.5.0.md`, README changelog entry, State of
       play refresh.
 
-**Verify:** `TEST_PLAN_v1.5.0.md` sections B through E, which are
-currently blocked on exactly these three items. Section A already
-passes in full.
+**Verify -- this phase is where Doug's testing lives.**
+
+The four tasks above are [CODE]. What follows them is **[GUI TEST]**,
+and it is the one kind of verification that cannot happen in the build
+environment: no wx, no Edge attached.
+
+- [ ] **[LAB]** Claude re-runs the headless checks first, so the GUI
+      pass is not spent finding things a script would have caught.
+- [ ] **[GUI TEST]** Doug works `TEST_PLAN_v1.5.0.md` sections B
+      through E, which are currently BLOCKED on exactly the three
+      unbuilt items above. Section A already passes in full.
+- [ ] **[GUI TEST]** Record results in `TEST_PLAN_v1.5.0.md` itself --
+      that file is the live record. Bring failures to chat; passes cost
+      the same to relay and produce nothing actionable.
 
 ---
 
