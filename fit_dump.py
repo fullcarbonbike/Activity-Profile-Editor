@@ -1189,11 +1189,31 @@ def classify_screens(messages):
                                  display name "Reserved" -- NOT confirmed
                                  GroupTrack-specific, see NAMED_SCREEN_TYPES'
                                  comment); active but exempt from f9 ordering.
-            "removed":          [(idx, mesg), ...] -- soft-deleted; content
+            "inactive":         [(idx, mesg), ...] -- f1=0 but f9 and/or
+                                 f10 STILL PRESENT. Configured and typed,
+                                 but not Active, and NOT user-removed:
+                                 the 840's factory profiles ship
+                                 hardware-conditional screens (Cycling
+                                 Dynamics, Lights, STEPS Metrics, eBike
+                                 Metrics) in this state, and the device's
+                                 OWN editor does not list them at all.
+                                 The 530 ships the same types Active, so
+                                 this bucket is normally empty there.
+                                 Distinguished from "removed" by f9/f10
+                                 surviving -- an inference from two models
+                                 (the 840's own Remove behaviour is
+                                 untested), so treat the split as
+                                 provisional even though the f1=0 test
+                                 itself is not.
+            "removed":          [(idx, mesg), ...] -- f1=0 with f9 AND f10
+                                 both absent: user soft-deleted. Content
                                  (f3/f7) preserved ONLY until the next
                                  NewFiles-mediated (toolkit) deploy --
                                  NOT purged by on-device-only editing.
-                                 See PROJECT_NOTES.md Screen State Model.
+                                 This is a PROVENANCE category, not a
+                                 feature: Garmin offers no un-remove, and
+                                 a NewFiles deploy clears it. See
+                                 PROJECT_NOTES.md Screen State Model.
             "unconfigured":     [(idx, mesg), ...] -- no f1==1 signal at
                                  all (f9/f10 absent, f1 not 1), slot never
                                  created. NOTE (v2.3.0 bug fix): this is
@@ -1213,6 +1233,7 @@ def classify_screens(messages):
     unknown_ids_seen = set()
     orderable = []    # (f9, slot_idx, mesg) -- real f9, appears in main viewing sequence
     conditional = []  # slot_idx, mesg -- f1=1, f9=None, f10=real (Conditional-state, still "on" -- historically called "GroupTrack-style," see the Reserved rename note above NAMED_SCREEN_TYPES)
+    inactive = []     # slot_idx, mesg -- f1=0 BUT f9 and/or f10 still present: configured, not Active, not user-removed (840 hardware-conditional screens)
     removed = []      # slot_idx, mesg -- f1=0, f9=None, f10=None (content preserved, pulled from sequence)
     unconfigured = [] # slot_idx, mesg -- no f1==1 signal at all (f9/f10 absent, f1 not 1) -- never created
 
@@ -1234,18 +1255,37 @@ def classify_screens(messages):
         f9 = m.get(9)
         f10 = m.get(10)
 
-        if f9 is not None:
+        # f1 IS THE STATE. f9 is only an ordering stamp, and on the 840
+        # it SURVIVES on a screen that is not Active -- so f1 must be
+        # tested FIRST. (Bug fixed 2026-09-27, PROJECT_NOTES Doc rev 123:
+        # this branch used to lead with `f9 is not None`, which was safe
+        # only because every 530 profile examined strips f9 and f10 when
+        # a screen leaves Active. The 840's factory profiles ship four
+        # screens -- Cycling Dynamics, Lights, STEPS Metrics, eBike
+        # Metrics -- at f1=0 with f9 and f10 still populated, and those
+        # were being promoted straight into `orderable` and reported to
+        # the user as active, editable screens.)
+        if f1 == 0:
+            if f9 is not None or f10 is not None:
+                # NOT Active, but still carrying its ordering stamp and
+                # type -- the 840 ships hardware-conditional screens
+                # this way, configured and waiting rather than deleted.
+                # The device's own editor does not list these at all.
+                inactive.append((idx, m))
+            else:
+                # CONFIRMED via live Remove-button test (see fit_patch.1
+                # BUGS): f1 0 + f9/f10 both absent = user-Removed. Field
+                # content (f3/f7) is preserved untouched at the moment of
+                # removal -- but see PROJECT_NOTES.md Screen State Model:
+                # only a soft delete until the NEXT device write of any
+                # kind, so this bucket is PROVENANCE (what was here, and
+                # until when), not a restorable feature. Garmin offers no
+                # un-remove and a NewFiles deploy clears it.
+                removed.append((idx, m))
+        elif f9 is not None:
             # Real, current display-order stamp -- Active/Display, on the
             # main scrollable sequence, regardless of whether f3 is present.
             orderable.append((f9, idx, m))
-        elif f1 == 0:
-            # CONFIRMED via live Remove-button test (see fit_patch.1 BUGS):
-            # f1 0 + f9/f10 both absent = Removed. Field content (f3/f7)
-            # is preserved untouched at the moment of removal -- but see
-            # PROJECT_NOTES.md Screen State Model: this is only a soft
-            # delete until the NEXT device write of any kind, not a
-            # persistently stable state.
-            removed.append((idx, m))
         elif f1 == 1 and f10 is not None:
             # f1 == 1, f9 absent, f10 present -- Conditional state: an
             # active record structurally exempt from the ordering system,
@@ -1278,6 +1318,7 @@ def classify_screens(messages):
     return {
         "orderable": orderable,
         "conditional": conditional,
+        "inactive": inactive,
         "removed": removed,
         "unconfigured": unconfigured,
         "unknown_ids_seen": unknown_ids_seen,
@@ -1296,6 +1337,7 @@ def cmd_screens(args):
 
     orderable = data["orderable"]
     conditional = data["conditional"]
+    inactive = data["inactive"]
     removed = data["removed"]
     unconfigured = data["unconfigured"]
     unknown_ids_seen = data["unknown_ids_seen"]
@@ -1344,6 +1386,21 @@ def cmd_screens(args):
     for position, (f9, idx, m) in enumerate(orderable, start=1):
         field_count = m.get(3)
         print(_row(idx, m, field_count, position))
+
+    if inactive:
+        print()
+        print("=== NOT ACTIVE -- the device's own editor does NOT list these "
+              "(f1=0, but f9/f10 still present) ===")
+        print("  These are configured and typed but switched off. The 840 ships")
+        print("  hardware-conditional screens this way (Cycling Dynamics, Lights,")
+        print("  STEPS Metrics, eBike Metrics); the 530 ships the same types Active.")
+        print("  Their f9 values can DUPLICATE an active screen's, so the position")
+        print("  column is deliberately blank -- they are not in the scroll order.")
+        print("  Editing one is possible but UNVERIFIABLE on-device until it")
+        print("  activates, so treat any edit here as unconfirmed.")
+        for idx, m in inactive:
+            field_count = m.get(3)
+            print(_row(idx, m, field_count))
 
     if conditional:
         print()

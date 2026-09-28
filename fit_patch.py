@@ -395,10 +395,17 @@ def read_current_state(input_path, message_index):
     f9 = _read_u8(9)
     f10 = _read_u8(10)
 
+    # f1 IS THE STATE; f9 is only an ordering stamp and can SURVIVE on a
+    # screen that is not Active. Tested first for the same reason as
+    # fit_dump.py's classify_screens() -- see that function's comment and
+    # PROJECT_NOTES Doc rev 123. Leading with `f9 is not None` reported
+    # the 840's four factory-inactive screens as 'active'.
+    if f1 == 0:
+        if f9 is not None or f10 is not None:
+            return 'inactive'      # configured, switched off, NOT user-removed
+        return 'removed'           # user soft-delete; f9/f10 stripped
     if f9 is not None:
         return 'active'
-    if f1 == 0:
-        return 'removed'
     if f1 == 1 and f10 is not None:
         return 'conditional'
     return 'unconfigured'
@@ -439,6 +446,22 @@ def count_shown_active_screens(input_path):
     for m in messages:
         if m['kind'] != 'data' or m['mesg_num'] != DATA_SCREEN_MESG_NUM:
             continue
+
+        # f1 FIRST: a screen at f1=0 is not Active however real its f9
+        # looks. Added 2026-09-27 (Doc rev 123) -- this loop gated only on
+        # f9 and f12, so the 840's four factory-inactive screens were
+        # counted, and because f10=64 (Lights) is not in
+        # NAMED_SCREEN_TYPES it was counted as a plain USER screen. The
+        # guard that protects the last visible user screen was therefore
+        # over-counting on the 840 and would have permitted hiding a
+        # screen it should have refused.
+        try:
+            f1_start, _ = field_byte_range(m, 1)
+        except KeyError:
+            pass          # no f1 at all -- fall through to the f9 tests
+        else:
+            if data[f1_start] == 0:
+                continue  # not Active, whatever f9 says
 
         try:
             f9_start, _ = field_byte_range(m, 9)

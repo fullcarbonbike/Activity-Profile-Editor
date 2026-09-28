@@ -1687,6 +1687,24 @@ class ViewScreensPanel(wx.Panel):
                 names = ", ".join(field_name(fid, terse=True) for fid in active_field_ids(m, field_count))
                 type_name = screen_type_name(m.get(10)) or "?"
                 other_lines.append(f"    slot {idx} ({type_name}): {names}")
+        if data["inactive"]:
+            # f1=0 with f9/f10 still present. Shown here rather than in
+            # the main list because they are NOT in the device's scroll
+            # order and their f9 can duplicate an active screen's -- see
+            # fit_dump.classify_screens() and PROJECT_NOTES Doc rev 123.
+            other_lines.append(
+                f"Not active -- your Edge's own editor doesn't list these "
+                f"({len(data['inactive'])}). Usually screens waiting on "
+                f"hardware you haven't paired, e.g. lights or an eBike. "
+                f"Editing one can't be checked on the Edge until it turns "
+                f"itself on:"
+            )
+            for idx, m in data["inactive"]:
+                field_count = m.get(3) or 0
+                names = ", ".join(field_name(fid, terse=True)
+                                  for fid in active_field_ids(m, field_count))
+                type_name = screen_type_name(m.get(10)) or "?"
+                other_lines.append(f"    slot {idx} ({type_name}): {names}")
         if data["removed"]:
             other_lines.append(
                 f"Removed screens (content preserved, not shown on-device): "
@@ -2574,7 +2592,8 @@ class EditScreenPanel(wx.Panel):
                 mesg, position = m, pos
                 break
         if mesg is None:
-            for idx, m in data["conditional"] + data["removed"]:
+            for idx, m in (data["conditional"] + data["inactive"]
+                           + data["removed"]):
                 if idx == self.slot:
                     mesg = m
                     break
@@ -3746,7 +3765,8 @@ def describe_screen_changes(path_a, path_b):
 
     def slot_map(data):
         slots = {}
-        for bucket in ("orderable", "conditional", "removed", "unconfigured"):
+        for bucket in ("orderable", "conditional", "inactive",
+                       "removed", "unconfigured"):
             for entry in data[bucket]:
                 idx, mesg = (entry[1], entry[2]) if bucket == "orderable" else entry
                 slots[idx] = mesg
