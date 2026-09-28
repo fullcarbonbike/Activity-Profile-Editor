@@ -1028,16 +1028,176 @@ def is_profile_file(path):
     return file_ids[0].get('type') == 'sport'
 
 
-def named_layout(f10):
+# ----------------------------------------------------------------------
+# PER-MODEL LAYOUT OVERRIDES  (ACTION_PLAN Phase 1B, 2026-09-28)
+# ----------------------------------------------------------------------
+#
+# Everything above this point was measured on an Edge 530. This table
+# holds what has been MEASURED ON ANOTHER MODEL, and nothing else.
+#
+# THE RULE FOR ADDING ANYTHING HERE: it must be observable, either as
+# stored (f3, f8) bytes in a real profile, or as a count range read off
+# the device's own editor with the f8 values known separately. Nothing
+# is copied across from the 530 to fill a gap, and nothing is inferred
+# from a neighbouring type.
+#
+# OMISSION IS MEANINGFUL AND SAFE. A type absent from a model's entry is
+# NOT governed by the 530's rule -- model_rule_known() returns False and
+# the toolkit advises instead of refusing. That is why Lap Summary,
+# Segment and Stamina are deliberately missing below: their 840 COUNT
+# ranges are known but their A/B/C-to-f8 mapping is NOT, and the 530
+# proves that mapping is per-type rather than ordinal (Segment stores
+# 4/A as f8=2 and 4/B as f8=1, inverted). Writing plausible values would
+# be exactly the error Doc rev 123 SS3 was about.
+MODEL_LAYOUTS = {
+    4062: {                                    # Edge 840
+        'label': 'Edge 840',
+        # Ordinary user screens. MEASURED both ways: the count range and
+        # the letters from the on-device editor (Doug, 2026-09-28,
+        # cross-checked in the Connect app), and the letter-to-f8
+        # mapping from stored bytes in CyclingRoadCensus2/3 -- 5/A=0,
+        # 5/B=1, 5/C=2, 3/C=2, 8/C=2, 4/B=1, 10=0. So A=0, B=1, C=2,
+        # count-independent (Doc rev 122 SS1).
+        'user_states': (
+            [(1, 0), (2, 0)]
+            + [(c, v) for c in range(3, 10) for v in (0, 1, 2)]
+            + [(10, 0)]
+        ),
+        'named': {
+            # Compass -- the defect that prompted all of this. The 840's
+            # editor offers 0, 1 or 2 where the 530 locks 2. (0,0) and
+            # (2,0) are stored bytes; count 1's variant is the ONLY
+            # inference here, from "no alternates offered at any count"
+            # plus f8=0 at both other counts. Flagged rather than hidden.
+            35: {'label': 'Compass', 'content': 'top',
+                 'states': [(0, 0), (1, 0), (2, 0)],
+                 'grids': {0: [], 1: [[0]], 2: [[0, 1]]}},
+            # eBike Metrics -- 1-8, no A/B/C (530 table says 1-4, and the
+            # 840 SHIPS this screen at 5, already outside it). Only the
+            # 5-field grid is known: Doug's note is full, full, two
+            # half-width, full from the top. Absent grids are fine --
+            # layout_grid() returning None means "don't draw", which
+            # callers already handle.
+            58: {'label': 'eBike Metrics', 'content': 'top',
+                 'states': [(c, 0) for c in range(1, 9)],
+                 'grids': {5: [[0], [1], [2, 3], [4]]}},
+            # STEPS Metrics -- 1-8, no A/B/C. The 4-field grid is a
+            # stack of four full-width fields.
+            95: {'label': 'STEPS Metrics (Shimano)', 'content': 'top',
+                 'states': [(c, 0) for c in range(1, 9)],
+                 'grids': {4: [[0], [1], [2], [3]]}},
+            # Class-3 types: 840-only, no geometry anywhere before now,
+            # so the layout picker was offering ordinary user-screen
+            # shapes for them. All three are stored bytes from Census3.
+            125: {'label': 'Power Guide', 'content': 'top',
+                  'states': [(2, 0)], 'grids': {2: [[0, 1]]}},
+            30:  {'label': 'Music Control', 'content': 'top',
+                  'states': [(2, 0)], 'grids': {2: [[0, 1]]}},
+            162: {'label': 'GroupRide', 'content': 'top',
+                  'states': [(0, 0)], 'grids': {0: []}},
+        },
+        # Workout (38) is NOT here: the 840's editor offers no layout
+        # choice but DOES let its fields be changed, unlike the 530.
+        # See NO_FIELD_EDIT_BY_MODEL below -- that is a separate question
+        # from geometry and needs a separate answer.
+        #
+        # DELIBERATELY ABSENT, so these stay permissive rather than
+        # inheriting a 530 rule:
+        #   74  Lap Summary -- counts known (0, 1/A, 1/B, 2/A, 2/B, 3, 4)
+        #                      but the B f8 values are NOT
+        #   56  Segment     -- 4/C and 6/A,6/B added on the 840, and the
+        #                      530 INVERTS this type's letters, so its
+        #                      f8 values cannot be guessed
+        #   127 Stamina     -- 0/2A/2B/4/5/6, same unknown, and its
+        #                      2-field layout renders STACKED where other
+        #                      named types render side by side
+        #   25  Map, 44 Elevation, 63 Cycling Dynamics, 104 ClimbPro,
+        #       57 GroupTrack List -- CONFIRMED identical to the 530
+        #       (Doug, 2026-09-28), so the global entry is correct and
+        #       duplicating it here would only invite drift.
+    },
+}
+
+# Which screen types the DEVICE generates, per model -- a separate
+# question from geometry, which is why it is a separate table. A model
+# absent here uses NO_FIELD_EDIT_TYPES unchanged.
+#
+# The 840 drops Workout (38): Doug's on-device report is that it offers
+# no layout choice but scrolling DOES reach its fields and offers to
+# change them. GroupTrack List (57), GroupRide (162) and Virtual Partner
+# (26) stay blocked -- all device-generated, all f3=0 where seen, and
+# unblocking them wholesale would re-open the v0.21.2 bug.
+NO_FIELD_EDIT_BY_MODEL = {
+    4062: {26, 57, 162},
+}
+
+
+def model_layout_entry(product):
+    """The MODEL_LAYOUTS entry for this device, or None."""
+    if product is None:
+        return None
+    return MODEL_LAYOUTS.get(product)
+
+
+def model_rule_known(f10, product):
     """
-    The NAMED_SCREEN_LAYOUTS entry for this screen type, or None for an
-    ordinary user screen (and for the no-editable-field types, which
-    deliberately have no entry -- see NO_FIELD_EDIT_TYPES).
+    Does this project have a MEASURED rule for this screen type on this
+    model? This is the question enforcement hangs on, and it is asked
+    per (model, type) rather than per model -- a 530 measurement is
+    evidence about the 530 and nothing else.
+
+    True when: the caller named no model (unmigrated call site, keep the
+    old behaviour); or the model is one whose global tables were
+    measured (the 530); or the model has its own entry AND that entry
+    covers this type.
     """
+    if product is None or model_is_surveyed(product):
+        return True
+    entry = model_layout_entry(product)
+    if entry is None:
+        return False
+    if f10 is None:
+        return False
+    if f10 in entry['named']:
+        return True
+    # An ordinary user screen is covered when the model states its own
+    # user_states. Named types NOT in this model's table stay unknown.
+    return f10 not in NAMED_SCREEN_TYPES and 'user_states' in entry
+
+
+def field_edit_blocked(f10, product=None):
+    """
+    True if the DEVICE generates this screen's contents, so its field
+    list is not the user's to edit. Per-model: Workout is blocked on the
+    530 and editable on the 840.
+    """
+    blocked = NO_FIELD_EDIT_BY_MODEL.get(product, NO_FIELD_EDIT_TYPES) \
+        if product is not None else NO_FIELD_EDIT_TYPES
+    return f10 in blocked
+
+
+def named_layout(f10, product=None):
+    """
+    The layout entry for this screen type, preferring a MEASURED
+    per-model entry over the 530-derived global one.
+
+    Returns None for an ordinary user screen (and for the
+    no-editable-field types, which deliberately have no entry -- see
+    NO_FIELD_EDIT_TYPES).
+
+    A model entry SHADOWS the global one for the types it covers and
+    does not touch the rest; a type the model has not measured falls
+    through to the global entry for DRAWING purposes, while
+    model_rule_known() separately stops it being ENFORCED. Drawing the
+    530's best guess is useful; refusing a write on it is not.
+    """
+    entry = model_layout_entry(product)
+    if entry is not None and f10 in entry['named']:
+        return entry['named'][f10]
     return NAMED_SCREEN_LAYOUTS.get(f10)
 
 
-def layout_states(f10):
+def layout_states(f10, product=None):
     """
     The (field_count, f8_variant) pairs this screen type can legally
     hold, in the order the on-device selector presents them.
@@ -1048,9 +1208,16 @@ def layout_states(f10):
     LAYOUT_GRIDS at variant 0, plus variant 1 for the counts in
     COUNTS_WITH_B_VARIANT.
     """
-    entry = named_layout(f10)
+    entry = named_layout(f10, product)
     if entry is not None:
         return list(entry['states'])
+    model = model_layout_entry(product)
+    if model is not None and 'user_states' in model:
+        # This model states its own ordinary-user-screen geometry. The
+        # 840 offers A/B/C at counts 3-9 where the 530 offers A/B at
+        # 3-7, so falling through to the global derivation would be
+        # wrong in both directions at once.
+        return list(model['user_states'])
     states = []
     for count in sorted(LAYOUT_GRIDS):
         states.append((count, 0))
@@ -1059,7 +1226,7 @@ def layout_states(f10):
     return states
 
 
-def layout_grid(f10, count, variant=0):
+def layout_grid(f10, count, variant=0, product=None):
     """
     Row structure for this type at this count -- a list of rows, each a
     list of 0-based field positions sharing that row. Two indices in one
@@ -1070,7 +1237,7 @@ def layout_grid(f10, count, variant=0):
     "don't draw/advise" rather than as an error: a profile can legally
     hold a count this type cannot render (see layout_state_is_valid()).
     """
-    entry = named_layout(f10)
+    entry = named_layout(f10, product)
     if entry is not None:
         return entry['grids'].get(count)
     return LAYOUT_GRIDS.get(count, {}).get(variant)
@@ -1098,17 +1265,17 @@ def layout_state_is_valid(f10, count, variant=0, product=None):
     stored, change nothing", not as a reason to rewrite bytes the user
     didn't ask to touch.
     """
-    if not layout_rules_enforced(product):
+    if not model_rule_known(f10, product):
         return True
-    return (count, variant) in layout_states(f10)
+    return (count, variant) in layout_states(f10, product)
 
 
-def layout_counts(f10):
+def layout_counts(f10, product=None):
     """Distinct field counts this screen type offers, ascending."""
-    return sorted({count for count, _variant in layout_states(f10)})
+    return sorted({count for count, _variant in layout_states(f10, product)})
 
 
-def layout_variants_for_count(f10, count):
+def layout_variants_for_count(f10, count, product=None):
     """
     The f8 variant values legal at this count for this type, in the
     device's own order. Empty if the count itself isn't offered.
@@ -1118,10 +1285,10 @@ def layout_variants_for_count(f10, count):
     because the VALUES are not positional: Segment at 4 returns
     [2, 1], so "A" is 2 and "B" is 1.
     """
-    return [v for c, v in layout_states(f10) if c == count]
+    return [v for c, v in layout_states(f10, product) if c == count]
 
 
-def layout_default_variant(f10, count):
+def layout_default_variant(f10, count, product=None):
     """
     The variant to store when a layout change lands on `count` and the
     caller has no explicit A/B preference -- the FIRST variant the
@@ -1130,7 +1297,7 @@ def layout_default_variant(f10, count):
     Returns None if the count isn't offered for this type. Never
     assumes 0: Segment at 4 correctly yields 2.
     """
-    variants = layout_variants_for_count(f10, count)
+    variants = layout_variants_for_count(f10, count, product)
     return variants[0] if variants else None
 
 
@@ -1161,7 +1328,7 @@ def layout_rules_enforced(product):
     """
     if product is None:
         return True
-    return model_is_surveyed(product)
+    return model_is_surveyed(product) or model_layout_entry(product) is not None
 
 
 def count_is_locked(f10, product=None):
@@ -1182,9 +1349,9 @@ def count_is_locked(f10, product=None):
     Omitting `product` keeps the old strict behaviour, so an unmigrated
     caller cannot accidentally unlock anything.
     """
-    if not layout_rules_enforced(product):
+    if not model_rule_known(f10, product):
         return False
-    return len(layout_counts(f10)) == 1
+    return len(layout_counts(f10, product)) == 1
 
 
 def is_position_full_width(count, layout_variant, position, f10=None):

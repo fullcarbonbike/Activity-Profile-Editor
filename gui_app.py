@@ -152,7 +152,10 @@ from fit_dump import (
     layout_state_is_valid,
     profile_model,
     model_label,
-    layout_rules_enforced,
+    model_rule_known,
+    field_edit_blocked,
+    model_layout_entry,
+    model_is_surveyed,
     layout_variants_for_count,
     layout_default_variant,
     count_is_locked,
@@ -1684,7 +1687,8 @@ class ViewScreensPanel(wx.Panel):
         _model = model_label(self.frame.profile_product,
                              self.frame.profile_model_name)
         other_lines.append(f"Profile written by: {_model}")
-        if not layout_rules_enforced(self.frame.profile_product):
+        if (model_layout_entry(self.frame.profile_product) is None
+                and not model_is_surveyed(self.frame.profile_product)):
             other_lines.append(
                 textwrap.fill(
                     "This toolkit hasn't measured this Edge's layout rules, so "
@@ -2665,22 +2669,24 @@ class EditScreenPanel(wx.Panel):
         # is what Doug reported as wrong. Show/Hide is deliberately
         # LEFT ENABLED -- this type isn't in NO_SHOW_TOGGLE_TYPES, so
         # hiding it is legitimate and stays available.
-        fields_editable = self.type_f10 not in NO_FIELD_EDIT_TYPES
+        fields_editable = not field_edit_blocked(self.type_f10,
+                                                 self.frame.profile_product)
         for btn in (self.add_field_btn, self.remove_field_btn,
                     self.change_type_btn, self.move_up_btn, self.move_down_btn):
             btn.Enable(fields_editable)
 
         # --- v0.22.0: named types use the layout picker, not the -------
         # --- count buttons + A/B radios --------------------------------
-        entry = named_layout(self.type_f10)
+        entry = named_layout(self.type_f10, self.frame.profile_product)
         is_named = entry is not None
         self.layout_row.ShowItems(not is_named)
         self.named_layout_row.ShowItems(is_named and fields_editable)
 
         if is_named:
-            states = layout_states(self.type_f10)
+            states = layout_states(self.type_f10, self.frame.profile_product)
             self._picker_states = states
-            self.layout_picker.Set([self._state_label(self.type_f10, c, v)
+            self.layout_picker.Set([self._state_label(self.type_f10, c, v,
+                                                      self.frame.profile_product)
                                     for c, v in states])
             try:
                 self.layout_picker.SetSelection(
@@ -2707,7 +2713,8 @@ class EditScreenPanel(wx.Panel):
                                       and not count_is_locked(
                                           self.type_f10,
                                           self.frame.profile_product))
-            supports_b = len(layout_variants_for_count(self.type_f10, count)) > 1
+            supports_b = len(layout_variants_for_count(
+                self.type_f10, count, self.frame.profile_product)) > 1
         else:
             supports_b = count in COUNTS_WITH_B_VARIANT
             self.layout_b_radio.Enable(supports_b and fields_editable)
@@ -2789,7 +2796,7 @@ class EditScreenPanel(wx.Panel):
         self.frame._relayout()
 
     @staticmethod
-    def _state_label(f10, count, variant):
+    def _state_label(f10, count, variant, product=None):
         """
         Human-readable label for one (count, variant) entry in the named
         layout picker, phrased the way the device's own menu does.
@@ -2800,7 +2807,7 @@ class EditScreenPanel(wx.Panel):
         within the device's own ordering -- deliberately not derived from
         the f8 value, which is why Segment's "A" can be f8=2.
         """
-        variants = layout_variants_for_count(f10, count)
+        variants = layout_variants_for_count(f10, count, product)
         if count == 0:
             base = "No data fields"
         elif count == 1:
@@ -2827,7 +2834,7 @@ class EditScreenPanel(wx.Panel):
         too, so the toolkit showing it is an improvement over stock
         behaviour rather than a defect it introduced.
         """
-        if named_layout(self.type_f10) is None:
+        if named_layout(self.type_f10, self.frame.profile_product) is None:
             return ""
         if layout_state_is_valid(self.type_f10, count, self.layout_variant,
                                  self.frame.profile_product):
@@ -2837,7 +2844,7 @@ class EditScreenPanel(wx.Panel):
             # a guess dressed as a finding. A false alarm indistinguishable
             # from a real one is worse than no check (Doc rev 120 SS1).
             return ""
-        counts = layout_counts(self.type_f10)
+        counts = layout_counts(self.type_f10, self.frame.profile_product)
         renders = max((c for c in counts if c <= count), default=counts[0])
         msg = (
             f"Note: this screen stores {count} field(s), which is not a layout "
@@ -2961,7 +2968,7 @@ class EditScreenPanel(wx.Panel):
         out, so in normal use this dialog is a backstop rather than the
         primary signal.
         """
-        if self.type_f10 not in NO_FIELD_EDIT_TYPES:
+        if not field_edit_blocked(self.type_f10, self.frame.profile_product):
             return False
         wx.MessageBox(
             f"\"{self.type_name}\" has no editable data fields.\n\n"
@@ -3169,7 +3176,8 @@ class EditScreenPanel(wx.Panel):
         # 4-field "A" is f8=2. layout_default_variant() returns whatever
         # the device actually offers first at the new count.
         _, current_layout = read_current_count_and_layout(self.frame.editing_path, self.slot)
-        legal_variants = layout_variants_for_count(self.type_f10, len(new_ids))
+        legal_variants = layout_variants_for_count(
+            self.type_f10, len(new_ids), self.frame.profile_product)
         if legal_variants and current_layout not in legal_variants:
             changes[8] = pack_layout_variant(
                 layout_default_variant(self.type_f10, len(new_ids)))

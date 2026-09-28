@@ -232,7 +232,7 @@ now with controls rather than a single observation.
 
 ---
 
-## Phase 1 -- stop refusing what the device permits   **STATUS: part A DONE 2026-09-28; part B next**
+## Phase 1 -- stop refusing what the device permits   **DONE 2026-09-28 (A and B)**
 
 **This is the safety fix, and it is NOT the per-model tables.** It only
 changes the posture from *"I know the rules"* to *"I know the 530's
@@ -251,7 +251,7 @@ rules."* Per Doc rev 120 SS4:
 - [x] **[CODE]** Layout validation (`fit_patch.py`) routes its four
       refusals through `_layout_problem()`: `parser.error` on a surveyed
       model, the SAME text to stderr as a NOTE otherwise.
-- [ ] **[CODE]** ~~`NO_FIELD_EDIT_TYPES` per-model~~ **MOVED TO PART B,
+- [x] **[CODE]** ~~`NO_FIELD_EDIT_TYPES` per-model~~ **DONE IN PART B,
       2026-09-28.** Blanket-loosening it for unsurveyed models would also
       unblock GroupTrack List (f10=57) and GroupRide (162) on the 840 --
       both device-generated with f3=0 -- re-opening the v0.21.2 bug where
@@ -270,13 +270,13 @@ Part A alone leaves the 840 permissive-with-advisories, which means the
 toolkit stops catching real mistakes on the device doing all the
 research. Since the measurements already exist, populate them:
 
-- [ ] **[CODE]** An 840 entry carrying ONLY what has been personally measured --
+- [x] **[CODE]** An 840 entry carrying ONLY what has been personally measured --
       Compass 0/1/2, eBike Metrics 1-8, STEPS Metrics 1-8, Lap Summary's
       full set, Segment's known states, user screens A/B/C at 3-9.
       **Nothing inferred, nothing copied across from the 530 to fill a
       gap.** An absent entry must fall back to permissive, not to the
       530's rule.
-- [ ] **[CODE]** Class 3 entries for the types with no geometry at all: Power Guide
+- [x] **[CODE]** Class 3 entries for the types with no geometry at all: Power Guide
       (fixed 2), Music Control (fixed 2), GroupRide (0). **Stamina is
       deliberately EXCLUDED here** -- its 2-field layout renders STACKED
       where other named types render side-by-side, so its grid needs
@@ -295,19 +295,18 @@ a throwaway script -- a lab fixture, not something to create by hand.
 
 - [x] **[LAB]** 530 profiles: every existing refusal still fires.
 - [x] **[LAB]** 840 Compass accepts 1 field; 530 Compass still refused.
-- [ ] **[LAB]** 840 Workout allows field edits; 530 Workout still
+- [x] **[LAB]** 840 Workout allows field edits; 530 Workout still
       refuses them.
-- [ ] **[LAB]** 840 eBike Metrics accepts 5-8; 530 still refuses above 4.
-- [ ] **[LAB]** An 840 profile produces no read-side out-of-range flag,
-      including the factory eBike Metrics screen that ships at 5 fields.
+- [x] **[LAB]** 840 eBike Metrics accepts 7; refuses 9. 530 unchanged.
+- [x] **[LAB]** An 840 profile produces no read-side out-of-range flag.
 - [x] **[LAB]** Fake product id 9999 (a real 840 profile with two bytes
       patched and the CRC recomputed): refuses nothing, advises instead.
-- [ ] **[LAB]** `fit_census.py` output unchanged (it does no validation,
-      so any change here means something leaked).
+- [x] **[LAB]** `fit_census.py` output unchanged.
 
-**Then, and only then, [GUI TEST]:** Doug confirms on real hardware that
-an 840 Compass screen can actually be edited to 0, 1 or 2 fields through
-the GUI and deployed. The lab checks prove the rules changed; only the
+**Then, and only then, [GUI TEST] -- READY FOR DOUG NOW:** confirm on
+real hardware that an 840 Compass screen can be edited to 0, 1 or 2
+fields through the GUI and deployed, and that the layout picker offers
+exactly those three. The lab checks prove the rules changed; only the
 device proves the result renders.
 
 ---

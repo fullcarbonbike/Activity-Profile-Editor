@@ -48,7 +48,8 @@ from fit_dump import (NAMED_SCREEN_TYPES, CIQ_FIELD_MARKER_IDS,
                       COUNTS_WITH_B_VARIANT,
                       layout_states, layout_counts, layout_state_is_valid,
                       layout_variants_for_count, count_is_locked,
-                      profile_model, model_label, layout_rules_enforced)
+                      profile_model, model_label,
+                      field_edit_blocked, model_rule_known)
 
 DATA_SCREEN_MESG_NUM = 14
 
@@ -807,7 +808,11 @@ def _no_field_edit_guard(parser, input_path, message_index):
     """
     raw = read_raw_field(input_path, message_index, 10)
     f10 = raw[0] if raw else None
-    if f10 not in NO_FIELD_EDIT_TYPES:
+    # Per-model (Phase 1B): Workout is device-generated on the 530 but
+    # its fields ARE editable on the 840. GroupTrack List and GroupRide
+    # stay blocked everywhere.
+    _prod, _ = profile_model(input_path)
+    if not field_edit_blocked(f10, _prod):
         return
     parser.error(
         f"slot {message_index} is a \"{screen_type_name(f10)}\" screen, which "
@@ -1568,7 +1573,6 @@ def _cli():
     # field). So on an unsurveyed model these checks ADVISE instead of
     # refusing -- ACTION_PLAN Phase 1A, and Doc rev 120 SS4's posture.
     _product, _model_name = profile_model(args.input_file)
-    _enforce = layout_rules_enforced(_product)
 
     def _layout_problem(message):
         """
@@ -1576,14 +1580,14 @@ def _cli():
         thing to stderr and carry on. The text is identical either way
         so there is only one wording to keep honest.
         """
-        if _enforce:
+        if model_rule_known(effective_f10, _product):
             parser.error(message)
         print(f"NOTE: {message}", file=sys.stderr)
-        print(f"  Proceeding anyway: this profile is from "
-              f"{model_label(_product, _model_name)}, whose layout rules this "
-              f"toolkit has NOT measured. The rule above comes from the Edge "
-              f"530 and may not apply here. Nothing is rewritten that you did "
-              f"not ask to change.", file=sys.stderr)
+        print(f"  Proceeding anyway: this is {model_label(_product, _model_name)}, "
+              f"and this toolkit has not measured THIS SCREEN TYPE on THIS "
+              f"model. The rule above comes from the Edge 530 and may not "
+              f"apply here. Nothing is rewritten that you did not ask to "
+              f"change.", file=sys.stderr)
 
     if effective_count is not None and effective_f10 is not None:
         # screen_type_name() returns "Screen N" for a plain user screen,
@@ -1591,8 +1595,8 @@ def _cli():
         type_label = screen_type_name(effective_f10) or f"f10={effective_f10}"
         type_phrase = type_label if type_label.startswith("Screen ") \
             else f"{type_label} screen"
-        legal = layout_states(effective_f10)
-        counts = layout_counts(effective_f10)
+        legal = layout_states(effective_f10, _product)
+        counts = layout_counts(effective_f10, _product)
 
         if effective_count not in counts:
             if count_is_locked(effective_f10, _product):
@@ -1612,7 +1616,7 @@ def _cli():
                 f"profile permanently disagreeing with what you see on the Edge."
             )
 
-        variants = layout_variants_for_count(effective_f10, effective_count)
+        variants = layout_variants_for_count(effective_f10, effective_count, _product)
         if effective_layout is not None and effective_layout not in variants:
             # Spell out the mapping rather than just the legal values:
             # for Segment at 4, "A" is 2 and "B" is 1, so a bare list of
