@@ -356,6 +356,22 @@ FIELD_ID_NAMES = {
     523: "Step Time",
     522: "Duration",
     511: "Workout Comparison",
+
+    # ---- 2026-09-27 batch, Edge 840 (PROJECT_NOTES Doc rev 122 SS3) ----
+    # Read POSITIONALLY out of an 840 screen at layout 4/B whose contents
+    # Doug recorded as: two half-width fields holding Compass and Map,
+    # then Location, then Timer. Slot 3 landed on id 56, which this table
+    # ALREADY holds as "Timer" -- that independently known anchor is what
+    # makes the alignment evidence rather than assumption.
+    #
+    # Compass and Map do NOT degrade to text in a half-width slot; they
+    # render as a miniature gauge and a small map area. So they are
+    # deliberately NOT added to GRAPH_OR_BARS_FIELD_IDS -- the half-width
+    # advisory does not apply to them, and extending it by analogy from
+    # "graphical field" would produce a warning the device contradicts.
+    529: "Compass",
+    725: "Map",
+    240: "Location",
     45:  "Workout Step",
     100: "Last Lap Power",
     258: "Lap Time Standing",
@@ -570,6 +586,34 @@ NAMED_SCREEN_TYPES = {
     74:  "Lap Summary",
     95:  "STEPS Metrics (Shimano)",  # 2026-08-16 batch, CyclingEbike.fit -- raw f10 (displayed as "Screen 96" before this entry existed, via the f10+1 fallback). Third-party drivetrain integration, first Shimano-branded screen type seen.
     104: "ClimbPro",
+
+    # ---- Edge 840 types (2026-09-27, PROJECT_NOTES Doc rev 123) -------
+    # The first three are named from Garmin's OWN on-device editor, which
+    # is the same class of evidence as every entry above.
+    125: "Power Guide",
+    127: "Stamina",
+    162: "GroupRide",
+    # 64 is named from its FIELD CONTENTS, not from a device label --
+    # it carries exactly 316 "Lights Connected" and 319 "Light Mode",
+    # and the 840 ships it f1=0 (not Active), so the editor never
+    # displays it and there is no menu string to read. Weaker evidence
+    # than the three above; the name is a description of what it holds.
+    64:  "Lights",
+    # The remaining three 840 codes are UNIDENTIFIED but are definitely
+    # TYPE codes rather than user-screen indices: a plain user screen's
+    # f10 is a per-profile counter starting at 0, so a factory profile
+    # with 11 screens cannot legitimately hold 30, 128 or 223. They are
+    # listed here rather than left out because being absent is not
+    # neutral -- screen_type_name() would return "Screen 31"/"Screen
+    # 224", which is a WRONG CLAIM (it asserts a user screen) rather
+    # than missing information, and it makes the last-visible-user-
+    # screen guard count them as user screens. An honest placeholder
+    # beats a confident mislabel. Same reasoning as 32 "Reserved".
+    # 128 has not yet been seen in a pulled profile; 30 and 223 appear
+    # in the 840's factory Road profile, inactive, holding real fields.
+    30:  "Unnamed type 30",
+    128: "Unnamed type 128",
+    223: "Unnamed type 223",
 }
 
 # Screen types whose stored field-slot bytes are real and correctly
@@ -654,7 +698,17 @@ FIELD_EDIT_UNCERTAIN_TYPES = set()
 # same "no editable fields" behaviour, which is conclusive that f3
 # content cannot be used to infer this property. Only the on-device
 # editor can.
-NO_FIELD_EDIT_TYPES = {26, 38, 57}
+NO_FIELD_EDIT_TYPES = {26, 38, 57, 162}
+# 162 GroupRide added 2026-09-27 (Doc rev 123) BY ANALOGY to 57
+# GroupTrack List, not from its own on-device report: every 840 profile
+# examined carries it at f3=0, the same zero-field signature 57 has, and
+# Doug's on-device description is "GroupRide -- no data fields". The
+# analogy is worth acting on because a wrong INCLUDE costs almost
+# nothing (field editing refused on a screen that has no field array
+# anyway) while a wrong OMIT reopens exactly the v0.21.2 bug: the field
+# picker opening on a screen whose contents the device generates. Its
+# stored f7 array is residue (rev 121 SS3) -- 57 and 162 carry the same
+# eight ids as each other, which is template junk, not content.
 
 
 # ----------------------------------------------------------------------
@@ -1052,7 +1106,20 @@ def screen_type_name(f10):
 # association with the f10=32 Conditional record they happened to be
 # seen on -- they aren't GroupTrack-specific at all, just two ordinary
 # lap-stat fields that record used them for other purposes.)
-KNOWN_UNRESOLVED_IDS = set()
+KNOWN_UNRESOLVED_IDS = {520, 578, 579}
+# Repopulated 2026-09-27 (Doc rev 123), closing rev 117's follow-up.
+# All three are REAL 840 field ids that the 530 does not have -- rev 117
+# confirmed the 530 renders them as a silent "Speed" fallback rather
+# than sanitising them, so their absence from FIELD_ID_NAMES is a gap in
+# this project's knowledge, not a sign of an invalid id.
+# Rev 122 narrowed what they belong to:
+#   520, 578 -- on the 840's Workout screen (f10=38), alongside 522
+#               "Duration" and 511 "Workout Comparison"
+#   579      -- on BOTH STEPS Metrics (f10=95) and eBike Metrics
+#               (f10=58), sitting between 491 "Assist Mode" and 494
+#               "Travel Range", so an eBike/drivetrain field
+# Naming them needs the on-device editor to display the screen that
+# holds them, which on the 840 means the relevant hardware present.
 
 
 def _fmt_value(value):
