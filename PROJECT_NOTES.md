@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-09-27, at Doc rev 122.*
+> *Last updated 2026-09-28, at Doc rev 123.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens. `fit_dump.py` 2.8.0, `fit_patch.py` 1.17.0, `gui_app.py`
@@ -205,7 +205,10 @@ Claude:
    Garmin-writes/toolkit-reads method worked exactly as intended.
 
    **What replaces it as the critical path (rev 122 §2): the SAME
-   mapping for NAMED types, starting with Segment.** The 530's Segment
+   mapping for NAMED types, starting with Segment** -- the ONLY
+   substantial census item still open. Rev 123 §7 closed the count
+   ranges for Compass, eBike Metrics, STEPS Metrics, Lap Summary and
+   Stamina; Segment's 4/A-4/B-4/C f8 values are what remain. The 530's Segment
    is a known counterexample — 4/A stores `f8=2`, 4/B stores `f8=1`,
    inverted against every ordinary screen — and the 840 now offers a
    third variant there. Whether the inversion survives decides how a
@@ -238,6 +241,13 @@ v1.5.0.
 **Interim safety, do before the 840 is used in anger:** gate v1.4.0's
 read-side "state the device doesn't offer" flag on *model surveyed*, or
 it cries wolf on every legitimate 840 profile (rev 120 §1).
+
+**v1.6.0 — per-model layout tables, now a DEFECT and not just a gap.**
+Rev 123 §7: the toolkit hard-locks Compass to 2 fields, but the 840's
+own editor offers 0, 1 or 2. That is the first case where the global
+530 table REFUSES something the device permits, rather than merely
+mislabelling it. eBike Metrics (1-8 vs the table's 1-4) and STEPS
+Metrics (1-8) are the same shape. Do NOT start this inside v1.5.0.
 
 ### 840 census profile — spec (agreed 2026-09-27)
 
@@ -318,6 +328,168 @@ profiles by filename and will otherwise overwrite an existing one.
   that established it go in the code comment beside it (Doc rev 119).
 
 ---
+
+*Doc rev 123 — refreshed 2026-09-28.* **`f1` is the screen state, not
+`f9` — a 530 invariant baked into a BRANCH ORDER was reporting the 840's
+switched-off screens as active and editable, and was inflating the
+last-visible-user-screen guard from 1 to 7. Fixed in both classifiers.
+The 840's screen types are now IN THE CODE (#146). `f10=30` is Music
+Control. And Census3 overturned this file's own description of what the
+switched-off records ARE: they are the profile's RESERVE POOL of Garmin
+screen types, which the device reuses in place when you add one.**
+
+### 1. ⚠ The bug: `if f9 is not None` came before `if f1 == 0`
+
+Doug's report: `fit_dump screens` listed four 840 screens as active and
+editable that the device's own editor does not show at all.
+
+`classify_screens()` and `fit_patch.read_current_state()` both tested
+the ORDERING STAMP before the STATE FLAG. That is correct only under a
+530 invariant — that leaving Active strips `f9` and `f10` — which the
+840 does not honour: its factory profiles ship screens at `f1=0` with
+`f9` and `f10` still populated, so they were promoted into `orderable`.
+
+Both now test `f1` first, and `f1=0` splits two ways:
+
+- **`inactive`** — `f9` and/or `f10` survive. New bucket, new
+  `read_current_state()` return value.
+- **`removed`** — `f9` AND `f10` both absent: user soft-delete. Per
+  Doug, this is a **provenance category, not a feature** — Garmin
+  offers no un-remove and a NewFiles deploy clears it. Docstring says
+  so now.
+
+The split rests on `f9`/`f10` surviving, which is an inference from two
+models (the 840's own Remove behaviour is untested) and is documented as
+provisional. The `f1=0` test itself is not provisional.
+
+**The same root cause was a SAFETY bug.**
+`count_shown_active_screens()` — the guard protecting the last visible
+user screen — gated on `f9` and `f12` and never on `f1`. Measured on
+Census1, which contains exactly ONE user screen:
+
+| State | Guard says |
+|---|---|
+| Before | **7** |
+| After the `f1` fix | 4 |
+| After #146 | **1** ✓ |
+
+It was over-counting by six on the 840 and would have permitted hiding a
+screen it exists to refuse.
+
+### 2. #146 — the census finally enters the code
+
+`NAMED_SCREEN_TYPES` still held only the 530's 13 codes. Added:
+**125 Power Guide, 127 Stamina, 162 GroupRide** (all from Garmin's own
+editor), and **30, 128, 223** as honest placeholders — being absent was
+not neutral, since `screen_type_name()` returned "Screen 31"/"Screen
+224", which ASSERTS a plain user screen rather than admitting ignorance,
+and fed the guard above. They are certainly type codes: a user screen's
+`f10` is a per-profile counter from 0, so a factory profile with 11
+screens cannot hold 223.
+
+Also: **162 → `NO_FIELD_EDIT_TYPES`**, by analogy to 57 GroupTrack List
+(f3=0 everywhere, "no data fields" on-device) — acted on because a wrong
+include costs nothing while a wrong omit reopens the v0.21.2 bug.
+**529 Compass, 725 Map, 240 Location** added to `FIELD_ID_NAMES` and
+deliberately NOT to `GRAPH_OR_BARS_FIELD_IDS`. **`KNOWN_UNRESOLVED_IDS`
+= {520, 578, 579}**, closing rev 117's follow-up.
+
+Side effect: the **"Screen 164"** bug is gone. `next_available_field10()`
+now returns 1 on Census1, because 162 GroupRide is no longer miscounted
+as a user screen to count up from.
+
+### 3. ⚠ `f10=64` named "Lights" and WITHDRAWN the same day
+
+Named from its field contents — it carries exactly 316 "Lights
+Connected" and 319 "Light Mode". Doug then walked the 840's Screens menu:
+no Lights entry exists, and the one unaccounted-for named screen offered
+is Music.
+
+**Field contents were the wrong evidence, and this file had already said
+why** — rev 121 §3 documented that an inactive screen's `f7` can be a
+stamped template rather than real content. The two ids sit inside `f3`
+rather than in the trailing residue, so they beat junk, but *"the
+template Garmin stamped"* is not the claim *"what this screen is."*
+
+Census3 then killed the competing hypothesis too: Music is `f10=30`.
+That leaves the Lights reading as the only one standing, and it is
+STILL not renamed — last-hypothesis-standing is not evidence. Naming it
+needs the editor to offer the screen, which means paired lights.
+
+Worth noting the fix cost nothing: the guard repair depended on 64 being
+IN the table, not on its label, so hedging the name changed no counts.
+**When the functional fix doesn't depend on the name, hedge the name.**
+
+### 4. `f10=30` = Music Control
+
+Doug cloned Census1 and added every named screen the 840 offers. His
+position 12, recorded as "Music Control, 2 fixed half-width fields:
+Timer, Distance", came back as `f10=30, f3=2` holding Timer and
+Distance. Device-editor evidence.
+
+### 5. ⚠ STRUCTURAL — the switched-off records are a RESERVE POOL
+
+Adding a named screen **reuses the record already sitting there**:
+
+| Slot | Census1 | Census3 |
+|---|---|---|
+| 4 Compass | `f1=0` | `f1=1` |
+| 6 Cycling Dynamics | `f1=0` | `f1=1` |
+| 11 STEPS Metrics | `f1=0` | `f1=1` |
+| 12 eBike Metrics | `f1=0` | `f1=1` |
+| 18 Music Control | `f1=0` | `f1=1` |
+
+Same slots. `unconfigured` did not move (11 → 11) while `inactive` went
+7 → 2 and `orderable` 11 → 16. **No new slot was created.**
+
+So this bucket is the profile's pool of AVAILABLE Garmin screen types,
+not a pile of dead records — the opposite of how rev 123's own first
+description had it ("screens waiting on hardware you haven't paired").
+CLI and GUI wording corrected. What remains after the editor's Add
+Screen list is exhausted — currently `f10` 64 and 223 — is the part
+genuinely gated on hardware or a runtime condition, which is what Doug
+predicted from the device side before the file was examined.
+
+### 6. `f9` is renumbered across the WHOLE profile on an add
+
+Workout 12→6, GroupTrack List 11→5, GroupRide 10→4; the active set
+compacted from sparse (0-3, 10-13, 18, 20, 21) to dense (0-15).
+**`f9` is not a durable identifier across edits — `message_index` is.**
+Anything that remembers a screen by position must key on the slot.
+
+### 7. Per-model layout counts — the v1.6.0 case is now concrete
+
+From the 840's editor, with the 530 for contrast:
+
+| Type | 530 | 840 |
+|---|---|---|
+| Compass (35) | LOCKED at 2 | **0, 1 or 2** — default 2 (Speed, Distance) |
+| eBike Metrics (58) | 1-4 | **1-8**, no A/B/C |
+| STEPS Metrics (95) | — | **1-8**, no A/B/C |
+| Lap Summary (74) | 1-4, no variants | 0, 1/A, 1/B, 2/A, 2/B, 3, 4 |
+| Segment (56) | 0, 2, 4/A, 4/B, 6 | 0, 2, 4/A, 4/B, **4/C**, 6/A, 6/B |
+| Stamina (127) | — | 0, 2/A, 2/B, 4, 5, 6 |
+| Map (25) | 0/A, 0/B, 1, 2 | identical |
+
+**The Compass row is a live defect, not just missing data:** the toolkit
+hard-locks Compass to 2 fields as a fixed-2 type, so on an 840 it refuses
+an edit the device itself offers. That is the first case where the global
+table blocks legitimate use rather than merely mislabelling something.
+(Doug set his Compass to 0 while exploring the range; the 2-field
+default is confirmed separately.)
+
+### 8. Closed: 5/C, and `Totals.fit` byte-stability
+
+Census2 re-saved reads `f3=5, f8=2`. The count-5 anomaly is fully
+closed and **C is confirmed count-independent at 3, 5 and 8**.
+
+And the `Totals.fit` pulled off the 840 carries exactly the values
+written to it — distance, timer, calories and session count all
+unchanged. **The device does NOT rewrite totals the way it rewrites
+`file_id.number`**, closing rev 118's outstanding follow-up: a future
+odometer feature can verify its own write by plain byte-compare.
+
+Prior rev (122, 2026-09-27) follows.*
 
 *Doc rev 122 — refreshed 2026-09-27.* **The A/B/C layout letters DECODE:
 for ordinary user screens, A=`f8`0, B=`f8`1, C=`f8`2. Confirmed from two
