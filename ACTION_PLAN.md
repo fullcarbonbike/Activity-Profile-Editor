@@ -37,22 +37,34 @@ that this is untested. The merge-and-tag procedure is written into
 
 ## The finding this plan is built around
 
-Two Garmin editors disagree about the same device:
+The iPhone Garmin Connect app and the 840's own on-device editor
+disagree about Compass: the device offers 0, 1 or 2 data fields, the app
+shows the count greyed out and uneditable.
 
-- The **840's own on-device editor** offers Compass at 0, 1 or 2 fields.
-- The **iPhone Garmin Connect app** shows Compass fixed at 2, greyed out
-  -- the same limit the 530 has.
+**First read (WRONG, recorded so it is not re-derived): "the app carries
+a conservative cross-device table."** Two checks killed that:
 
-So "what Garmin's editor allows" is not a single authority. The app
-appears to carry a conservative cross-device table; the device firmware
-knows its own capability.
+1. Doug set Compass to 0 on-device. The app then DISPLAYS 0 correctly
+   but still greys out the selector. So the app's READ path is
+   model-accurate; only its edit-capability entry is wrong.
+2. Cross-checking every other named type, the app agrees with the device
+   exactly -- eBike Metrics at 1-8, Lap Summary's count-0 state, Segment
+   4/C, all offered. A conservative table would have clamped those too.
 
-**Rule adopted: the device's own editor is the authority. The Connect
-app is a second opinion that can be wrong.**
+So it is **one bad entry, not a policy** -- most likely device firmware
+ahead of the app's revision, or simply an app bug.
 
-Important nuance, confirmed on-device 2026-09-28: the disagreement is
-**type-specific, not blanket.** For USER-DEFINED screens the app and the
-device agree exactly --
+**Rules adopted:**
+
+- The **device's own editor is the authority.**
+- The **Connect app is a usable survey instrument** -- much faster to
+  enumerate options in than walking on-device menus -- **but confirm
+  on-device anything that appears LOCKED**, since a greyed-out control
+  is exactly where its one known failure mode lives. Everything it
+  OFFERS has matched the device so far.
+
+Confirmed on-device 2026-09-28, for USER-DEFINED screens, app and device
+agreeing exactly:
 
 | Field count | Alternate layouts |
 |---|---|
@@ -60,16 +72,43 @@ device agree exactly --
 | 3 through 9 | **A / B / C** |
 | 10 | none |
 
--- which confirms the range Doc rev 120 took from the Connect app. It is
-the NAMED types (Compass so far) where the app is more restrictive than
-the hardware.
+That confirms the range Doc rev 120 took from the app, which had been
+flagged as needing on-device backing.
 
-**Where this bites today:** the toolkit hard-locks Compass to 2 fields
-as a fixed-2 type. On an 840 it therefore REFUSES an edit the device
-itself offers. That is the first case where the global 530 table blocks
-legitimate use rather than merely mislabelling something. eBike Metrics
-(1-8 vs the table's 1-4) and STEPS Metrics (1-8) are the same shape but
-are not locked, so they do not bite the same way.
+---
+
+## What is actually broken today -- three classes
+
+Checked against what `NAMED_SCREEN_LAYOUTS` and the guards actually
+hold, not from memory.
+
+**Class 1 -- the toolkit REFUSES what the 840 permits (hard blocks):**
+
+| Type | 530 rule | 840 offers |
+|---|---|---|
+| **Compass (35)** | `[(2,0)]`, count LOCKED | 0, 1 or 2 |
+| **Workout (38)** | in `NO_FIELD_EDIT_TYPES` -- no field editing at all | layout can't change, but scrolling reaches the fields and offers to change them |
+
+**Class 2 -- validation range too narrow (refuses an edit; no symptom
+until you make one):**
+
+| Type | 530 table | 840 offers |
+|---|---|---|
+| **eBike Metrics (58)** | 1-4 | 1-8 -- and the 840 SHIPS it at 5, already outside the table |
+| **STEPS Metrics (95)** | 1-4 | 1-8 |
+| **Lap Summary (74)** | 1-4, no variants | 0, 1/A, 1/B, 2/A, 2/B, 3, 4 |
+| **Segment (56)** | 0, 2, 4/A, 4/B, 6 | adds **4/C**, and 6 gains A/B |
+
+**Class 3 -- no table entry at all, so they fall through to GENERIC
+user-screen geometry:**
+
+Power Guide (125, fixed 2), Music Control (30, fixed 2), GroupRide
+(162, zero fields), Stamina (127, 0/2A/2B/4/5/6), plus 64, 128, 223.
+Not a refusal -- the layout picker just offers the wrong shape, which
+for a fixed-2 type means offering counts the device will not honour.
+
+**Phase 1 below fixes classes 1 and 2. Class 3 needs actual table
+entries -- no amount of loosening supplies a grid that is not there.**
 
 ---
 
@@ -116,24 +155,54 @@ rules."* Per Doc rev 120 SS4:
 > from that model's table: allow it, say plainly that it is unverified,
 > and never rewrite what was not explicitly edited.
 
-**Tasks**
+**Tasks -- part A, scope the existing rules to the model**
 
 - [ ] `count_is_locked()` locks only for the model the lock was measured
-      on. Removes the Compass defect.
+      on.
 - [ ] Layout validation (`fit_patch.py`) refuses only when the model is
       surveyed AND the state is known-illegal; otherwise advise and
       write.
+- [ ] `NO_FIELD_EDIT_TYPES` becomes per-model, so Workout's block stops
+      applying to the 840 (class 1).
 - [ ] v1.4.0's read-side "state the device doesn't offer" flag gates on
       model-surveyed, so it stops crying wolf on 840 profiles.
 - [ ] GUI shows the model, and carries a one-line advisory when a
       profile's model is unsurveyed.
+
+**Tasks -- part B, a FIRST 840 table (plan change, 2026-09-28)**
+
+Part A alone leaves the 840 permissive-with-advisories, which means the
+toolkit stops catching real mistakes on the device doing all the
+research. Since the measurements already exist, populate them:
+
+- [ ] An 840 entry carrying ONLY what has been personally measured --
+      Compass 0/1/2, eBike Metrics 1-8, STEPS Metrics 1-8, Lap Summary's
+      full set, Segment's known states, user screens A/B/C at 3-9.
+      **Nothing inferred, nothing copied across from the 530 to fill a
+      gap.** An absent entry must fall back to permissive, not to the
+      530's rule.
+- [ ] Class 3 entries for the types with no geometry at all: Power Guide
+      (fixed 2), Music Control (fixed 2), GroupRide (0). **Stamina is
+      deliberately EXCLUDED here** -- its 2-field layout renders STACKED
+      where other named types render side-by-side, so its grid needs
+      care rather than speed. It stays permissive until Phase 3.
+
+This is Phase 3's shape arriving early for the types already known. It
+is in scope because the data exists and the alternative is knowingly
+shipping no validation for the 840; it is NOT licence to start
+inferring per-model rules that have not been measured.
 
 **Verify**
 
 - [ ] 530 profiles: every existing refusal still fires. This is the
       regression that matters -- Phase 1 must not loosen the 530 path.
 - [ ] 840 Compass accepts 0, 1 and 2 without a refusal.
-- [ ] An 840 profile produces no read-side out-of-range flag.
+- [ ] 840 Workout allows field edits; 530 Workout still refuses them.
+- [ ] 840 eBike Metrics accepts 5-8; 530 still refuses above 4.
+- [ ] An 840 profile produces no read-side out-of-range flag, including
+      the factory eBike Metrics screen that ships at 5 fields.
+- [ ] A profile from neither model (fake `file_id.product`) refuses
+      nothing and advises instead.
 - [ ] `fit_census.py` output unchanged (it does no validation, so any
       change here means something leaked).
 
@@ -167,9 +236,9 @@ passes in full.
 
 Do NOT start this inside v1.5.0.
 
-Keyed on Phase 0's model id, populated from the on-device notes below,
-with an explicit "unsurveyed model" entry that is permissive by
-construction.
+Phase 1 part B already lands the measured 840 entries, so this phase is
+now COMPLETION rather than construction: the remaining types, Stamina's
+stacked geometry, and whatever a third model turns out to need.
 
 **Blocked on one measurement:** Segment's 4/A, 4/B and 4/C `f8` values
 on the 840. The 530 INVERTS the mapping for Segment -- 4/A stores
@@ -194,11 +263,20 @@ currently distinguishes those two designs.
 | GroupRide (162) | -- | 0 fields |
 | Map (25) | 0/A, 0/B, 1, 2 | identical |
 
-Also outstanding, and cheap once the tables exist:
-`NAMED_SCREEN_LAYOUTS` entries for Power Guide, Stamina, GroupRide and
-Music Control. Stamina's 2-field layout renders STACKED where other
-named types render side-by-side, so its grid needs care rather than
-speed.
+### Cheap bench task, worth doing before Phase 1 part B
+
+Three more types are count-LOCKED in the table on 530 evidence and have
+never been checked on the 840:
+
+- [ ] **Elevation (44)** -- is the count picker greyed out?
+- [ ] **Cycling Dynamics (63)** -- same
+- [ ] **ClimbPro (104)** -- same
+
+Census3 shows all three at two fields, but that is their CURRENT state,
+not whether the count is selectable. Any that offers a range is another
+class-1 defect. Thirty seconds each: open the layout menu and look.
+The Connect app can answer this too -- but per the rule above, confirm
+on-device anything that appears locked, which is exactly this case.
 
 ---
 
