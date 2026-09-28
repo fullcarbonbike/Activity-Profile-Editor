@@ -200,30 +200,35 @@ to report so a new device can be added.
 
 ---
 
-## Phase 1 PREREQUISITE -- three bench checks   **STATUS: waiting on Doug**
+## Phase 1 PREREQUISITE -- three bench checks   **DONE 2026-09-28**
 
-**This is the only thing currently waiting on Doug, and it blocks Phase
-1 part B from being COMPLETE rather than blocking it from starting.**
+Three types were count-LOCKED in the table on 530 evidence alone and had
+never been checked on the 840. **All three confirmed LOCKED at 2 on the
+840 as well** (Doug, 2026-09-28, checked on-device AND in the app):
 
-Three types are count-LOCKED in the table on 530 evidence alone and have
-never been checked on the 840:
+- [x] **[BENCH] Elevation (44)** -- fixed 2 half-width fields at the
+      bottom of the screen. App: layout selection greyed out, shows 2.
+- [x] **[BENCH] Cycling Dynamics (63)** -- same.
+- [x] **[BENCH] ClimbPro (104)** -- same.
 
-- [ ] **[BENCH] Elevation (44)** -- is the count picker greyed out?
-- [ ] **[BENCH] Cycling Dynamics (63)** -- same
-- [ ] **[BENCH] ClimbPro (104)** -- same
+**Result: NO new class-1 defects. Compass remains the only one.**
 
-Census3 shows all three at two fields, but that is their CURRENT state,
-not whether the count is selectable. Any that offers a range is another
-class-1 defect -- the toolkit would be refusing an edit the device
-permits, exactly like Compass.
+Two consequences, both good:
 
-Thirty seconds each: open the layout menu and look. The Connect app can
-answer this too, but per the rule above, **confirm on-device anything
-that appears locked** -- which is precisely this case, and precisely
-where the app's one known failure mode lives.
+1. **Part B gets smaller.** These three agree with the 530, so the 840
+   table needs NO entries for them -- it only carries the types that
+   actually differ. An 840 entry that merely restates the 530's rule
+   would be duplication waiting to drift.
+2. **The "one bad app entry" reading is now supported by three negative
+   controls.** The app was checked on all three and agrees with the
+   device every time. So the app is not conservative about fixed-2 types
+   in general -- it is wrong about Compass specifically.
 
-Phase 1 part B can be written without these answers; it just would not
-know whether to add 840 entries for those three types.
+That makes the coherent story: **840 firmware added variable field
+counts to Compass, and the app's table predates that change.** The other
+three fixed-2 types did not change, which is exactly why the app is
+still right about them. Doug's firmware-ahead-of-app-revision hypothesis,
+now with controls rather than a single observation.
 
 ---
 
