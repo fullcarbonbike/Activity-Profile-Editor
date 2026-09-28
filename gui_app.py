@@ -150,6 +150,9 @@ from fit_dump import (
     layout_grid,
     layout_counts,
     layout_state_is_valid,
+    profile_model,
+    model_label,
+    layout_rules_enforced,
     layout_variants_for_count,
     layout_default_variant,
     count_is_locked,
@@ -1306,6 +1309,7 @@ class ProfileListPanel(wx.Panel):
         self.frame.discard_edits()
 
         self.staged_path = staged_path
+        self.profile_product, self.profile_model_name = profile_model(staged_path)
         self.frame.staged_path = staged_path
         self.frame.profile_filename = profile_filename
 
@@ -1671,6 +1675,25 @@ class ViewScreensPanel(wx.Panel):
         self.add_screen_btn.Enable()  # doesn't need a row selected, unlike the others
 
         other_lines = []
+
+        # Which Edge wrote this profile, and -- when it is a model whose
+        # layouts have never been measured -- an honest word about what
+        # that means for the rules shown elsewhere in this app. Phrased
+        # as a capability limit of the toolkit, not a defect in the
+        # user's device (ACTION_PLAN Phase 1A).
+        _model = model_label(self.frame.profile_product,
+                             self.frame.profile_model_name)
+        other_lines.append(f"Profile written by: {_model}")
+        if not layout_rules_enforced(self.frame.profile_product):
+            other_lines.append(
+                textwrap.fill(
+                    "This toolkit hasn't measured this Edge's layout rules, so "
+                    "it won't block a field count or layout it doesn't "
+                    "recognise -- it'll let the change through and say so. "
+                    "Anything it does warn about here was measured on an "
+                    "Edge 530 and may not apply to yours.",
+                    GRAPH_WARNING_WRAP_WIDTH))
+
         if data["conditional"]:
             other_lines.append(
                 f"Conditional screens (active, exempt from ordering — always "
@@ -2681,7 +2704,9 @@ class EditScreenPanel(wx.Panel):
             # A single-count type (the fixed-2 group: Compass, Elevation,
             # Cycling Dynamics, ClimbPro) has nothing to choose at all.
             self.layout_picker.Enable(fields_editable
-                                      and not count_is_locked(self.type_f10))
+                                      and not count_is_locked(
+                                          self.type_f10,
+                                          self.frame.profile_product))
             supports_b = len(layout_variants_for_count(self.type_f10, count)) > 1
         else:
             supports_b = count in COUNTS_WITH_B_VARIANT
@@ -2804,7 +2829,13 @@ class EditScreenPanel(wx.Panel):
         """
         if named_layout(self.type_f10) is None:
             return ""
-        if layout_state_is_valid(self.type_f10, count, self.layout_variant):
+        if layout_state_is_valid(self.type_f10, count, self.layout_variant,
+                                 self.frame.profile_product):
+            # Also silent on an UNSURVEYED model: this note claims the
+            # device will render something other than what is stored, and
+            # on a device whose layouts have never been measured that is
+            # a guess dressed as a finding. A false alarm indistinguishable
+            # from a real one is worse than no check (Doc rev 120 SS1).
             return ""
         counts = layout_counts(self.type_f10)
         renders = max((c for c in counts if c <= count), default=counts[0])
@@ -5812,6 +5843,15 @@ class MainFrame(wx.Frame):
         self.working_dir = load_saved_working_dir() or DEFAULT_WORKING_DIR
         self.staged_path = None
         self.profile_filename = None
+        # Which Edge MODEL wrote the profile being edited, from
+        # file_id.product (ACTION_PLAN Phase 1A). Every layout rule in
+        # fit_dump.py was measured on a 530, and applying them to an 840
+        # already produced a real defect -- Compass hard-locked at 2
+        # fields when the 840 offers 0, 1 or 2 (Doc rev 123 SS7). Held on
+        # the frame rather than re-read per panel so the whole edit
+        # session agrees about which device it is working for.
+        self.profile_product = None
+        self.profile_model_name = None
         self.editing_path = None   # scratch working copy -- IS the pending-edit queue, see module docstring
         self.editing_slot = None   # message_index of whatever screen EditScreenPanel is currently open on
         self.deploy_return_panel = "review"  # where DeployPanel's "Back" goes -- "review" (normal edit flow), "restore" (arrived via Restore-from-Backup), or "clone" (arrived via Clone) -- the latter two skip PreflightPanel entirely

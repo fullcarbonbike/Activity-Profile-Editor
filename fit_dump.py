@@ -1076,10 +1076,19 @@ def layout_grid(f10, count, variant=0):
     return LAYOUT_GRIDS.get(count, {}).get(variant)
 
 
-def layout_state_is_valid(f10, count, variant=0):
+def layout_state_is_valid(f10, count, variant=0, product=None):
     """
     True if this exact (count, variant) is one the device offers for
     this screen type.
+
+    `product` (2026-09-28, ACTION_PLAN Phase 1A): on an UNSURVEYED model
+    this returns True for everything. That is not a claim the state is
+    legal -- it is a refusal to claim it is illegal on a device whose
+    rules have never been measured. See layout_rules_enforced().
+
+    Callers that want "does the table know this combination", regardless
+    of model, should ask `(count, variant) in layout_states(f10)`
+    directly. This function answers the ENFORCEMENT question.
 
     False is NOT necessarily corruption. The device CLAMPS an
     over-range count when rendering (keeps the first N) and does NOT
@@ -1089,6 +1098,8 @@ def layout_state_is_valid(f10, count, variant=0):
     stored, change nothing", not as a reason to rewrite bytes the user
     didn't ask to touch.
     """
+    if not layout_rules_enforced(product):
+        return True
     return (count, variant) in layout_states(f10)
 
 
@@ -1123,16 +1134,56 @@ def layout_default_variant(f10, count):
     return variants[0] if variants else None
 
 
-def count_is_locked(f10):
+def layout_rules_enforced(product):
+    """
+    Whether this project's layout rules may REFUSE a write for a profile
+    from this model. (ACTION_PLAN Phase 1A, 2026-09-28.)
+
+    `product` is `file_id.product` -- see profile_model(). The contract
+    is deliberately asymmetric:
+
+      product is None   -> ENFORCE. The caller didn't say which model
+                           this is, so behave exactly as before. Any
+                           call site not yet migrated keeps today's
+                           behaviour rather than silently going
+                           permissive -- the safe direction to fail.
+      surveyed model    -> ENFORCE. Rules were measured on this device.
+      any other model   -> DO NOT ENFORCE. Advise, never refuse.
+
+    Doc rev 120 SS4's posture, made callable: "refuse only when the model
+    is KNOWN and the state is KNOWN-ILLEGAL." Every table in this file
+    was measured on an Edge 530, and applying them to an 840 has already
+    produced a real defect -- Compass hard-locked at 2 fields when the
+    840's own editor offers 0, 1 or 2 (Doc rev 123 SS7).
+
+    NOT the same question as "do we have a table for this model". This
+    only decides whether a MISMATCH is grounds to refuse.
+    """
+    if product is None:
+        return True
+    return model_is_surveyed(product)
+
+
+def count_is_locked(f10, product=None):
     """
     True if this screen type offers exactly ONE field count, so the
-    count is not a user choice at all -- the four fixed-2 types
-    (Compass, Elevation, Cycling Dynamics, ClimbPro).
+    count is not a user choice at all -- on the 530, the four fixed-2
+    types (Compass, Elevation, Cycling Dynamics, ClimbPro).
 
     Field CONTENTS stay fully editable for these; only the count is
     fixed. Derived from 'states' rather than listed separately, so a
     type can never be locked and multi-count at the same time.
+
+    `product` (2026-09-28): a lock measured on one model is not evidence
+    about another. On an unsurveyed model this returns False -- nothing
+    is locked, because nothing has been measured. Compass is the case in
+    point: locked on the 530, freely 0/1/2 on the 840.
+
+    Omitting `product` keeps the old strict behaviour, so an unmigrated
+    caller cannot accidentally unlock anything.
     """
+    if not layout_rules_enforced(product):
+        return False
     return len(layout_counts(f10)) == 1
 
 

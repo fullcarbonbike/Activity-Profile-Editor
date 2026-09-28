@@ -232,7 +232,7 @@ now with controls rather than a single observation.
 
 ---
 
-## Phase 1 -- stop refusing what the device permits   **STATUS: not started, [CODE]**
+## Phase 1 -- stop refusing what the device permits   **STATUS: part A DONE 2026-09-28; part B next**
 
 **This is the safety fix, and it is NOT the per-model tables.** It only
 changes the posture from *"I know the rules"* to *"I know the 530's
@@ -245,17 +245,24 @@ rules."* Per Doc rev 120 SS4:
 
 **Tasks -- part A, scope the existing rules to the model**
 
-- [ ] **[CODE]** `count_is_locked()` locks only for the model the lock
-      was measured on.
-- [ ] **[CODE]** Layout validation (`fit_patch.py`) refuses only when the model is
-      surveyed AND the state is known-illegal; otherwise advise and
-      write.
-- [ ] **[CODE]** `NO_FIELD_EDIT_TYPES` becomes per-model, so Workout's block stops
-      applying to the 840 (class 1).
-- [ ] **[CODE]** v1.4.0's read-side "state the device doesn't offer" flag gates on
-      model-surveyed, so it stops crying wolf on 840 profiles.
-- [ ] **[CODE]** GUI shows the model, and carries a one-line advisory when a
-      profile's model is unsurveyed.
+- [x] **[CODE]** `count_is_locked(f10, product)` locks only for a
+      SURVEYED model. New `layout_rules_enforced(product)` carries the
+      policy in one place.
+- [x] **[CODE]** Layout validation (`fit_patch.py`) routes its four
+      refusals through `_layout_problem()`: `parser.error` on a surveyed
+      model, the SAME text to stderr as a NOTE otherwise.
+- [ ] **[CODE]** ~~`NO_FIELD_EDIT_TYPES` per-model~~ **MOVED TO PART B,
+      2026-09-28.** Blanket-loosening it for unsurveyed models would also
+      unblock GroupTrack List (f10=57) and GroupRide (162) on the 840 --
+      both device-generated with f3=0 -- re-opening the v0.21.2 bug where
+      the field picker opened on a screen whose contents the device
+      writes. That set is about "the device generates this screen", which
+      is structural rather than a count rule, so it needs a per-model
+      ENTRY (Workout differs on the 840) and not a policy switch.
+- [x] **[CODE]** v1.4.0's read-side flag gates on model-surveyed.
+- [x] **[CODE]** GUI shows "Profile written by: <model>" and, when
+      unsurveyed, says plainly that it won't block what it doesn't
+      recognise and that any warning shown came from a 530.
 
 **Tasks -- part B, a FIRST 840 table (plan change, 2026-09-28)**
 
@@ -286,17 +293,15 @@ Every one of these runs against files already on disk. The "fake
 product id" case is a copy of a real profile with two bytes patched by
 a throwaway script -- a lab fixture, not something to create by hand.
 
-- [ ] **[LAB]** 530 profiles: every existing refusal still fires. This
-      is the regression that matters -- Phase 1 must not loosen the 530
-      path.
-- [ ] **[LAB]** 840 Compass accepts 0, 1 and 2 without a refusal.
+- [x] **[LAB]** 530 profiles: every existing refusal still fires.
+- [x] **[LAB]** 840 Compass accepts 1 field; 530 Compass still refused.
 - [ ] **[LAB]** 840 Workout allows field edits; 530 Workout still
       refuses them.
 - [ ] **[LAB]** 840 eBike Metrics accepts 5-8; 530 still refuses above 4.
 - [ ] **[LAB]** An 840 profile produces no read-side out-of-range flag,
       including the factory eBike Metrics screen that ships at 5 fields.
-- [ ] **[LAB]** A profile from neither model (fake `file_id.product`)
-      refuses nothing and advises instead.
+- [x] **[LAB]** Fake product id 9999 (a real 840 profile with two bytes
+      patched and the CRC recomputed): refuses nothing, advises instead.
 - [ ] **[LAB]** `fit_census.py` output unchanged (it does no validation,
       so any change here means something leaked).
 

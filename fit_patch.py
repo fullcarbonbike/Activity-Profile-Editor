@@ -47,7 +47,8 @@ from fit_dump import (NAMED_SCREEN_TYPES, CIQ_FIELD_MARKER_IDS,
                       # used to be defined -- see its comment below.
                       COUNTS_WITH_B_VARIANT,
                       layout_states, layout_counts, layout_state_is_valid,
-                      layout_variants_for_count, count_is_locked)
+                      layout_variants_for_count, count_is_locked,
+                      profile_model, model_label, layout_rules_enforced)
 
 DATA_SCREEN_MESG_NUM = 14
 
@@ -1561,6 +1562,29 @@ def _cli():
     else:
         effective_f10 = read_screen_f10(args.input_file, args.slot)
 
+    # Which MODEL wrote this profile. Every rule checked below was
+    # measured on an Edge 530, and Doc rev 123 SS7 showed the global
+    # table already REFUSING a state the 840 permits (Compass at 0 or 1
+    # field). So on an unsurveyed model these checks ADVISE instead of
+    # refusing -- ACTION_PLAN Phase 1A, and Doc rev 120 SS4's posture.
+    _product, _model_name = profile_model(args.input_file)
+    _enforce = layout_rules_enforced(_product)
+
+    def _layout_problem(message):
+        """
+        Refuse on a surveyed model; on an unsurveyed one, say the same
+        thing to stderr and carry on. The text is identical either way
+        so there is only one wording to keep honest.
+        """
+        if _enforce:
+            parser.error(message)
+        print(f"NOTE: {message}", file=sys.stderr)
+        print(f"  Proceeding anyway: this profile is from "
+              f"{model_label(_product, _model_name)}, whose layout rules this "
+              f"toolkit has NOT measured. The rule above comes from the Edge "
+              f"530 and may not apply here. Nothing is rewritten that you did "
+              f"not ask to change.", file=sys.stderr)
+
     if effective_count is not None and effective_f10 is not None:
         # screen_type_name() returns "Screen N" for a plain user screen,
         # so appending "screen" to it would read "Screen 1 screen".
@@ -1571,8 +1595,8 @@ def _cli():
         counts = layout_counts(effective_f10)
 
         if effective_count not in counts:
-            if count_is_locked(effective_f10):
-                parser.error(
+            if count_is_locked(effective_f10, _product):
+                _layout_problem(
                     f"{type_label} screens hold exactly {counts[0]} data field(s) -- "
                     f"the on-device editor offers no count choice for this type at all, "
                     f"and a count of {effective_count} is not a state the device can "
@@ -1581,7 +1605,7 @@ def _cli():
                     f"the device from then on. Field CONTENTS are freely editable; only "
                     f"the count is fixed."
                 )
-            parser.error(
+            _layout_problem(
                 f"{type_label} screens accept {counts} data field(s) on-device, not "
                 f"{effective_count}. The device clamps an over-range count when "
                 f"rendering and does NOT rewrite the file, so this would leave the "
@@ -1597,7 +1621,7 @@ def _cli():
                 f"--layout {v} ({'A' if i == 0 else 'B' if i == 1 else f'option {i + 1}'})"
                 for i, v in enumerate(variants)
             )
-            parser.error(
+            _layout_problem(
                 f"--layout {effective_layout} is not a layout the device offers for a "
                 f"{effective_count}-field {type_phrase}. Valid here: {shown}. "
                 f"These values are MEASURED per type and per count, not positional -- "
@@ -1607,12 +1631,13 @@ def _cli():
         if effective_layout is None and args.new_slot:
             pass  # handled by the --new-slot default above
         elif not layout_state_is_valid(effective_f10, effective_count,
-                                       effective_layout if effective_layout is not None else 0):
+                                       effective_layout if effective_layout is not None else 0,
+                                       _product):
             # Count and variant are each individually legal but the PAIR
             # isn't offered. Currently unreachable for every surveyed
             # type; kept so a future table addition can't slip an
             # unoffered combination through unnoticed.
-            parser.error(
+            _layout_problem(
                 f"a {effective_count}-field {type_phrase} with layout "
                 f"{effective_layout} is not one of the states the device offers "
                 f"({legal})."
