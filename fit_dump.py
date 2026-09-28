@@ -916,6 +916,82 @@ NAMED_SCREEN_LAYOUTS = {
 DEFAULT_FILLER_FIELD_ID = 56
 
 
+# ----------------------------------------------------------------------
+# DEVICE MODEL IDENTITY  (added v2.10.0, 2026-09-28 -- ACTION_PLAN Phase 0)
+# ----------------------------------------------------------------------
+#
+# Every layout constant in this file was measured on an Edge 530 and was
+# applied to every device until now. PROJECT_NOTES Doc rev 120 and 123
+# established that the rules are PER MODEL, and that the global table has
+# started REFUSING states the 840 actually offers (Compass locked at 2
+# where the 840 offers 0/1/2). Fixing that needs a way to say which model
+# a profile came from -- which is what this section is.
+#
+# `file_id.product` carries it, in the file itself, so this works
+# offline, on a backup, and on a folder pull with no device attached.
+# Verified on real files from both devices.
+KNOWN_MODELS = {
+    3121: "Edge 530",
+    4062: "Edge 840",
+}
+
+# The models whose LAYOUT RULES have actually been measured. This is a
+# deliberately separate set from KNOWN_MODELS: recognising a product id
+# is not the same as knowing what that device's editor offers, and
+# conflating the two is how a 530 measurement came to be applied to an
+# 840 in the first place. A model absent here must be treated
+# PERMISSIVELY -- advise, never refuse -- per Doc rev 120 SS4.
+SURVEYED_MODELS = {3121}
+
+
+def profile_model(path_or_messages):
+    """
+    Which Edge model wrote this profile: an (product_id, name) pair, or
+    (None, None) if the file doesn't say or isn't readable.
+
+    Accepts either a path or an already-decoded messages dict, so a
+    caller that has decoded the file once doesn't pay for it twice.
+
+    An UNRECOGNISED product id returns (id, None) rather than (None,
+    None) -- the distinction matters, because "a device we've never seen"
+    and "no identity at all" call for different handling, and the raw id
+    is what a user would report when asking for a new model to be added.
+
+    NEVER raises: callers enumerate folders that may hold junk.
+    """
+    try:
+        if isinstance(path_or_messages, dict):
+            messages = path_or_messages
+        else:
+            messages = decode_file(path_or_messages)
+        file_ids = messages.get('file_id_mesgs') or []
+        if not file_ids:
+            return (None, None)
+        product = file_ids[0].get('product')
+        if product is None:
+            return (None, None)
+        return (product, KNOWN_MODELS.get(product))
+    except Exception:                                   # noqa: BLE001
+        return (None, None)
+
+
+def model_label(product, name):
+    """Human-readable model for display. Never returns an empty string."""
+    if product is None:
+        return "unknown (no product id in file)"
+    if name is None:
+        return f"unrecognised model (product id {product})"
+    return name
+
+
+def model_is_surveyed(product):
+    """
+    True only if this project has MEASURED this model's layout rules.
+    Everything downstream of Phase 1 keys refusals on this.
+    """
+    return product in SURVEYED_MODELS
+
+
 def is_profile_file(path):
     """
     True if `path` is an Activity Profile (a FIT "sport" file), False
@@ -1424,6 +1500,21 @@ def cmd_screens(args):
     messages = decode_file(args.file)
     data = classify_screens(messages)
     verbose = args.verbose
+
+    # Model line first: every layout rule below is per-model now, so
+    # which device wrote this file is context for reading the whole
+    # listing, not a footnote. Doug's report (2026-09-28) was that
+    # `screens` never said, and `dump` said it only amid everything else.
+    product, model_name = profile_model(messages)
+    print(f"Device model: {model_label(product, model_name)}")
+    if not model_is_surveyed(product):
+        print("  NOTE: this model's layout rules have NOT been measured by "
+              "this project.")
+        print("  Field counts and layout variants below are reported as "
+              "stored; any rule")
+        print("  shown elsewhere in the toolkit comes from the Edge 530 and "
+              "may not apply.")
+    print()
 
     orderable = data["orderable"]
     conditional = data["conditional"]

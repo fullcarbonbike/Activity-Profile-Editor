@@ -112,7 +112,21 @@ entries -- no amount of loosening supplies a grid that is not there.**
 
 ---
 
-## Phase 0 -- model identity
+## Who does what
+
+Every task below is tagged. This was missing in the first draft and
+caused exactly the confusion it should have prevented -- Doug read
+Phase 0 as something to run and found no script to run it with.
+
+- **[CODE]** -- Claude writes it. Nothing for Doug to do until it exists.
+- **[BENCH]** -- Doug, on the device or in the Connect app. Cannot be
+  done from a file.
+- **[CHECK]** -- run after the matching [CODE] lands, by either of us;
+  these are commands, not code.
+
+---
+
+## Phase 0 -- model identity   **DONE 2026-09-28**
 
 Small, headless, foundational. Everything below depends on it and
 nothing else does.
@@ -128,19 +142,43 @@ and offline folders:
 
 **Tasks**
 
-- [ ] `fit_dump.profile_model(path)` -- returns a model id/name, or
-      `None` for an unrecognised product. Never raises.
-- [ ] `KNOWN_MODELS` map, with a comment that an absent product means
-      "unsurveyed", which is a real state and not an error.
-- [ ] `SURVEYED_MODELS` -- the set whose layout rules have actually been
-      measured. Currently the 530; the 840 joins it when Phase 3 lands.
+- [x] **[CODE]** `fit_dump.profile_model()` -- returns `(product_id,
+      name)`, `(id, None)` for an unrecognised device, `(None, None)` if
+      the file doesn't say. Never raises. Takes a path OR an
+      already-decoded messages dict.
+- [x] **[CODE]** `KNOWN_MODELS` = {3121: Edge 530, 4062: Edge 840}, and
+      `SURVEYED_MODELS` = {3121} -- deliberately SEPARATE sets.
+      Recognising a product id is not the same as knowing what that
+      device's editor offers, and conflating the two is how a 530
+      measurement came to be applied to an 840 in the first place.
+- [x] **[CODE]** `model_label()` and `model_is_surveyed()`.
+- [x] **[CODE]** `fit_dump.py screens` prints a **Device model:** line
+      first, plus a NOTE when the model is unsurveyed. Doug's report:
+      `screens` never said which device, and `dump` said it only amid
+      everything else.
+- [x] **[CODE]** `fit_census.py` gains a **model** column, so a whole
+      folder of backups is attributable in one command.
 
-**Verify**
+**How to use it -- [CHECK], nothing to build**
 
-- [ ] Returns 530 for every profile in `ClaudeCowork`, 840 for the three
-      Census files.
-- [ ] Returns `None` rather than raising on `Totals.fit` and
-      `Device.fit`.
+One profile, with the model on the first line:
+
+    python3 fit_dump.py screens <file.fit>
+
+A whole folder, or several, in one pass:
+
+    python3 fit_census.py <folder> [<folder> ...] --out models.csv
+
+then read the `model` column. Files the toolkit doesn't recognise show
+an empty `model` with the raw id still in `product` -- that id is what
+to report so a new device can be added.
+
+**Verified 2026-09-28**
+
+- [x] Sweep of `ClaudeCowork` + the Census uploads: 1178 records Edge
+      530 (3121), 217 Edge 840 (4062), nothing unrecognised.
+- [x] `screens` on an 840 profile prints the unsurveyed NOTE; on a 530
+      profile it prints the model and no note.
 
 ---
 
@@ -157,16 +195,16 @@ rules."* Per Doc rev 120 SS4:
 
 **Tasks -- part A, scope the existing rules to the model**
 
-- [ ] `count_is_locked()` locks only for the model the lock was measured
-      on.
-- [ ] Layout validation (`fit_patch.py`) refuses only when the model is
+- [ ] **[CODE]** `count_is_locked()` locks only for the model the lock
+      was measured on.
+- [ ] **[CODE]** Layout validation (`fit_patch.py`) refuses only when the model is
       surveyed AND the state is known-illegal; otherwise advise and
       write.
-- [ ] `NO_FIELD_EDIT_TYPES` becomes per-model, so Workout's block stops
+- [ ] **[CODE]** `NO_FIELD_EDIT_TYPES` becomes per-model, so Workout's block stops
       applying to the 840 (class 1).
-- [ ] v1.4.0's read-side "state the device doesn't offer" flag gates on
+- [ ] **[CODE]** v1.4.0's read-side "state the device doesn't offer" flag gates on
       model-surveyed, so it stops crying wolf on 840 profiles.
-- [ ] GUI shows the model, and carries a one-line advisory when a
+- [ ] **[CODE]** GUI shows the model, and carries a one-line advisory when a
       profile's model is unsurveyed.
 
 **Tasks -- part B, a FIRST 840 table (plan change, 2026-09-28)**
@@ -175,13 +213,13 @@ Part A alone leaves the 840 permissive-with-advisories, which means the
 toolkit stops catching real mistakes on the device doing all the
 research. Since the measurements already exist, populate them:
 
-- [ ] An 840 entry carrying ONLY what has been personally measured --
+- [ ] **[CODE]** An 840 entry carrying ONLY what has been personally measured --
       Compass 0/1/2, eBike Metrics 1-8, STEPS Metrics 1-8, Lap Summary's
       full set, Segment's known states, user screens A/B/C at 3-9.
       **Nothing inferred, nothing copied across from the 530 to fill a
       gap.** An absent entry must fall back to permissive, not to the
       530's rule.
-- [ ] Class 3 entries for the types with no geometry at all: Power Guide
+- [ ] **[CODE]** Class 3 entries for the types with no geometry at all: Power Guide
       (fixed 2), Music Control (fixed 2), GroupRide (0). **Stamina is
       deliberately EXCLUDED here** -- its 2-field layout renders STACKED
       where other named types render side-by-side, so its grid needs
@@ -213,16 +251,16 @@ inferring per-model rules that have not been measured.
 Ordered deliberately: safety, then the feature that depends on Phase 1,
 then the smaller piece, then release mechanics.
 
-- [ ] **#142 -- device-dependent paths inert offline.** First because
+- [ ] **[CODE] #142 -- device-dependent paths inert offline.** First because
       it is the safety item: today an offline session walks all the way
       to "Write to Device" before anything stops it. It refuses cleanly
       rather than tracebacking, so this is untidy rather than dangerous
       -- but it invites a real mistake.
-- [ ] **#141 -- Export replaces Deploy offline.** Safe to build only
+- [ ] **[CODE] #141 -- Export replaces Deploy offline.** Safe to build only
       after Phase 1, so its validation does not encode 530 rules into
       the one feature whose entire purpose is serving the 840.
-- [ ] **#145 -- `startup.txt` offline import/export.**
-- [ ] **#143 -- release mechanics.** Headless verification, version
+- [ ] **[CODE] #145 -- `startup.txt` offline import/export.**
+- [ ] **[CODE] #143 -- release mechanics.** Headless verification, version
       bumps, `RELEASE_NOTES_v1.5.0.md`, README changelog entry, State of
       play refresh.
 
@@ -268,9 +306,9 @@ currently distinguishes those two designs.
 Three more types are count-LOCKED in the table on 530 evidence and have
 never been checked on the 840:
 
-- [ ] **Elevation (44)** -- is the count picker greyed out?
-- [ ] **Cycling Dynamics (63)** -- same
-- [ ] **ClimbPro (104)** -- same
+- [ ] **[BENCH] Elevation (44)** -- is the count picker greyed out?
+- [ ] **[BENCH] Cycling Dynamics (63)** -- same
+- [ ] **[BENCH] ClimbPro (104)** -- same
 
 Census3 shows all three at two fields, but that is their CURRENT state,
 not whether the count is selectable. Any that offers a range is another

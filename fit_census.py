@@ -58,6 +58,7 @@ import sys
 from collections import defaultdict
 
 import fit_raw_walk
+import fit_dump
 
 __version__ = "1.0.0"
 
@@ -101,7 +102,7 @@ _FMT = {(1, False): 'B', (1, True): 'b',
 KNOWN_SCREEN_FIELDS = {1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 254}
 
 CSV_COLUMNS = [
-    "file", "serial", "manufacturer", "product",
+    "file", "model", "serial", "manufacturer", "product",
     "msg_index", "f1_state", "f3_count", "f8_variant", "f9_order",
     "f10_type", "f12_hidden",
     "f7_field_ids", "f7_active", "f7_nonempty",
@@ -183,11 +184,17 @@ def census_file(path):
     if val(file_id, 0) != FILE_TYPE_SPORT:
         return None, []                           # Totals/Device/Locations
 
+    product = val(file_id, 2)
     info = {
         "file": os.path.basename(path),
+        # Model NAME resolved from the product id. Added 2026-09-28 so a
+        # whole folder of backups can be attributed in one command --
+        # `dump` mode reported the product id but only amid everything
+        # else, and `screens` did not report it at all.
+        "model": fit_dump.KNOWN_MODELS.get(product) or "",
         "serial": val(file_id, 3),
         "manufacturer": val(file_id, 1),
-        "product": val(file_id, 2),
+        "product": product,
     }
 
     rows = []
