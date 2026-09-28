@@ -593,12 +593,28 @@ NAMED_SCREEN_TYPES = {
     125: "Power Guide",
     127: "Stamina",
     162: "GroupRide",
-    # 64 is named from its FIELD CONTENTS, not from a device label --
-    # it carries exactly 316 "Lights Connected" and 319 "Light Mode",
-    # and the 840 ships it f1=0 (not Active), so the editor never
-    # displays it and there is no menu string to read. Weaker evidence
-    # than the three above; the name is a description of what it holds.
-    64:  "Lights",
+    # 64 was briefly labelled "Lights" (2026-09-27) because it carries
+    # exactly 316 "Lights Connected" and 319 "Light Mode". WITHDRAWN the
+    # same day: Doug went through the 840's Screens menu and there is no
+    # Lights entry offered at all. The only unaccounted-for named screen
+    # the editor DOES offer is "Music".
+    #
+    # Field contents were the wrong evidence to name a type from, and
+    # this file already documents why -- an inactive screen's f7 array
+    # can be a stamped template rather than its real content (rev 121
+    # SS3: f10=57 and f10=162 carry the same eight ids as each other).
+    # These two ids sit inside f3, not in the trailing residue, so they
+    # are better than junk, but "the template Garmin stamped" is not the
+    # same claim as "what this screen is".
+    #
+    # Competing hypotheses, undecided: 64 is a Lights screen that the
+    # editor hides because no lights are paired (consistent -- the editor
+    # hides ALL f1=0 screens), or 64 is Music and the light fields are
+    # template residue. DECISIVE TEST: add a Music screen in the device's
+    # editor and read its f10. If Music comes back as 64, this was wrong;
+    # if Music takes 30, 128 or 223, one of those gets named instead and
+    # 64 stays open.
+    64:  "Unnamed type 64",
     # The remaining three 840 codes are UNIDENTIFIED but are definitely
     # TYPE codes rather than user-screen indices: a plain user screen's
     # f10 is a per-profile counter starting at 0, so a factory profile
