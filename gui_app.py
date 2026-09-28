@@ -1693,11 +1693,13 @@ class ViewScreensPanel(wx.Panel):
             # order and their f9 can duplicate an active screen's -- see
             # fit_dump.classify_screens() and PROJECT_NOTES Doc rev 123.
             other_lines.append(
-                f"Not active -- your Edge's own editor doesn't list these "
-                f"({len(data['inactive'])}). Usually screens waiting on "
-                f"hardware you haven't paired, e.g. lights or an eBike. "
-                f"Editing one can't be checked on the Edge until it turns "
-                f"itself on:"
+                f"Not in your screen list ({len(data['inactive'])}). These "
+                f"are Garmin screen types this profile is holding in "
+                f"reserve -- your Edge adds one from here when you pick it "
+                f"under Add Screen, so most of these you can turn on from "
+                f"the Edge itself. Any that the Edge doesn't offer are "
+                f"waiting on hardware or a ride condition. Editing one "
+                f"here can't be checked on the Edge until it's added:"
             )
             for idx, m in data["inactive"]:
                 field_count = m.get(3) or 0

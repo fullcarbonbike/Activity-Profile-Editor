@@ -607,13 +607,15 @@ NAMED_SCREEN_TYPES = {
     # are better than junk, but "the template Garmin stamped" is not the
     # same claim as "what this screen is".
     #
-    # Competing hypotheses, undecided: 64 is a Lights screen that the
-    # editor hides because no lights are paired (consistent -- the editor
-    # hides ALL f1=0 screens), or 64 is Music and the light fields are
-    # template residue. DECISIVE TEST: add a Music screen in the device's
-    # editor and read its f10. If Music comes back as 64, this was wrong;
-    # if Music takes 30, 128 or 223, one of those gets named instead and
-    # 64 stays open.
+    # 2026-09-28: the Music hypothesis is DEAD -- Music Control came back
+    # as f10=30, not 64. That leaves the Lights reading as the only one
+    # still standing, and Doug adding EVERY named screen the 840 offers
+    # left 64 and 223 still inactive, consistent with both being gated on
+    # hardware or a runtime condition rather than merely unlisted.
+    # Still NOT renamed: "the only surviving hypothesis" is not evidence,
+    # and the original error was naming a type from a stamped field
+    # template. Naming it needs the editor to actually offer the screen,
+    # which on the 840 means paired lights.
     64:  "Unnamed type 64",
     # The remaining three 840 codes are UNIDENTIFIED but are definitely
     # TYPE codes rather than user-screen indices: a plain user screen's
@@ -625,11 +627,16 @@ NAMED_SCREEN_TYPES = {
     # than missing information, and it makes the last-visible-user-
     # screen guard count them as user screens. An honest placeholder
     # beats a confident mislabel. Same reasoning as 32 "Reserved".
-    # 128 has not yet been seen in a pulled profile; 30 and 223 appear
-    # in the 840's factory Road profile, inactive, holding real fields.
-    30:  "Unnamed type 30",
+    # 128 has not yet been seen in a pulled profile; 223 appears in the
+    # 840's factory Road profile, inactive, holding real fields.
     128: "Unnamed type 128",
     223: "Unnamed type 223",
+    # 30 NAMED 2026-09-28 from the device's own editor: Doug added every
+    # named screen the 840 offers, and the one he recorded as "Music
+    # Control" came back as f10=30 with f3=2 holding Timer and Distance,
+    # exactly matching his written description of it. Same evidence
+    # class as Power Guide/Stamina/GroupRide.
+    30:  "Music Control",
 }
 
 # Screen types whose stored field-slot bytes are real and correctly
@@ -1472,15 +1479,21 @@ def cmd_screens(args):
 
     if inactive:
         print()
-        print("=== NOT ACTIVE -- the device's own editor does NOT list these "
-              "(f1=0, but f9/f10 still present) ===")
-        print("  These are configured and typed but switched off. The 840 ships")
-        print("  hardware-conditional screens this way (Cycling Dynamics, Lights,")
-        print("  STEPS Metrics, eBike Metrics); the 530 ships the same types Active.")
-        print("  Their f9 values can DUPLICATE an active screen's, so the position")
-        print("  column is deliberately blank -- they are not in the scroll order.")
-        print("  Editing one is possible but UNVERIFIABLE on-device until it")
-        print("  activates, so treat any edit here as unconfirmed.")
+        print("=== NOT ACTIVE -- named screen types held in RESERVE "
+              "(f1=0, f9/f10 still present) ===")
+        print("  CONFIRMED 2026-09-28 (Census3): adding a named screen in the")
+        print("  device's own editor REUSES the record sitting here -- f1 flips")
+        print("  0->1 in the SAME slot and no unconfigured slot is consumed. So")
+        print("  this is the profile's pool of available Garmin screen types,")
+        print("  not a pile of dead records. The 530 ships these types Active")
+        print("  instead, which is why the bucket is normally empty there.")
+        print("  Anything left here after the editor's Add Screen list is")
+        print("  exhausted is gated on hardware or a runtime condition.")
+        print("  Their f9 values can DUPLICATE an active screen's, so the")
+        print("  position column is blank -- they are not in the scroll order,")
+        print("  and the device RENUMBERS f9 across the whole profile when one")
+        print("  is added. Editing one is possible but UNVERIFIABLE on-device")
+        print("  until it is added, so treat any edit here as unconfirmed.")
         for idx, m in inactive:
             field_count = m.get(3)
             print(_row(idx, m, field_count))
