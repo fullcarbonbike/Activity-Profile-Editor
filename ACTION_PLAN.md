@@ -200,7 +200,34 @@ to report so a new device can be added.
 
 ---
 
-## Phase 1 -- stop refusing what the device permits
+## Phase 1 PREREQUISITE -- three bench checks   **STATUS: waiting on Doug**
+
+**This is the only thing currently waiting on Doug, and it blocks Phase
+1 part B from being COMPLETE rather than blocking it from starting.**
+
+Three types are count-LOCKED in the table on 530 evidence alone and have
+never been checked on the 840:
+
+- [ ] **[BENCH] Elevation (44)** -- is the count picker greyed out?
+- [ ] **[BENCH] Cycling Dynamics (63)** -- same
+- [ ] **[BENCH] ClimbPro (104)** -- same
+
+Census3 shows all three at two fields, but that is their CURRENT state,
+not whether the count is selectable. Any that offers a range is another
+class-1 defect -- the toolkit would be refusing an edit the device
+permits, exactly like Compass.
+
+Thirty seconds each: open the layout menu and look. The Connect app can
+answer this too, but per the rule above, **confirm on-device anything
+that appears locked** -- which is precisely this case, and precisely
+where the app's one known failure mode lives.
+
+Phase 1 part B can be written without these answers; it just would not
+know whether to add 840 entries for those three types.
+
+---
+
+## Phase 1 -- stop refusing what the device permits   **STATUS: not started, [CODE]**
 
 **This is the safety fix, and it is NOT the per-model tables.** It only
 changes the posture from *"I know the rules"* to *"I know the 530's
@@ -275,7 +302,7 @@ device proves the result renders.
 
 ---
 
-## Phase 2 -- finish v1.5.0
+## Phase 2 -- finish v1.5.0   **STATUS: blocked on Phase 1**
 
 Ordered deliberately: safety, then the feature that depends on Phase 1,
 then the smaller piece, then release mechanics.
@@ -310,7 +337,7 @@ environment: no wx, no Edge attached.
 
 ---
 
-## Phase 3 -- v1.6.0, per-model layout tables
+## Phase 3 -- v1.6.0, per-model layout tables   **STATUS: blocked on Segment 4/A/B/C [BENCH]**
 
 Do NOT start this inside v1.5.0.
 
@@ -340,23 +367,6 @@ currently distinguishes those two designs.
 | Music Control (30) | -- | fixed 2 |
 | GroupRide (162) | -- | 0 fields |
 | Map (25) | 0/A, 0/B, 1, 2 | identical |
-
-### Cheap bench task, worth doing before Phase 1 part B
-
-Three more types are count-LOCKED in the table on 530 evidence and have
-never been checked on the 840:
-
-- [ ] **[BENCH] Elevation (44)** -- is the count picker greyed out?
-- [ ] **[BENCH] Cycling Dynamics (63)** -- same
-- [ ] **[BENCH] ClimbPro (104)** -- same
-
-Census3 shows all three at two fields, but that is their CURRENT state,
-not whether the count is selectable. Any that offers a range is another
-class-1 defect. Thirty seconds each: open the layout menu and look.
-The Connect app can answer this too -- but per the rule above, confirm
-on-device anything that appears locked, which is exactly this case.
-
----
 
 ## Open questions, none blocking
 
