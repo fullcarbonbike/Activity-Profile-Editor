@@ -372,7 +372,17 @@ def read_startup_txt(garmin_root):
     it's a real (harmless, in all evidence so far) behavior change from
     a plain byte-for-byte round-trip.
     """
-    path = os.path.join(garmin_root, STARTUP_TXT_FILENAME)
+    return read_startup_txt_at(os.path.join(garmin_root, STARTUP_TXT_FILENAME))
+
+
+def read_startup_txt_at(path):
+    """
+    Path-based core of read_startup_txt(), added for OFFLINE mode
+    (#145). Same decoding, same BOM strip, same line-ending
+    normalisation -- the device version is now a thin wrapper, so the
+    two paths cannot drift. Offline there is no garmin_root to join
+    against; the user points at a file directly.
+    """
     if not os.path.exists(path):
         return None
     with open(path, "rb") as f:
@@ -504,9 +514,36 @@ def write_startup_txt(garmin_root, content, working_dir):
     back up (e.g. this is the very first time startup.txt is ever set
     by this tool).
     """
-    path = os.path.join(garmin_root, STARTUP_TXT_FILENAME)
+    return write_startup_txt_at(
+        os.path.join(garmin_root, STARTUP_TXT_FILENAME), content, working_dir)
+
+
+def write_startup_txt_at(path, content, working_dir=None):
+    """
+    Path-based core of write_startup_txt(), added for OFFLINE mode
+    (#145). The device version is a thin wrapper so the smart-character
+    normalisation and the ASCII encode cannot drift apart between the
+    two paths -- that normalisation exists because of a real reported
+    bug (v0.12.3) and must apply wherever the file is written, not just
+    on the device.
+
+    working_dir is OPTIONAL here. On the device an existing startup.txt
+    is the user's only copy and is always backed up first; offline the
+    destination is usually a new file the user just chose, and the
+    original stays wherever it came from. Pass one to get the same
+    backup-before-overwrite behaviour.
+    """
+    # Create the destination folder, matching export_profile(). Found
+    # by the #145 headless test: without it a save into a folder the
+    # user creates in the dialog raises FileNotFoundError, which is a
+    # baffling failure for what is plainly a save operation. The device
+    # path never hit this because garmin_root always exists.
+    dest_dir = os.path.dirname(path)
+    if dest_dir:
+        os.makedirs(dest_dir, exist_ok=True)
+
     backup_path = None
-    if os.path.exists(path):
+    if working_dir and os.path.exists(path):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_dir = os.path.join(working_dir, "backups", timestamp)
         os.makedirs(backup_dir, exist_ok=True)

@@ -750,11 +750,10 @@ class DetectPanel(wx.Panel):
             self.frame.update_title()
 
         self.next_btn.Enable()
-        # #142: startup.txt lives on the device, so offline there is
-        # nothing to read. #145 adds a file-based import/export path;
-        # until then this is honestly unavailable rather than silently
-        # showing a device's leftover message.
-        self.startup_txt_btn.Enable(not self.frame.offline_mode)
+        # Enabled in BOTH modes as of #145: offline it reads a
+        # startup.txt from the working folder and exports an edited one
+        # back, the same shape as profile Export.
+        self.startup_txt_btn.Enable()
         self.frame.SetStatusText("Connected.")
         self.frame._relayout()
 
@@ -5754,38 +5753,148 @@ class StartupTxtPanel(wx.Panel):
 
         self.SetSizer(outer)
 
+    def _save_offline(self):
+        """
+        Offline save (#145) -- the startup.txt counterpart to profile
+        Export, and deliberately the same shape: pick a destination,
+        write, say what happens next.
+
+        THE FILENAME MATTERS HERE TOO, for a different reason than
+        profiles. The device reads exactly `startup.txt` from the top
+        level of the Garmin folder -- not inside Sports/, which is the
+        easy mistake -- so the dialog pre-fills the right name and the
+        success message says where it goes.
+
+        No working_dir is passed to write_startup_txt_at(), so no backup
+        is taken: the destination is a file the user just chose, and the
+        original stays wherever it was read from. That differs from the
+        device path, where the existing startup.txt is the user's only
+        copy and is always backed up first.
+        """
+        content = garmin_device.build_startup_txt(
+            self.header, self.display_spin.GetValue(),
+            self.message_text.GetValue())
+
+        start_dir = (self.frame.last_export_dir
+                     or self.frame.offline_dir
+                     or os.path.expanduser("~"))
+        with wx.FileDialog(
+                self, "Export startup.txt as",
+                defaultDir=start_dir,
+                defaultFile=garmin_device.STARTUP_TXT_FILENAME,
+                wildcard="Text file (*.txt)|*.txt",
+                style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as dlg:
+            if dlg.ShowModal() == wx.ID_CANCEL:
+                return
+            dest = dlg.GetPath()
+
+        try:
+            garmin_device.write_startup_txt_at(dest, content)
+        except OSError as e:
+            wx.MessageBox(f"Couldn't write that file: {e}",
+                          "Save failed", wx.OK | wx.ICON_ERROR)
+            return
+
+        self.frame.last_export_dir = os.path.dirname(dest)
+        self._baseline_message = self.message_text.GetValue()
+        self._baseline_display = self.display_spin.GetValue()
+        wx.MessageBox(
+            f"Saved to:\n{dest}\n\n"
+            f"To use it, copy this onto the Edge as "
+            f"{garmin_device.STARTUP_TXT_FILENAME} at the TOP LEVEL of the "
+            f"Garmin folder -- beside Sports and NewFiles, not inside them. "
+            f"Then let the device power cycle once for the message to "
+            f"change.",
+            "Saved", wx.OK | wx.ICON_INFORMATION)
+
+    def _reset_to_empty(self):
+        """
+        Every "nothing to edit" path lands here: no device, no file on
+        the device, no file in the offline folder.
+
+        Extracted 2026-09-29 (#145) because the block was already
+        duplicated VERBATIM twice and this feature would have made
+        three. It carries the v0.23.2 fix -- `_baseline_message = ""`
+        keeps _is_dirty() in step -- and a third hand-copied instance is
+        exactly how that fix comes undone on one path and not the
+        others. The caller sets the status text; this resets state only.
+        """
+        self.header = ""
+        self.original_display = None
+        self.original_message = ""
+        self._baseline_display = 3
+        self.display_spin.SetValue(3)
+        self.message_text.SetValue("")
+        self._baseline_message = ""
+        self.message_text.Disable()
+        self.display_spin.Disable()
+        self.save_btn.Disable()
+        self.eject_auto_btn.Disable()
+        self.eject_manual_btn.Disable()
+        self.done_btn.Disable()
+        self.warning_text.SetLabel("")
+        self.frame._relayout()
+
+    def _load_from_content(self, content):
+        """
+        Offline load (#145). Reuses the DEVICE path's baseline
+        discipline rather than re-deriving it: baseline against what the
+        CONTROLS hold after loading, never against what the file said,
+        because wx.TextCtrl round-tripping has bitten this project three
+        times (v0.12.1 CRLF, v0.12.3 smart quotes, v0.23.2 the trailing
+        newline).
+        """
+        self.header, self.original_display, self.original_message = \
+            garmin_device.parse_startup_txt(content)
+        self._baseline_display = (self.original_display
+                                  if self.original_display is not None else 3)
+        self.display_spin.SetValue(self._baseline_display)
+        self._baseline_display = self.display_spin.GetValue()
+        self.message_text.SetValue(self.original_message)
+        self._baseline_message = self.message_text.GetValue()
+        self.message_text.Enable()
+        self.display_spin.Enable()
+        self.save_btn.Enable()
+        # Offline there is no device to eject or wait for.
+        self.eject_auto_btn.Disable()
+        self.eject_manual_btn.Disable()
+        self.done_btn.Enable()
+        self._update_warning()
+
     def on_show(self):
         """Called by MainFrame every time this panel becomes active -- always re-reads fresh from the device."""
         self.stage = "ready"
         self.backup_path = None
         root = self.frame.garmin_root
 
+        if self.frame.offline_mode:
+            # #145. Offline the file is whatever sits in the working
+            # folder. A MISSING one is an ordinary state, not an error:
+            # startup.txt is optional on the device too, and an 840
+            # owner may simply never have pulled it.
+            self.source_path = os.path.join(
+                self.frame.offline_dir or "", garmin_device.STARTUP_TXT_FILENAME)
+            content = garmin_device.read_startup_txt_at(self.source_path)
+            if content is None:
+                self.status_text.SetLabel(_wrap_status_paragraphs(
+                    "No startup.txt in this folder. If your Edge has a boot "
+                    "message you want to edit, copy startup.txt off the "
+                    "device into this folder first -- it sits at the top "
+                    "level of the Garmin folder, not inside Sports."))
+                self._reset_to_empty()
+                return
+            self._load_from_content(content)
+            self.status_text.SetLabel(_wrap_status_paragraphs(
+                "Editing the startup.txt in this folder. Saving writes a "
+                "copy you then move onto the Edge yourself."))
+            self.frame._relayout()
+            return
+
         if root is None:
-            # Mode-aware (#142): offline this is not a failed detection,
-            # it is a deliberate state, and telling the user to "detect a
-            # Garmin first" would be misleading advice.
             self.status_text.SetLabel(
-                "You're working from a folder, so there's no device to read "
-                "this from. Editing a saved startup.txt is coming; for now, "
-                "switch to a connected device to use this."
-                if self.frame.offline_mode else
                 "No device detected -- go back and connect/detect a Garmin first."
             )
-            self.header = ""
-            self.original_display = None
-            self.original_message = ""
-            self._baseline_display = 3
-            self.display_spin.SetValue(3)
-            self.message_text.SetValue("")
-            self._baseline_message = ""  # v0.23.2: keep every reset path in step with _is_dirty()
-            self.message_text.Disable()
-            self.display_spin.Disable()
-            self.save_btn.Disable()
-            self.eject_auto_btn.Disable()
-            self.eject_manual_btn.Disable()
-            self.done_btn.Disable()
-            self.warning_text.SetLabel("")
-            self.frame._relayout()
+            self._reset_to_empty()
             return
 
         content = garmin_device.read_startup_txt(root)
@@ -5795,21 +5904,7 @@ class StartupTxtPanel(wx.Panel):
                 f"nothing to show or edit. (Not every device or firmware "
                 f"version has one.)"
             )
-            self.header = ""
-            self.original_display = None
-            self.original_message = ""
-            self._baseline_display = 3
-            self.display_spin.SetValue(3)
-            self.message_text.SetValue("")
-            self._baseline_message = ""  # v0.23.2: keep every reset path in step with _is_dirty()
-            self.message_text.Disable()
-            self.display_spin.Disable()
-            self.save_btn.Disable()
-            self.eject_auto_btn.Disable()
-            self.eject_manual_btn.Disable()
-            self.done_btn.Disable()
-            self.warning_text.SetLabel("")
-            self.frame._relayout()
+            self._reset_to_empty()
             return
 
         self.header, self.original_display, self.original_message = garmin_device.parse_startup_txt(content)
@@ -5960,8 +6055,8 @@ class StartupTxtPanel(wx.Panel):
         event.Skip()
 
     def on_save(self, event):
-        if not self.frame.assert_mode(False, "Saving startup.txt to the device"):
-            return
+        if self.frame.offline_mode:
+            return self._save_offline()
         root = self.frame.garmin_root
         if root is None:
             wx.MessageBox(
