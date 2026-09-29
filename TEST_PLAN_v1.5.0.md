@@ -148,3 +148,32 @@ Independent of this release; needs no GUI.
 - [ ] Try one of those two in a **half-width** slot — a 3-field stacked
       layout is all full-width, so whether they degrade like the
       Graph/Bars fields is still unknown
+
+---
+
+## F. Export and mode isolation (#141/#142) -- 2026-09-29
+
+**Do F6 first if you only do one thing.** The Deploy button was rebound
+to a dispatcher serving BOTH modes, so device-mode Deploy is a real
+regression risk, on the path used most.
+
+The rest exists because Export's button-to-handler wiring is the one
+part that cannot be checked headlessly -- the same gap that let the
+per-model feature ship inert on 2026-09-28.
+
+| # | Step | Expect | Result |
+|---|---|---|---|
+| F1 | Offline mode, open a profile, edit any screen | Bottom-right button reads **"Export Profile..."** and is ENABLED | |
+| F2 | Before editing anything | Same button is DISABLED (nothing to export yet) | |
+| F3 | Click Export | Save dialog pre-filled with the CLEAN filename -- `CyclingRoadCensus3.fit`, **not** `..._staged_...fit.editing.fit` | |
+| F4 | Save it | Success dialog says the copy was read back and matches byte for byte; file exists at that path with that name | |
+| F5 | Export again, rename it in the dialog | Warning that the Edge matches by filename and will silently ignore a mismatch; offers to use the right name; **warns, doesn't refuse** | |
+| F6 | **REGRESSION: device mode, 530 connected, edit a screen** | Button reads **"Review && Deploy..."** and still reaches Pre-Flight exactly as before. Backing out is fine -- no need to actually deploy | |
+| F7 | Offline mode, Detect panel | **"Startup Message..."** is greyed out | |
+| F8 | Device mode, Detect panel | "Startup Message..." is enabled again | |
+
+**If F6 fails, stop and report** -- that one breaks existing behaviour
+rather than a new feature.
+
+**Not worth testing yet:** `startup.txt` offline (#145) is unbuilt, so
+F7's greyed button is correct rather than a defect.
