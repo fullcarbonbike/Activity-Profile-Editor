@@ -750,7 +750,11 @@ class DetectPanel(wx.Panel):
             self.frame.update_title()
 
         self.next_btn.Enable()
-        self.startup_txt_btn.Enable()
+        # #142: startup.txt lives on the device, so offline there is
+        # nothing to read. #145 adds a file-based import/export path;
+        # until then this is honestly unavailable rather than silently
+        # showing a device's leftover message.
+        self.startup_txt_btn.Enable(not self.frame.offline_mode)
         self.frame.SetStatusText("Connected.")
         self.frame._relayout()
 
@@ -1510,7 +1514,7 @@ class ViewScreensPanel(wx.Panel):
         # independent of whatever row happens to be selected.
         self.review_btn = wx.Button(self, label="Review && Deploy...")
         self.review_btn.Disable()
-        self.review_btn.Bind(wx.EVT_BUTTON, self.on_review)
+        self.review_btn.Bind(wx.EVT_BUTTON, self.on_review_or_export)
         button_row1.Add(self.review_btn, 0)
 
         # Screen-level reordering (v0.7.0) -- select + Move Up/Down,
@@ -1585,7 +1589,30 @@ class ViewScreensPanel(wx.Panel):
     def on_refresh(self, event):
         # Independent of working_path/decode success below -- this only
         # cares whether anything has been accumulated to review yet.
-        self.review_btn.Enable(self.frame.editing_path is not None)
+        # #142: offline there is nothing to deploy TO. Disabled rather
+        # than left clickable-then-refused -- a dialog after the fact is
+        # precisely what was reported as wrong in v0.21.2. The guard in
+        # on_deploy() stays as a backstop.
+        #
+        # Export (#141) will take this button's place offline. Until it
+        # lands, the label says what the user must do instead, because
+        # the edits ARE saved and reachable -- silence here would read as
+        # "your work is stuck".
+        has_edits = self.frame.editing_path is not None
+        if self.frame.offline_mode:
+            # #141: offline, Deploy becomes EXPORT. Same position, same
+            # role in the flow -- "I'm finished, get this out of here" --
+            # but the destination is a folder the user picks instead of a
+            # mounted device.
+            self.review_btn.Enable(has_edits)
+            self.review_btn.SetLabel("Export Profile...")
+            self.review_btn.SetToolTip(
+                "Save the edited profile to a folder, named exactly as the "
+                "device expects, ready to copy into Garmin/NewFiles/.")
+        else:
+            self.review_btn.Enable(has_edits)
+            self.review_btn.SetLabel("Review && Deploy...")
+            self.review_btn.SetToolTip(None)
 
         working_path = self.frame.get_working_path()
         if working_path is None:
@@ -1899,6 +1926,90 @@ class ViewScreensPanel(wx.Panel):
 
     def on_add_screen(self, event):
         self.frame.show_panel("add_screen")
+
+    def on_review_or_export(self, event):
+        """
+        One button, two destinations. Device mode reviews and deploys;
+        offline mode exports to a folder. Dispatched here rather than by
+        rebinding, so there is exactly one place that decides.
+        """
+        if self.frame.offline_mode:
+            return self.on_export(event)
+        return self.on_review(event)
+
+    def on_export(self, event):
+        """
+        OFFLINE counterpart to Deploy (#141): write the edited profile
+        somewhere the user chooses, verified, ready to move onto the
+        device by hand.
+
+        THE FILENAME IS THE POINT. The device matches profiles by
+        filename on import and silently ignores anything that does not
+        match -- no error, no indication, the profile simply does not
+        change. So the save dialog is pre-filled with the ORIGINAL
+        profile filename, not the staging name, which carries a
+        `_staged_<timestamp>` infix and a `.editing.fit` suffix and
+        would be accepted-then-ignored by the Edge. Doug hit exactly
+        this doing it by hand and had to rename the file himself.
+        """
+        if not self.frame.assert_mode(True, "Export"):
+            return
+
+        source = self.frame.get_working_path()
+        if source is None:
+            wx.MessageBox("Nothing to export yet -- edit a screen first.",
+                          "Nothing to export", wx.OK | wx.ICON_INFORMATION)
+            return
+
+        suggested = self.frame.profile_filename or "profile.fit"
+        start_dir = (self.frame.last_export_dir
+                     or self.frame.offline_dir
+                     or os.path.expanduser("~"))
+
+        with wx.FileDialog(
+                self, "Export profile as",
+                defaultDir=start_dir, defaultFile=suggested,
+                wildcard="Garmin profile (*.fit)|*.fit",
+                style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as dlg:
+            if dlg.ShowModal() == wx.ID_CANCEL:
+                return
+            dest = dlg.GetPath()
+
+        # Guard the one mistake that fails SILENTLY on the device.
+        # Warn rather than refuse: the user may be exporting for some
+        # other purpose (a spare copy, an attachment), and renaming is
+        # something they can do afterwards.
+        if os.path.basename(dest) != suggested:
+            answer = wx.MessageBox(
+                f"You're saving this as \"{os.path.basename(dest)}\", but the "
+                f"Edge matches profiles by filename when it imports them. "
+                f"Under any other name it will accept the file and quietly "
+                f"ignore it -- no error, and the profile won't change.\n\n"
+                f"Save as \"{suggested}\" instead?",
+                "Filename won't match on the device",
+                wx.YES_NO | wx.CANCEL | wx.ICON_WARNING)
+            if answer == wx.CANCEL:
+                return
+            if answer == wx.YES:
+                dest = os.path.join(os.path.dirname(dest), suggested)
+
+        try:
+            garmin_device.export_profile(source, dest)
+        except (garmin_device.GarminDeviceError, OSError) as e:
+            wx.MessageBox(
+                f"Export failed: {e}\n\nNothing was left behind that you "
+                f"could mistake for a good copy.",
+                "Export failed", wx.OK | wx.ICON_ERROR)
+            return
+
+        self.frame.last_export_dir = os.path.dirname(dest)
+        wx.MessageBox(
+            f"Exported to:\n{dest}\n\n"
+            f"Verified: the copy was read back and matches byte for byte.\n\n"
+            f"To put it on the Edge, copy it into the device's "
+            f"Garmin/NewFiles/ folder, then disconnect and restart the "
+            f"device. Keep the filename exactly as it is.",
+            "Exported", wx.OK | wx.ICON_INFORMATION)
 
     def on_review(self, event):
         self.frame.show_panel("review")
@@ -4124,6 +4235,14 @@ class PreflightPanel(wx.Panel):
         self.frame.show_panel("screens")
 
     def on_deploy(self, event):
+        # #142 backstop. Offline there is no device to deploy TO, and
+        # the path below reaches for garmin_root several calls deep.
+        # The button is also disabled offline (see refresh_buttons), so
+        # reaching here means something bypassed that -- which is
+        # exactly when a guard earns its keep.
+        if not self.frame.assert_mode(False, "Deploying to the device"):
+            return
+
         self.frame.deploy_return_panel = "review"
         self.frame.show_panel("deploy")
 
@@ -4356,6 +4475,8 @@ class DeployPanel(wx.Panel):
         self.frame._relayout()
 
     def on_write(self, event):
+        if not self.frame.assert_mode(False, "Writing to the device"):
+            return
         root = self.frame.garmin_root
         if root is None:
             wx.MessageBox(
@@ -5598,7 +5719,14 @@ class StartupTxtPanel(wx.Panel):
         root = self.frame.garmin_root
 
         if root is None:
+            # Mode-aware (#142): offline this is not a failed detection,
+            # it is a deliberate state, and telling the user to "detect a
+            # Garmin first" would be misleading advice.
             self.status_text.SetLabel(
+                "You're working from a folder, so there's no device to read "
+                "this from. Editing a saved startup.txt is coming; for now, "
+                "switch to a connected device to use this."
+                if self.frame.offline_mode else
                 "No device detected -- go back and connect/detect a Garmin first."
             )
             self.header = ""
@@ -5790,6 +5918,8 @@ class StartupTxtPanel(wx.Panel):
         event.Skip()
 
     def on_save(self, event):
+        if not self.frame.assert_mode(False, "Saving startup.txt to the device"):
+            return
         root = self.frame.garmin_root
         if root is None:
             wx.MessageBox(
