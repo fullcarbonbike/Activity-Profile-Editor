@@ -574,6 +574,14 @@ GRAPH_OR_BARS_FIELD_IDS = {
 # menu entry for the feature.
 NAMED_SCREEN_TYPES = {
     25:  "Map",
+    # 26 Virtual Partner is 530-ONLY so far. Confirmed twice on
+    # 2026-09-29: Doug found no Virtual Partner entry in the 840's
+    # Screens menu, and 26 appears in no 840 profile this project has
+    # read while appearing in the 530's. Kept in this global table and
+    # in NO_FIELD_EDIT_BY_MODEL[4062] deliberately -- a 530 profile
+    # CAN be deployed to an 840 (done with FLDTEST), so an 840 session
+    # may still encounter the record even though the device does not
+    # offer the screen.
     26:  "Virtual Partner",
     32:  "Reserved",         # always-present Conditional-only runtime record of unclear purpose -- NOT confirmed GroupTrack-specific, see comment above (renamed from "GroupTrack" 2026-08-15)
     35:  "Compass",
@@ -627,8 +635,12 @@ NAMED_SCREEN_TYPES = {
     # than missing information, and it makes the last-visible-user-
     # screen guard count them as user screens. An honest placeholder
     # beats a confident mislabel. Same reasoning as 32 "Reserved".
-    # 128 has not yet been seen in a pulled profile; 223 appears in the
-    # 840's factory Road profile, inactive, holding real fields.
+    # Both appear in 840 profiles, inactive, holding real fields: 223 in
+    # the factory Road profile, and 128 -- recorded as "not yet seen" in
+    # Doc rev 123 and CORRECTED 2026-09-29 -- in the factory INDOOR
+    # profile at slot 14 (f3=2, Speed + Distance). It was absent from the
+    # Road profiles the census had been reading, which is why it looked
+    # unseen. A type can be per-SPORT as well as per-model.
     128: "Unnamed type 128",
     223: "Unnamed type 223",
     # 30 NAMED 2026-09-28 from the device's own editor: Doug added every
