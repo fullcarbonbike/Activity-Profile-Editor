@@ -4527,6 +4527,13 @@ class DeployPanel(wx.Panel):
         self._refresh()
 
     def on_check(self, event):
+        # Found by the #142 static audit, not by reading the code: this
+        # is the post-deploy reconnect check, only reachable from a
+        # device-mode deploy, so it "cannot" be hit offline. Guarded
+        # anyway -- every other unreachable-by-design path in this file
+        # that turned out to be reachable was also unreachable by design.
+        if not self.frame.assert_mode(False, "Checking for the device"):
+            return
         root = garmin_device.find_garmin_root()
         if root is None:
             wx.MessageBox(
