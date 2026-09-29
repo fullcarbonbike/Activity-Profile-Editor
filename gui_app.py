@@ -1312,7 +1312,6 @@ class ProfileListPanel(wx.Panel):
         self.frame.discard_edits()
 
         self.staged_path = staged_path
-        self.profile_product, self.profile_model_name = profile_model(staged_path)
         self.frame.staged_path = staged_path
         self.frame.profile_filename = profile_filename
 
@@ -1690,13 +1689,8 @@ class ViewScreensPanel(wx.Panel):
         if (model_layout_entry(self.frame.profile_product) is None
                 and not model_is_surveyed(self.frame.profile_product)):
             other_lines.append(
-                textwrap.fill(
-                    "This toolkit hasn't measured this Edge's layout rules, so "
-                    "it won't block a field count or layout it doesn't "
-                    "recognise -- it'll let the change through and say so. "
-                    "Anything it does warn about here was measured on an "
-                    "Edge 530 and may not apply to yours.",
-                    GRAPH_WARNING_WRAP_WIDTH))
+                "Layout rules for this Edge aren't known here, so "
+                "unrecognised field counts are allowed, not blocked.")
 
         if data["conditional"]:
             other_lines.append(
@@ -1719,21 +1713,19 @@ class ViewScreensPanel(wx.Panel):
             # the main list because they are NOT in the device's scroll
             # order and their f9 can duplicate an active screen's -- see
             # fit_dump.classify_screens() and PROJECT_NOTES Doc rev 123.
+            # Types only, not a per-slot field dump. On an 840 factory
+            # profile this bucket holds seven screens, and listing each
+            # one's fields pushed the screens list down to six visible
+            # rows -- reported 2026-09-28. The detail belongs in
+            # `fit_dump.py screens`, which has room for it.
+            _held = ", ".join(sorted(screen_type_name(m.get(10)) or "?"
+                                     for _idx, m in data["inactive"]))
             other_lines.append(
-                f"Not in your screen list ({len(data['inactive'])}). These "
-                f"are Garmin screen types this profile is holding in "
-                f"reserve -- your Edge adds one from here when you pick it "
-                f"under Add Screen, so most of these you can turn on from "
-                f"the Edge itself. Any that the Edge doesn't offer are "
-                f"waiting on hardware or a ride condition. Editing one "
-                f"here can't be checked on the Edge until it's added:"
-            )
-            for idx, m in data["inactive"]:
-                field_count = m.get(3) or 0
-                names = ", ".join(field_name(fid, terse=True)
-                                  for fid in active_field_ids(m, field_count))
-                type_name = screen_type_name(m.get(10)) or "?"
-                other_lines.append(f"    slot {idx} ({type_name}): {names}")
+                f"Held in reserve, not in your screen list "
+                f"({len(data['inactive'])}): {_held}")
+            other_lines.append(
+                "Your Edge adds one of these when you pick it under "
+                "Add Screen. Run fit_dump.py screens for the detail.")
         if data["removed"]:
             other_lines.append(
                 f"Removed screens (content preserved, not shown on-device): "
@@ -1747,7 +1739,23 @@ class ViewScreensPanel(wx.Panel):
             other_lines.append(
                 f"Unknown field IDs on this file: {sorted(data['unknown_ids_seen'])}"
             )
-        self.other_text.SetLabel("\n".join(other_lines))
+        # WRAP HERE, not at each append. other_text is a plain
+        # wx.StaticText with no wrapping and no scrollbar, so ONE long
+        # line stretches the whole window -- this codebase's most
+        # recurrent bug (v0.16.2, v0.16.3, v0.16.16, v0.19.18, the backup
+        # dialog, and again on 2026-09-28 when a ~300-char line was added
+        # four lines below a comment warning about exactly this).
+        # Wrapping at the point of DISPLAY means a new line cannot
+        # reintroduce it by being written unwrapped; relying on every
+        # author remembering has now failed seven times.
+        _wrapped = []
+        for _line in other_lines:
+            indent = " " * (len(_line) - len(_line.lstrip()))
+            for _part in _line.splitlines() or [""]:
+                _wrapped.append(textwrap.fill(
+                    _part, GRAPH_WARNING_WRAP_WIDTH,
+                    subsequent_indent=indent + "  ") if _part else "")
+        self.other_text.SetLabel("\n".join(_wrapped))
 
         self.frame._relayout()
 
@@ -5851,15 +5859,14 @@ class MainFrame(wx.Frame):
         self.working_dir = load_saved_working_dir() or DEFAULT_WORKING_DIR
         self.staged_path = None
         self.profile_filename = None
-        # Which Edge MODEL wrote the profile being edited, from
-        # file_id.product (ACTION_PLAN Phase 1A). Every layout rule in
-        # fit_dump.py was measured on a 530, and applying them to an 840
-        # already produced a real defect -- Compass hard-locked at 2
-        # fields when the 840 offers 0, 1 or 2 (Doc rev 123 SS7). Held on
-        # the frame rather than re-read per panel so the whole edit
-        # session agrees about which device it is working for.
-        self.profile_product = None
-        self.profile_model_name = None
+        # Model identity is a derived PROPERTY, not an assigned
+        # attribute -- see profile_product below. The first cut assigned
+        # it alongside staged_path and set it on the wrong object
+        # (ProfileListPanel instead of the frame), so every consumer read
+        # None and the whole per-model feature was silently inert while
+        # the CLI tests passed. A property cannot be forgotten by a new
+        # staging path.
+        self._model_cache = (None, None, None)   # (path, product, name)
         self.editing_path = None   # scratch working copy -- IS the pending-edit queue, see module docstring
         self.editing_slot = None   # message_index of whatever screen EditScreenPanel is currently open on
         self.deploy_return_panel = "review"  # where DeployPanel's "Back" goes -- "review" (normal edit flow), "restore" (arrived via Restore-from-Backup), or "clone" (arrived via Clone) -- the latter two skip PreflightPanel entirely
@@ -6023,6 +6030,35 @@ class MainFrame(wx.Frame):
         editing_path IS the pending-edit queue.
         """
         return self.editing_path if self.editing_path is not None else self.staged_path
+
+    @property
+    def profile_product(self):
+        """
+        `file_id.product` of the profile currently being edited, or None.
+
+        DERIVED from whichever working file exists, deliberately, rather
+        than assigned when a profile is staged. The assigned version was
+        set on the wrong object and read None everywhere -- and because
+        None means "enforce the 530's rules" (the safe default), the
+        failure was invisible: the app simply behaved as it had before.
+        A property has no call site to miss.
+
+        Cached on the path so a repaint doesn't re-decode the file.
+        """
+        path = self.editing_path or self.staged_path
+        if path is None:
+            return None
+        cached_path, product, _name = self._model_cache
+        if cached_path != path:
+            product, name = profile_model(path)
+            self._model_cache = (path, product, name)
+        return self._model_cache[1]
+
+    @property
+    def profile_model_name(self):
+        """Model NAME for display; see profile_product."""
+        _ = self.profile_product          # populates the cache
+        return self._model_cache[2]
 
     def discard_edits(self):
         """Drop the scratch working copy -- back to the pristine staged file."""
