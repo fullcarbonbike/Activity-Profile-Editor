@@ -5896,10 +5896,8 @@ class StartupTxtPanel(wx.Panel):
         self.message_text.Enable()
         self.display_spin.Enable()
         self.save_btn.Enable()
-        # Offline there is no device to eject or wait for.
-        self.eject_auto_btn.Disable()
-        self.eject_manual_btn.Disable()
-        self.done_btn.Enable()
+        # The eject/Done trio is HIDDEN offline by on_show(), so there is
+        # nothing to enable or disable here.
         self._update_warning()
 
     def on_show(self):
@@ -5921,9 +5919,16 @@ class StartupTxtPanel(wx.Panel):
             # device -> offline -> empty folder shows "Save to Device"
             # on a panel with no device anywhere near it.
             self.save_btn.SetLabel("Export startup.txt...")
-            self.done_btn.SetLabel("Done -- Back to Profiles"
-                                   if self.frame.startup_return_to == "profiles"
-                                   else "Done -- Back to Detect")
+            # HIDDEN, not disabled. Doug, 2026-09-29: "there's nothing to
+            # eject in Offline mode, so those could go away", and Done is
+            # redundant once Back goes to the right place -- Back returns
+            # to the profile list, and Detect is one more Back from
+            # there. A greyed button still asks the user to work out why
+            # it is greyed; an absent one asks nothing.
+            for btn in (self.eject_auto_btn, self.eject_manual_btn,
+                        self.done_btn):
+                btn.Hide()
+            self.Layout()   # reflow, or the hidden buttons leave a gap
 
             content = garmin_device.read_startup_txt_at(self.source_path)
             if content is None:
@@ -5953,6 +5958,9 @@ class StartupTxtPanel(wx.Panel):
         # otherwise persist into a device session and read as a lie.
         self.save_btn.SetLabel("Save to Device")
         self.done_btn.SetLabel("Done -- Back to Detect")
+        for btn in (self.eject_auto_btn, self.eject_manual_btn, self.done_btn):
+            btn.Show()
+        self.Layout()
 
         content = garmin_device.read_startup_txt(root)
         if content is None:
@@ -6182,7 +6190,12 @@ class StartupTxtPanel(wx.Panel):
         )
 
     def on_done(self, event):
-        self.frame.show_panel("detect")
+        # Honour the same return point Back does. Relabelling this
+        # button without rewiring it (2026-09-29) made it say "Back to
+        # Profiles" and go to Detect -- a label that lies is worse than
+        # the wording it replaced. Offline the button is hidden anyway
+        # (see on_show), so this is the device path plus a backstop.
+        self.frame.show_panel(self.frame.startup_return_to)
 
     def on_back(self, event):
         reason = self._dirty_reason() if self.stage == "ready" else None
