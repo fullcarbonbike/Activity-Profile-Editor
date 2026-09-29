@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-09-28, at Doc rev 123.*
+> *Last updated 2026-09-29, at Doc rev 124.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens. `fit_dump.py` 2.8.0, `fit_patch.py` 1.17.0, `gui_app.py`
@@ -175,7 +175,26 @@ Decide the nudge-vs-warning wording from a real cross-MODEL test — and
 note that a cross-model deploy has now been done successfully
 (FLDTEST, a 530 profile, onto the 840), so that test is partly answered.
 
-### NEXT UP — the 840 census, ahead of the remaining GUI work
+### Where the build stands (2026-09-29)
+
+**ACTION_PLAN.md is the live worklist**; this block is the summary.
+
+- **Phase 0 (model identity) — DONE.** `file_id.product` distinguishes
+  530 (3121) from 840 (4062), works offline and on backups.
+- **Phase 1A (enforce only on the measured model) — DONE.**
+- **Phase 1B (first measured 840 table) — DONE.** Compass 0/1/2, eBike
+  and STEPS 1-8, user screens A/B/C at 3-9, Power Guide / Music Control
+  / GroupRide geometry, Workout field-editable on the 840.
+- **Phase 1 [GUI TEST] — PASSED on hardware 2026-09-28** (rev 124 SS1):
+  Compass edited through the GUI, deployed via `NewFiles/`, rendered,
+  pulled back and diffed.
+- **Phase 2 (#142, #141, #145, #143) — NEXT, all [CODE].**
+- **Phase 3 (v1.6.0 per-model tables) — blocked on Segment 4/A/B/C.**
+
+**Still the only thing waiting on Doug:** Segment's 4/A, 4/B and 4/C
+`f8` values on the 840 (rev 122 SS2).
+
+### The 840 census — substantially DONE, one item left
 
 **Sequencing decided 2026-09-27 (Doug), reasoning in Doc rev 120 §5:**
 the census comes BEFORE #141/#142, because building Export's validation
@@ -328,6 +347,168 @@ profiles by filename and will otherwise overwrite an existing one.
   that established it go in the code comment beside it (Doc rev 119).
 
 ---
+
+*Doc rev 124 — refreshed 2026-09-29.* **First toolkit-authored write to
+an Edge 840 profile, confirmed on hardware and read back: the write is
+SURGICAL (one record, two fields, nothing else) and the 840-only mesg-14
+field 14 survives a NewFiles round trip -- closing an assumption every
+future 840 write rested on. The DEVICE, separately, erases some
+switched-off records on import. Also: ACTION_PLAN Phases 0 and 1 built,
+and the per-model feature shipped INERT in the GUI for a day because it
+was assigned to the wrong object.**
+
+### 1. The round trip, split three ways
+
+Doug edited an 840 Compass screen in the GUI (Heading + Compass fields),
+renamed the staged copy, moved it via OpenMTP into `NewFiles/`,
+restarted, confirmed it rendered, and pulled the profile back. With the
+intermediate file kept, the diff separates cleanly:
+
+| Comparison | Records changed |
+|---|---|
+| original -> toolkit-written | **slot 4 only**, fields `f3` and `f7` |
+| toolkit-written -> device-returned | slots 7 and 14 |
+
+**The toolkit touched exactly the record it was asked to, and exactly
+the two fields.** No collateral edits. That is the property `export_profile()`
+and #141 depend on, and it is now measured rather than assumed.
+
+**`mesg 14` field 14 SURVIVED** -- present on all 31 records before and
+after. The 840 checklist had this as *"currently reasoning, not
+evidence, and every future 840 write depends on it."* Evidence now.
+
+**`file_id` came back byte-identical, including `number`.** Doc rev 117
+found the 530 rewrites that field on import. Not a contradiction: the
+import replaced the same profile, so the device reassigned the same
+index. Worth knowing before a future feature treats a changed `number`
+as a failure.
+
+### 2. ⚠ The device ERASES some switched-off records on import
+
+Slots 7 and 14 came back as all-`0xFF` -- wiped to never-configured.
+
+- **Slot 14** was the user-Removed screen. **Expected**: the Screen
+  State Model already records that Removed content survives only until
+  the next NewFiles-mediated deploy.
+- **Slot 7** was `f10=64` (the Lights candidate), `f1=0` with `f9`/`f10`
+  still present -- a RESERVE-POOL record in rev 123 SS5's sense. **Not
+  previously known to be at risk.**
+- **Slot 19** (`f10=223`) is also `f1=0` with `f9`/`f10` present and
+  **SURVIVED** the same import.
+
+So it is not "every `f1=0` record is purged". Something distinguishes 64
+from 223 and this rev does not know what. Plausible: the device rebuilds
+the reserve pool from what the hardware currently supports, and no
+lights are paired. Untested, and recorded as a question rather than an
+answer.
+
+**Consequence for #141 Export:** a NewFiles import can silently drop
+reserve records. Export's verification must not read that as corruption,
+and the user should be told it can happen. Census3 no longer carries
+`f10=64` at all; **Census1 is now the only live instance** of it.
+
+### 3. `529` = Compass confirmed by EXPERIMENT, not position
+
+Rev 122 SS3 inferred 529 = Compass and 12 = Heading from slot order in a
+4/B layout, anchored on the already-known Timer id. Doug then picked
+"Compass" in the field picker -- which writes 529 -- and the Edge drew a
+compass. Prediction, test, confirmation. Stronger footing than the
+positional read, and `FIELD_ID_NAMES` is again correct on 840 hardware.
+
+### 4. ⚠ The per-model feature shipped INERT in the GUI
+
+ACTION_PLAN Phase 1 made layout rules per-model. Doug's first GUI test
+found the Compass picker offering nothing at all -- exactly the
+pre-Phase-1 behaviour.
+
+Root cause: the assignment capturing `file_id.product` landed inside
+`ProfileListPanel`, setting `panel.profile_product`, while every
+consumer reads `self.frame.profile_product`. That stayed `None` -- and
+`None` deliberately means "enforce the 530's rules", the safe default.
+**So the failure was invisible: the app simply behaved as it always
+had.**
+
+Why verification missed it: all twelve [LAB] cases exercised the
+`fit_patch` CLI, which reads the product from the file and was correct
+throughout. The backend was verified and the GUI was ASSERTED on the
+strength of it. There is no wx in the build environment, so "cannot test
+this" quietly became "assume this" -- which is exactly what the
+[LAB] / [GUI TEST] split in ACTION_PLAN exists to prevent, written two
+days earlier.
+
+Fixed as a derived PROPERTY on the frame rather than an assigned
+attribute. There is no call site left that can forget it, which matters
+because a second staging path had the same hole waiting.
+
+**Rule: when a change cannot be exercised in the build environment, the
+claim it works is a HYPOTHESIS until hardware says otherwise. Say so.**
+
+### 5. The window-width bug, seventh occurrence -- fix the CLASS
+
+A ~300-character unwrapped line was added to the screens-view details
+pane, four lines below a comment reading *"other_text is a plain
+wx.StaticText with no wrapping and no scrollbar of its own, so a long
+unwrapped line here is actually MORE exposed to this bug category"*.
+The window stretched to screen width.
+
+First fix wrapped the text at 42 columns -- which traded a width bug for
+a HEIGHT bug, since every wrapped line steals a row from the screens
+list above.
+
+Real fix: **the pane is now a read-only multiline `wx.TextCtrl`, not a
+`wx.StaticText`.** A StaticText has no wrapping, so the sizer grows the
+WINDOW to fit its longest line; a TextCtrl wraps internally and never
+widens its parent. That removes the bug CLASS. Seven occurrences
+(v0.16.2, v0.16.3, v0.16.16, v0.19.18, the backup dialog, twice here) is
+sufficient evidence that "remember to wrap" was the wrong control.
+
+### 6. The eight-row screens list was an ACCIDENT
+
+Doug then reported six rows in both modes, where the 530 had shown
+eight. The consistency was the clue.
+
+The list never asked for eight. wx's `ListCtrl` best-size guess is ~6
+rows -- recorded in `_relayout()`'s own v0.11.0 comment. The eight rows
+were incidental: the old unwrapped text stretched the window and the
+list absorbed the slack. Bounding the text removed the slack.
+
+So the report was right and the obvious diagnosis -- "I stole two rows"
+-- was wrong. Fixing it by restoring the old window size would have
+restored a coincidence. New `SCREENS_LIST_MIN_HEIGHT` makes the list ASK
+for ten rows, deterministic across modes and profiles.
+
+### 7. Provenance: a whole FILE was never swept
+
+Doug hit *"(confirmed via field 10 -- not a guess)"* in a dialog. Doc rev
+119's sweep covered `gui_app.py` only -- but `fit_patch.py`'s guard
+messages surface in GUI dialogs, so it was always a user-facing surface.
+Five more cleaned there. Three remain deliberately: argparse HELP text,
+where provenance is documentation.
+
+Method note, and it is the second of its kind: matching the DECODED
+string constants found nothing, because f-string concatenation splits
+them across source lines. The source form had to be patched. Rev 121
+found grep misses strings assembled in intermediate variables; this adds
+that the decoded form and the written form are different search targets.
+
+### 8. Phases 0 and 1 of ACTION_PLAN, built
+
+- **Phase 0**: `profile_model()` from `file_id.product` (530 = 3121,
+  840 = 4062), `KNOWN_MODELS` and `SURVEYED_MODELS` kept deliberately
+  SEPARATE -- recognising a device is not knowing its rules, and
+  conflating them is how a 530 measurement came to govern an 840.
+  Surfaced in `fit_dump.py screens` and as a `fit_census.py` column.
+- **Phase 1A**: `layout_rules_enforced()` / `model_rule_known()`.
+  `product=None` means ENFORCE, so an unmigrated call site keeps old
+  behaviour rather than silently loosening.
+- **Phase 1B**: a first measured 840 table. **Omission is meaningful**:
+  a type absent from a model's entry is NOT governed by the 530's rule,
+  it is unenforced. That is what lets the table hold only measured facts
+  -- Lap Summary, Segment and Stamina are deliberately absent because
+  their A/B/C-to-`f8` mapping is unknown and Segment proves that mapping
+  is per-type rather than ordinal.
+
+Prior rev (123, 2026-09-28) follows.*
 
 *Doc rev 123 — refreshed 2026-09-28.* **`f1` is the screen state, not
 `f9` — a 530 invariant baked into a BRANCH ORDER was reporting the 840's
