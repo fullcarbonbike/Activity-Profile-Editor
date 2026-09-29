@@ -761,6 +761,7 @@ class DetectPanel(wx.Panel):
         self.frame.show_panel("profiles")
 
     def on_startup_txt(self, event):
+        self.frame.startup_return_to = "detect"
         self.frame.show_panel("startup_txt")
 
     def on_offline(self, event):
@@ -1301,6 +1302,7 @@ class ProfileListPanel(wx.Panel):
         is the ONLY route to it; with a device connected it duplicates
         DetectPanel's button, which is harmless and saves a trip back.
         """
+        self.frame.startup_return_to = "profiles"
         self.frame.show_panel("startup_txt")
 
     def on_back(self, event):
@@ -5764,6 +5766,10 @@ class StartupTxtPanel(wx.Panel):
         self.warning_text = wx.StaticText(self, label="")
         outer.Add(self.warning_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
 
+        # Label is set per mode in on_show() -- offline this writes a
+        # FILE the user then moves themselves, exactly like the profile
+        # Export button, and calling that "Save to Device" would promise
+        # something it does not do.
         self.save_btn = wx.Button(self, label="Save to Device")
         self.save_btn.Bind(wx.EVT_BUTTON, self.on_save)
         outer.Add(self.save_btn, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 12)
@@ -5909,6 +5915,16 @@ class StartupTxtPanel(wx.Panel):
             # owner may simply never have pulled it.
             self.source_path = os.path.join(
                 self.frame.offline_dir or "", garmin_device.STARTUP_TXT_FILENAME)
+            # Labels FIRST, before any early return. The panel instance
+            # is reused across mode switches, so the not-found branch
+            # must correct them too -- otherwise a session that went
+            # device -> offline -> empty folder shows "Save to Device"
+            # on a panel with no device anywhere near it.
+            self.save_btn.SetLabel("Export startup.txt...")
+            self.done_btn.SetLabel("Done -- Back to Profiles"
+                                   if self.frame.startup_return_to == "profiles"
+                                   else "Done -- Back to Detect")
+
             content = garmin_device.read_startup_txt_at(self.source_path)
             if content is None:
                 self.status_text.SetLabel(_wrap_status_paragraphs(
@@ -5931,6 +5947,12 @@ class StartupTxtPanel(wx.Panel):
             )
             self._reset_to_empty()
             return
+
+        # Device mode: restore the device wording. The panel instance is
+        # REUSED across mode switches, so a label set offline would
+        # otherwise persist into a device session and read as a lie.
+        self.save_btn.SetLabel("Save to Device")
+        self.done_btn.SetLabel("Done -- Back to Detect")
 
         content = garmin_device.read_startup_txt(root)
         if content is None:
@@ -6173,7 +6195,7 @@ class StartupTxtPanel(wx.Panel):
             )
             if answer != wx.YES:
                 return
-        self.frame.show_panel("detect")
+        self.frame.show_panel(self.frame.startup_return_to)
 
 
 class MainFrame(wx.Frame):
@@ -6208,6 +6230,14 @@ class MainFrame(wx.Frame):
         # staging path.
         self._model_cache = (None, None, None)   # (path, product, name)
         self.editing_path = None   # scratch working copy -- IS the pending-edit queue, see module docstring
+        # Which panel the boot-message editor should return to. It is
+        # reachable from two places now (DetectPanel and, since the
+        # offline entry point was added, ProfileListPanel), and Back
+        # used to go to Detect unconditionally -- so opening it from the
+        # profile list just to LOOK at the message dumped the user back
+        # to the start (Doug, 2026-09-29). The opener says where Back
+        # goes; it is the only thing that knows.
+        self.startup_return_to = "detect"
         self.editing_slot = None   # message_index of whatever screen EditScreenPanel is currently open on
         self.deploy_return_panel = "review"  # where DeployPanel's "Back" goes -- "review" (normal edit flow), "restore" (arrived via Restore-from-Backup), or "clone" (arrived via Clone) -- the latter two skip PreflightPanel entirely
         self.known_profiles = {}  # filename -> latest backup path, refreshed by ProfileListPanel.on_refresh() -- lets ClonePanel validate a new filename doesn't collide with anything currently on the device
