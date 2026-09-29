@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-09-29, at Doc rev 125.*
+> *Last updated 2026-09-29, at Doc rev 126.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens. `fit_dump.py` 2.8.0, `fit_patch.py` 1.17.0, `gui_app.py`
@@ -349,6 +349,68 @@ profiles by filename and will otherwise overwrite an existing one.
   that established it go in the code comment beside it (Doc rev 119).
 
 ---
+
+*Doc rev 126 — refreshed 2026-09-29.* **The toolkit was used for real
+work, on both models, and the hardest-won machinery in the project held:
+a Connect IQ placement survived three chained edits on a 530 and the
+same edits applied offline-and-Exported to an 840. mesg-170 maintenance
+is CONFIRMED ON A SECOND MODEL for the first time.**
+
+### What Doug actually did, and why it proves more than a test would
+
+Not a contrived edit -- a real problem. A new Windfield release needed a
+slightly larger full-width field, which the 7/B layout provides
+mid-screen.
+
+**530, device mode:** ROAD profile, screen 1. Moved the Windfield field
+DOWN TWO POSITIONS, removed one field (8 -> 7), then toggled the layout
+to 7/B.
+
+**840, offline mode:** copied the live ROAD profile to a folder, made
+the same edits there, used **Export**, and copied the result back via
+OpenMTP.
+
+**Windfield renders correctly on both.**
+
+### Why the 530 half is a demanding test
+
+A Connect IQ placement is stored in mesg 170 as
+`(1 << (5 + field_position)) | slot_index` -- the field's POSITION is a
+one-hot bit. So the placement had to be rewritten correctly for the
+reorder, again when the field count dropped and positions shifted, and
+again on the layout change. **Three chained rewrites, each on top of the
+last**, exercising all three CIQ-maintaining paths in sequence
+(`_swap_fields`, `_apply_field_list`, `on_layout_choice`).
+
+Every previous confirmation had been a single edit. A placement that is
+subtly wrong survives one operation and falls apart under composition,
+which is exactly what this did not do.
+
+### Why the 840 half closes a gap nobody had scheduled
+
+The whole mesg-170 apparatus came out of the v1.2.2/v1.2.3 saga and had
+been confirmed repeatedly ON THE 530 ONLY. Whether the 840 stored
+placements the same way was never tested and never on any list -- it
+was simply assumed by the code. It holds.
+
+The failure mode is specific and quiet: a Connect IQ field that loses
+its placement renders as **"Timer"**, with no error anywhere. That it
+renders as Windfield is the confirmation.
+
+### And the path itself
+
+This is the first time **offline mode + Export** carried real work end
+to end: folder as source, edits made with no device attached, Export
+with its filename pre-fill and verification, manual MTP transfer,
+device accepts it. #141's reason for existing, demonstrated rather than
+argued.
+
+Also incidentally confirmed: the 530's `(7,1)` and the 840's `(7,1)` are
+both legal and both render, so the per-model layout tables added in
+Phase 1B did not break the common case -- the same logical edit reached
+two models correctly.
+
+Prior rev (125, 2026-09-29) follows.*
 
 *Doc rev 125 — refreshed 2026-09-29.* **Segment is fully measured on
 both models, and the answer is the awkward one: `f8` values for a named

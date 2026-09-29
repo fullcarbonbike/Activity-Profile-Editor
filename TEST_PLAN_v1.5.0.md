@@ -168,7 +168,7 @@ per-model feature ship inert on 2026-09-28.
 | F3 | Click Export | Save dialog pre-filled with the CLEAN filename -- `CyclingRoadCensus3.fit`, **not** `..._staged_...fit.editing.fit` | |
 | F4 | Save it | Success dialog says the copy was read back and matches byte for byte; file exists at that path with that name | |
 | F5 | Export again, rename it in the dialog | Warning that the Edge matches by filename and will silently ignore a mismatch; offers to use the right name; **warns, doesn't refuse** | |
-| F6 | **REGRESSION: device mode, 530 connected, edit a screen** | Button reads **"Review && Deploy..."** and still reaches Pre-Flight exactly as before. Backing out is fine -- no need to actually deploy | |
+| F6 | **REGRESSION: device mode, 530 connected, edit a screen** | Button reads **"Review && Deploy..."** and still reaches Pre-Flight exactly as before | ✅ PASS |
 | F7 | Offline mode, Detect panel | **"Startup Message..."** is greyed out | |
 | F8 | Device mode, Detect panel | "Startup Message..." is enabled again | |
 
@@ -177,3 +177,12 @@ rather than a new feature.
 
 **Not worth testing yet:** `startup.txt` offline (#145) is unbuilt, so
 F7's greyed button is correct rather than a defect.
+
+**Section F result: ALL PASS (2026-09-29).** F4 was re-scoped mid-test --
+Doug asked whether the CRC was checked and it wasn't, only a byte-for-
+byte read-back. Export now does both; see the commit and Doc rev 126.
+
+**Beyond the plan, same session:** real work deployed to BOTH devices --
+ROAD profile, 8 fields -> 7/B, with a Connect IQ field (Windfield) moved
+two positions first. Survived on the 530 (device mode) and on the 840
+(offline mode + Export + OpenMTP). See Doc rev 126.
