@@ -438,6 +438,13 @@ BACKUP_DIALOG_WRAP = 56
 # result independent of font/DPI/platform quirks.
 GRAPH_WARNING_WRAP_WIDTH = 42
 
+# Height cap for ViewScreensPanel's details pane, in pixels -- roughly
+# eight lines. The pane scrolls beyond this rather than growing, so the
+# screens list above it keeps its rows no matter how much this has to
+# say. Added 2026-09-28 after an 840 profile's details squeezed the list
+# from eight visible screens to six.
+OTHER_TEXT_HEIGHT = 130
+
 
 def _wrap_status_paragraphs(*paragraphs):
     """
@@ -1431,7 +1438,31 @@ class ViewScreensPanel(wx.Panel):
         self.screens_list.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.on_row_deselected)
         outer.Add(self.screens_list, 1, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
 
-        self.other_text = wx.StaticText(self, label="")
+        # A read-only multiline TextCtrl, NOT a StaticText. This fixes
+        # two things at once, both reported by Doug on 2026-09-28:
+        #
+        # WIDTH. A StaticText has no wrapping of its own, so the sizer
+        # grows the whole WINDOW to fit its longest line -- this
+        # codebase's most recurrent bug, seven occurrences (v0.16.2,
+        # v0.16.3, v0.16.16, v0.19.18, the backup dialog, and twice
+        # here). A TextCtrl wraps internally and never widens its
+        # parent, which removes the bug CLASS rather than the instance.
+        # That is why the manual textwrap.fill() pass this block used to
+        # carry is gone: it was compensating for the wrong widget.
+        #
+        # HEIGHT. The old StaticText took its natural height at
+        # proportion 0, so every extra line stole a row from the screens
+        # list -- an 840 factory profile pushed the list down to SIX
+        # visible screens against the 530's eight. A capped min height
+        # plus the control's own scrollbar means this pane can say as
+        # much as it likes without ever costing the list a row. Doug
+        # asked whether it was meant to scroll; it is now.
+        self.other_text = wx.TextCtrl(
+            self, value="",
+            style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_BESTWRAP
+            | wx.BORDER_NONE)
+        self.other_text.SetMinSize((-1, OTHER_TEXT_HEIGHT))
+        self.other_text.SetBackgroundColour(self.GetBackgroundColour())
         outer.Add(self.other_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
 
         # v0.17.0: split into two rows -- real feedback from Doug
@@ -1543,7 +1574,7 @@ class ViewScreensPanel(wx.Panel):
         if working_path is None:
             self.title_text.SetLabel("No profile staged yet.")
             self.edits_note.SetLabel("")
-            self.other_text.SetLabel(
+            self.other_text.SetValue(
                 "Go Back to the profile list and stage one for editing first."
             )
             self.screens_list.DeleteAllItems()
@@ -1586,7 +1617,7 @@ class ViewScreensPanel(wx.Panel):
         try:
             messages = decode_file(working_path)
         except Exception as e:
-            self.other_text.SetLabel(f"Failed to read file: {e}")
+            self.other_text.SetValue(f"Failed to read file: {e}")
             self.screens_list.DeleteAllItems()
             self.row_slots = []
             self.edit_btn.Disable()
@@ -1739,23 +1770,11 @@ class ViewScreensPanel(wx.Panel):
             other_lines.append(
                 f"Unknown field IDs on this file: {sorted(data['unknown_ids_seen'])}"
             )
-        # WRAP HERE, not at each append. other_text is a plain
-        # wx.StaticText with no wrapping and no scrollbar, so ONE long
-        # line stretches the whole window -- this codebase's most
-        # recurrent bug (v0.16.2, v0.16.3, v0.16.16, v0.19.18, the backup
-        # dialog, and again on 2026-09-28 when a ~300-char line was added
-        # four lines below a comment warning about exactly this).
-        # Wrapping at the point of DISPLAY means a new line cannot
-        # reintroduce it by being written unwrapped; relying on every
-        # author remembering has now failed seven times.
-        _wrapped = []
-        for _line in other_lines:
-            indent = " " * (len(_line) - len(_line.lstrip()))
-            for _part in _line.splitlines() or [""]:
-                _wrapped.append(textwrap.fill(
-                    _part, GRAPH_WARNING_WRAP_WIDTH,
-                    subsequent_indent=indent + "  ") if _part else "")
-        self.other_text.SetLabel("\n".join(_wrapped))
+        # No manual wrapping: other_text is a TextCtrl and wraps itself
+        # (see its construction above). Lines are written full-length
+        # here on purpose so the control can use the real window width
+        # rather than an assumed column count.
+        self.other_text.SetValue("\n".join(other_lines))
 
         self.frame._relayout()
 

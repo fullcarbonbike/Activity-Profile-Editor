@@ -1117,8 +1117,7 @@ def check_system_screen_guard(input_path, message_index):
     if f10_val is not None:
         if f10_val in NAMED_SCREEN_TYPES:
             return (
-                f"is a Garmin '{NAMED_SCREEN_TYPES[f10_val]}' screen "
-                f"(confirmed via field 10 -- not a guess)."
+                f"is a Garmin '{NAMED_SCREEN_TYPES[f10_val]}' screen."
             )
         return None  # confirmed plain user screen -- nothing to warn about
 
@@ -1289,9 +1288,9 @@ def _cli():
         if unsupported_type is not None:
             parser.error(
                 f"--remove: slot {args.slot} is a '{unsupported_type}' screen. "
-                f"CONFIRMED via direct on-device inspection that this screen "
-                f"type has no Remove option at all in the Data Screens editor "
-                f"-- there is no --force override, because forcing this write "
+                f"This screen type has no Remove option at all in the Data "
+                f"Screens editor -- there is no --force override, because "
+                f"forcing this write "
                 f"here would produce a state with no on-device equivalent to "
                 f"compare it against on any profile."
             )
@@ -1299,10 +1298,9 @@ def _cli():
             parser.error(
                 f"--remove: slot {args.slot} is currently the ONLY visible "
                 f"USER screen on this profile (Garmin-named screens don't "
-                f"count toward this). Confirmed via real on-device testing "
-                f"that the editor refuses to hide OR remove a profile's last "
-                f"remaining user screen -- there is no --force override for "
-                f"this, because it isn't a guess: show at least one other "
+                f"count toward this). Garmin's own editor refuses to hide "
+                f"OR remove a profile's last remaining user screen, so there "
+                f"is no --force override: show at least one other "
                 f"user screen first, then remove this one."
             )
         remove_screen(args.input_file, args.output_file, args.slot)
@@ -1442,9 +1440,8 @@ def _cli():
         if unsupported_type is not None:
             parser.error(
                 f"--hide: slot {args.slot} is a '{unsupported_type}' screen. "
-                f"CONFIRMED via direct on-device inspection that this screen "
-                f"type has no Show Screen toggle at all in the Data Screens "
-                f"editor -- there is no --force override, because forcing "
+                f"This screen type has no Show Screen toggle at all in the "
+                f"Data Screens editor -- there is no --force override, because forcing "
                 f"f12=1 here would produce a state with no on-device "
                 f"equivalent to compare it against on any profile."
             )
@@ -1452,10 +1449,9 @@ def _cli():
             parser.error(
                 f"--hide: slot {args.slot} is currently the ONLY visible USER "
                 f"screen on this profile (Garmin-named screens don't count "
-                f"toward this). Confirmed via real on-device testing that the "
-                f"editor refuses to hide or remove a profile's last remaining "
-                f"user screen -- there is no --force override for this, "
-                f"because it isn't a guess: show at least one other user "
+                f"toward this). Garmin's own editor refuses to hide or "
+                f"remove a profile's last remaining user screen, so there is "
+                f"no --force override: show at least one other user "
                 f"screen first, then hide this one."
             )
         changes[12] = pack_enabled(False)
@@ -1519,7 +1515,7 @@ def _cli():
             auto_f10 = next_available_field10(args.input_file)
             changes[10] = pack_uint8(auto_f10)
             print(f"note: auto-assigning field 10 = {auto_f10} (next unused user-screen "
-                  f"identity; CONFIRMED via live device test -- shows on-device as "
+                  f"identity; shows on-device as "
                   f"'Screen {auto_f10 + 1}')", file=sys.stderr)
 
     # --- layout: figure out what value will actually end up on disk,
