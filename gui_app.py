@@ -439,11 +439,27 @@ BACKUP_DIALOG_WRAP = 56
 GRAPH_WARNING_WRAP_WIDTH = 42
 
 # Height cap for ViewScreensPanel's details pane, in pixels -- roughly
-# eight lines. The pane scrolls beyond this rather than growing, so the
+# seven lines. The pane SCROLLS beyond this rather than growing, so the
 # screens list above it keeps its rows no matter how much this has to
-# say. Added 2026-09-28 after an 840 profile's details squeezed the list
-# from eight visible screens to six.
-OTHER_TEXT_HEIGHT = 130
+# say.
+OTHER_TEXT_HEIGHT = 110
+
+# Minimum height for the screens list, in pixels -- about ten rows plus
+# the header.
+#
+# This exists because the list never actually ASKED for a useful number
+# of rows. wx's ListCtrl best-size guess is ~6 rows, noted in
+# _relayout()'s v0.11.0 comment, and the eight rows Doug had been seeing
+# were incidental: the old unwrapped details text stretched the window,
+# and the list absorbed the slack. Bounding that text (2026-09-28) took
+# the slack away and both modes dropped to six -- consistently, which is
+# how the accident became visible.
+#
+# Profiles routinely hold 11-18 screens, so six is short regardless of
+# how it came about. Asking for ten makes it deterministic instead of a
+# by-product of whatever else is on the panel. _relayout() only ever
+# GROWS the window, so a manual enlargement still survives a refresh.
+SCREENS_LIST_MIN_HEIGHT = 240
 
 
 def _wrap_status_paragraphs(*paragraphs):
@@ -1436,6 +1452,7 @@ class ViewScreensPanel(wx.Panel):
         self.screens_list.InsertColumn(6, "Fields", width=280)
         self.screens_list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_row_selected)
         self.screens_list.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.on_row_deselected)
+        self.screens_list.SetMinSize((-1, SCREENS_LIST_MIN_HEIGHT))
         outer.Add(self.screens_list, 1, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
 
         # A read-only multiline TextCtrl, NOT a StaticText. This fixes
