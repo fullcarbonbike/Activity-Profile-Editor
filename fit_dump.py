@@ -1095,6 +1095,25 @@ MODEL_LAYOUTS = {
                   'states': [(2, 0)], 'grids': {2: [[0, 1]]}},
             162: {'label': 'GroupRide', 'content': 'top',
                   'states': [(0, 0)], 'grids': {0: []}},
+            # Segment -- COMPLETE, every state measured on hardware from
+            # profiles Garmin's own editor wrote (2026-09-29). The 840 is
+            # plain ordinal at every count: A=0, B=1, C=2.
+            #
+            # This entry is why the type could not be added earlier. With
+            # count 4 measured but count 6 unknown, a partial entry would
+            # have made model_rule_known() return True and started
+            # REFUSING 6/A and 6/B -- two legal states. Omission was the
+            # safer half-measure until the set was closed.
+            #
+            # Grids are IDENTICAL to the 530's: four fields are two rows
+            # of two half-width, six are three rows. Only the f8 values
+            # differ between models, which is the whole point -- geometry
+            # travelled, the variant numbering did not.
+            56: {'label': 'Segment', 'content': 'top',
+                 'states': [(0, 0), (2, 0), (4, 0), (4, 1), (4, 2),
+                            (6, 0), (6, 1)],
+                 'grids': {0: [], 2: [[0, 1]], 4: [[0, 1], [2, 3]],
+                           6: [[0, 1], [2, 3], [4, 5]]}},
         },
         # Workout (38) is NOT here: the 840's editor offers no layout
         # choice but DOES let its fields be changed, unlike the 530.
@@ -1105,9 +1124,8 @@ MODEL_LAYOUTS = {
         # inheriting a 530 rule:
         #   74  Lap Summary -- counts known (0, 1/A, 1/B, 2/A, 2/B, 3, 4)
         #                      but the B f8 values are NOT
-        #   56  Segment     -- 4/C and 6/A,6/B added on the 840, and the
-        #                      530 INVERTS this type's letters, so its
-        #                      f8 values cannot be guessed
+        #   (56 Segment was here until 2026-09-29, when every state was
+        #    measured -- see its entry above.)
         #   127 Stamina     -- 0/2A/2B/4/5/6, same unknown, and its
         #                      2-field layout renders STACKED where other
         #                      named types render side by side

@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-09-29, at Doc rev 124.*
+> *Last updated 2026-09-29, at Doc rev 125.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens. `fit_dump.py` 2.8.0, `fit_patch.py` 1.17.0, `gui_app.py`
@@ -189,7 +189,9 @@ note that a cross-model deploy has now been done successfully
   Compass edited through the GUI, deployed via `NewFiles/`, rendered,
   pulled back and diffed.
 - **Phase 2 (#142, #141, #145, #143) — NEXT, all [CODE].**
-- **Phase 3 (v1.6.0 per-model tables) — blocked on Segment 4/A/B/C.**
+- **Phase 3 (v1.6.0 per-model tables) — UNBLOCKED (rev 125).** Decided:
+  per-type-per-model is required for `states`, but `grids` travel
+  between models unchanged.
 
 **Still the only thing waiting on Doug:** Segment's 4/A, 4/B and 4/C
 `f8` values on the 840 (rev 122 SS2).
@@ -347,6 +349,103 @@ profiles by filename and will otherwise overwrite an existing one.
   that established it go in the code comment beside it (Doc rev 119).
 
 ---
+
+*Doc rev 125 — refreshed 2026-09-29.* **Segment is fully measured on
+both models, and the answer is the awkward one: `f8` values for a named
+screen type are PER MODEL and cannot be derived. The 840 is plain
+ordinal at every count (A=0, B=1, C=2); the 530 is not. Settled by
+matching variants on APPEARANCE rather than menu letter -- and a
+hypothesis of mine was wrong, which is how the method proved itself.**
+
+### 1. The measurements
+
+Every state below was set in Garmin's own editor, pulled, and read from
+stored bytes. The toolkit never wrote any of them.
+
+| Variant, by how it LOOKS | 530 | 840 |
+|---|---|---|
+| 4 fields, graph-like area above | `f8=2` | `f8=0` |
+| 4 fields, stats-like area above | `f8=1` | `f8=1` |
+| 4 fields, split | not offered | `f8=2` |
+| 6 fields, small graph above | not offered | `f8=0` |
+| 6 fields, stats above | not offered | `f8=1` |
+
+Complete 840 Segment: `(0,0) (2,0) (4,0) (4,1) (4,2) (6,0) (6,1)`.
+Complete 530 Segment: `(0,0) (2,0) (4,2) (4,1) (6,0)`.
+
+**The 840 is ordinal everywhere. The 530's 4-field Segment is the single
+known irregularity in the entire dataset** -- its "A" sits at menu
+position 0 and stores 2. Two independent measurements now agree on it
+(the v1.4.0 survey and this pull), so it is real rather than a slip.
+
+### 2. ⚠ A wrong hypothesis, and the method that caught it
+
+When the 840 came back ordinal, this rev's author proposed that the
+530's entry was a TRANSPOSED NOTE -- that the v1.4.0 survey had recorded
+which menu entry was "A" incorrectly -- and put "real weight" on it. It
+was wrong. The 530's 4/A genuinely stores 2, and the old table stands.
+
+What settled it: **matching the variants by APPEARANCE rather than by
+letter.** The menu letter was the thing in doubt, so it could not also
+be the evidence. The graph-like area is recognisable on both models, and
+the same-looking variant stores different values -- which no
+transposition explains.
+
+**Rule: when a label is what you are testing, anchor the comparison on
+something the label cannot contaminate.**
+
+### 3. ⚠ Caveat on every named-screen appearance in this file
+
+Doug's own qualification, and it applies backwards through rev 122-124:
+**all of this comes from the on-device editor's PREVIEW, not from live
+rendering during a ride.** A Segment screen only truly renders when a
+segment is active. The editor draws a static mock -- on the 530 the
+"stats" area is entirely blank, on the 840 it shows ":" characters.
+
+Consequences, kept straight:
+
+- The "stats = 1 on both models" pairing is WEAKER than it first looked.
+  The 530's variant is blank, so it was matched by elimination, not by
+  appearance. Suggestive, not established.
+- The graph pairing IS visually grounded, and the per-model conclusion
+  rests on it alone. That is enough.
+- **The soft half is not load-bearing.** What the code needs is which
+  `f8` values are legal at which counts, and how the DATA FIELDS are
+  arranged. Both are hard data: `f8` from stored bytes, and all Segment
+  variants put their fields in the same half-width rows regardless of
+  what sits above. Content-area labels are documentation flavour; if
+  "graph" turns out to be something else mid-ride, no validation rule
+  changes.
+
+### 4. What this decides for v1.6.0
+
+**Per-type-per-model, confirmed.** The single-ordinal-rule design that
+looked briefly possible is dead: same type, same apparent layout, same
+field geometry, different stored value. There is no derivation --
+`f8` for a named type has to be measured on each model.
+
+**But geometry DID travel.** The 840's Segment grids are identical to
+the 530's: four fields are two rows of two half-width, six are three
+rows. So the per-model dimension is needed for `states`, not for
+`grids`, which is a meaningfully smaller change than "everything becomes
+per-model".
+
+### 5. Segment added to the 840 table
+
+With every state measured it can finally go in. It was held out
+deliberately while count 6 was unknown: a partial entry would have made
+`model_rule_known()` return True and started REFUSING 6/A and 6/B, two
+legal states. **Omission was the safer half-measure** -- which is the
+design from rev 124 SS8 doing its job.
+
+Verified: 840 accepts 4/C and 6/B, refuses 6/C and an f8 of 3; 530 still
+accepts 4/A at `f8=2`, still refuses `f8=0` at four fields and 6/B.
+
+Incidental: the 530 ships Segment with **Distance to Go / Time to Go**
+where the 840 ships **Distance to Next / Time to Next** -- different
+field ids, not just different labels. Defaults are per-model too.
+
+Prior rev (124, 2026-09-29) follows.*
 
 *Doc rev 124 — refreshed 2026-09-29.* **First toolkit-authored write to
 an Edge 840 profile, confirmed on hardware and read back: the write is
