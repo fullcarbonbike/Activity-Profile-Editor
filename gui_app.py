@@ -5964,6 +5964,8 @@ class StartupTxtPanel(wx.Panel):
         self._refresh()
 
     def on_eject_auto(self, event):
+        if not self.frame.assert_mode(False, "Ejecting the device"):
+            return
         eject_target = garmin_device._volume_mount_point(self.frame.garmin_root)
         answer = wx.MessageBox(
             f"Eject '{eject_target}' now?",
