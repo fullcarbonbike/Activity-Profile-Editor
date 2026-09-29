@@ -2058,7 +2058,12 @@ class ViewScreensPanel(wx.Panel):
         # the loss effectively permanent. Same confirm-dialog style already used
         # elsewhere for destructive/losable actions (e.g. RestorePanel's
         # on_restore()).
-        if self.frame.editing_path is not None:
+        # v0.23.4 (2026-09-29): was `editing_path is not None`, which
+        # fires for a screen merely OPENED -- see has_unsaved_edits().
+        # import_pending is checked FIRST and separately: a staged import
+        # is a real pending change even when the bytes happen to match,
+        # because what would be lost is the import itself.
+        if self.frame.import_pending or self.frame.has_unsaved_edits():
             # v0.16.17 REWORDED (Doug's feedback, 2026-08-14): the
             # original wording's "before returning here" implied a
             # user could come back and pick up where they left off,
@@ -6376,6 +6381,42 @@ class MainFrame(wx.Frame):
         """Model NAME for display; see profile_product."""
         _ = self.profile_product          # populates the cache
         return self._model_cache[2]
+
+    def has_unsaved_edits(self):
+        """
+        Are there REAL edits pending -- as in, does the working copy
+        actually differ from the staged file?
+
+        Not the same question as "does editing_path exist", which is
+        what the Back warning used to ask. ViewScreensPanel.on_edit()
+        creates the scratch copy when a screen is OPENED, before any
+        change is made, so merely looking at a screen and backing out
+        produced a warning about edits that were never made (Doug,
+        2026-09-29, browsing an 840 profile offline). Pre-existing since
+        v0.16.14; offline mode surfaced it because opening a profile
+        just to look at it is a normal thing to do there.
+
+        A byte compare also gets the case the old test could never get
+        right: change something, change it back, and there is genuinely
+        nothing to lose. PreflightPanel already diffs against the staged
+        file for exactly this reason.
+
+        Errs toward WARNING. If either file can't be read, assume edits
+        exist -- losing real work silently is far worse than one
+        unnecessary confirm.
+        """
+        if self.editing_path is None:
+            return False
+        if self.staged_path is None:
+            return True
+        try:
+            with open(self.editing_path, "rb") as f:
+                edited = f.read()
+            with open(self.staged_path, "rb") as f:
+                staged = f.read()
+        except OSError:
+            return True
+        return edited != staged
 
     def discard_edits(self):
         """Drop the scratch working copy -- back to the pristine staged file."""

@@ -201,9 +201,9 @@ three times, and G7 is the device path, which the refactor also touched.
 | G2 | Copy a real startup.txt into that folder, re-enter the panel | Loads; message text and display seconds both populated | |
 | G3 | **Open it, change NOTHING, click Back** | **NO "unsaved changes" warning** | |
 | G4 | Edit the message and change display seconds, click Save | Dialog pre-filled `startup.txt`; saves where you choose | |
-| G5 | **Open the saved file in BBEdit** | Garmin's header comments intact and unchanged; `<display = N>` shows your new value; NO stray `?` characters anywhere | |
+| G5 | **Open the saved file in BBEdit** | Garmin's header comments intact and unchanged; `<display = N>` shows your new value; NO stray `?` characters anywhere | ✅ PASS |
 | G6 | Save into a folder you create from inside the save dialog | Works -- no error (this one failed until the headless test caught it) | |
-| G7 | **REGRESSION: 530 connected, device mode, Startup Message** | Reads, edits, saves and backs up exactly as before | |
+| G7 | **REGRESSION: 530 connected, device mode, Startup Message** | Reads, edits, saves and backs up exactly as before | ✅ PASS |
 
 **G5 is the one only you can do.** The `?`-character and BOM bugs were
 both found by opening the raw file in an editor, never by the GUI, which
@@ -212,3 +212,27 @@ only ever shows the editable message half.
 **Not a defect:** a folder with no startup.txt is an ordinary state --
 the file is optional on the device too, and an 840 owner may simply
 never have pulled it.
+
+### G8 -- false "Unsaved edits" on Back, FIXED 2026-09-29
+
+Doug, browsing offline: open a folder, pick a profile, open a screen,
+change nothing, Back (no complaint), then Back again from the Screen
+order pane -> **"Unsaved edits" warning about edits never made.**
+
+Pre-existing since v0.16.14, surfaced by offline mode because opening a
+profile just to LOOK at it is a normal thing to do there.
+
+Cause: `ViewScreensPanel.on_edit()` creates the scratch working copy
+when a screen is OPENED, and the Back warning asked "does that file
+exist" rather than "does it differ". Now content-based via
+`frame.has_unsaved_edits()`.
+
+| # | Step | Expect | Result |
+|---|---|---|---|
+| G8a | Open a profile, open a screen, change nothing, Back, Back | **No warning** | |
+| G8b | Open a screen, make a real edit, Back, Back | Warning still appears | |
+| G8c | Make an edit, then change it back to what it was, Back, Back | **No warning** -- there is genuinely nothing to lose | |
+| G8d | Import a profile, then Back without deploying | "Unsaved import" warning still appears | |
+
+G8b and G8d are the ones that matter: the warning exists to stop real
+work being thrown away, and must still fire.
