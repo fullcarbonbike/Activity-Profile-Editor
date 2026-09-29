@@ -948,7 +948,13 @@ class ProfileListPanel(wx.Panel):
         self.selection_text = wx.StaticText(self, label="")
         outer.Add(self.selection_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 12)
 
+        # TWO ROWS, following ViewScreensPanel's v0.17.0 split for the
+        # same reason: a seventh button on one row pushes this panel past
+        # the window width, which is this codebase's most recurrent bug.
+        # Row 1 = session/navigation actions that need no profile
+        # selected. Row 2 = actions on the selected profile.
         button_row = wx.BoxSizer(wx.HORIZONTAL)
+        button_row2 = wx.BoxSizer(wx.HORIZONTAL)
 
         back_btn = wx.Button(self, label="‹ Back")
         back_btn.Bind(wx.EVT_BUTTON, self.on_back)
@@ -958,15 +964,30 @@ class ProfileListPanel(wx.Panel):
         refresh_btn.Bind(wx.EVT_BUTTON, self.on_refresh)
         button_row.Add(refresh_btn, 0, wx.RIGHT, 8)
 
+        # Startup Message lives HERE as well as on DetectPanel, because
+        # offline mode never passes through DetectPanel's button row --
+        # on_offline() jumps straight to this panel once a folder is
+        # picked. Doug, 2026-09-29: "I don't see a way to view or edit
+        # the 840 startup.txt file." The panel was built and working and
+        # simply unreachable from where the user actually stands.
+        #
+        # Same class of mistake this project already recorded once, over
+        # the README's MTP workaround: checking that a feature EXISTS is
+        # not checking that it is REACHABLE from the state the user is
+        # in.
+        self.startup_btn = wx.Button(self, label="Startup Message...")
+        self.startup_btn.Bind(wx.EVT_BUTTON, self.on_startup_txt)
+        button_row.Add(self.startup_btn, 0, wx.RIGHT, 8)
+
         self.restore_btn = wx.Button(self, label="Restore from Backup...")
         self.restore_btn.Disable()
         self.restore_btn.Bind(wx.EVT_BUTTON, self.on_restore)
-        button_row.Add(self.restore_btn, 0, wx.RIGHT, 8)
+        button_row2.Add(self.restore_btn, 0, wx.RIGHT, 8)
 
         self.clone_btn = wx.Button(self, label="Clone...")
         self.clone_btn.Disable()
         self.clone_btn.Bind(wx.EVT_BUTTON, self.on_clone)
-        button_row.Add(self.clone_btn, 0, wx.RIGHT, 8)
+        button_row2.Add(self.clone_btn, 0, wx.RIGHT, 8)
 
         # Import an external profile (2026-08-24, Doug's go-ahead) --
         # unlike every other button on this panel, deliberately does
@@ -976,14 +997,15 @@ class ProfileListPanel(wx.Panel):
         # See ImportPanel's own docstring for the full feature writeup.
         import_btn = wx.Button(self, label="Import Profile...")
         import_btn.Bind(wx.EVT_BUTTON, self.on_import_profile)
-        button_row.Add(import_btn, 0, wx.RIGHT, 8)
+        button_row2.Add(import_btn, 0, wx.RIGHT, 8)
 
         self.next_btn = wx.Button(self, label="View Screens →")
         self.next_btn.Disable()
         self.next_btn.Bind(wx.EVT_BUTTON, self.on_next)
-        button_row.Add(self.next_btn, 0)
+        button_row2.Add(self.next_btn, 0)
 
-        outer.Add(button_row, 0, wx.ALL, 12)
+        outer.Add(button_row, 0, wx.LEFT | wx.RIGHT | wx.TOP, 12)
+        outer.Add(button_row2, 0, wx.ALL, 12)
 
         self.SetSizer(outer)
 
@@ -1272,6 +1294,14 @@ class ProfileListPanel(wx.Panel):
             self.frame.show_panel("import")
         else:
             dlg.Destroy()
+
+    def on_startup_txt(self, event):
+        """
+        Open the boot-message editor from the profile list. Offline this
+        is the ONLY route to it; with a device connected it duplicates
+        DetectPanel's button, which is harmless and saves a trip back.
+        """
+        self.frame.show_panel("startup_txt")
 
     def on_back(self, event):
         self.frame.show_panel("detect")
