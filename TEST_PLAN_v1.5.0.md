@@ -186,3 +186,29 @@ byte read-back. Export now does both; see the commit and Doc rev 126.
 ROAD profile, 8 fields -> 7/B, with a Connect IQ field (Windfield) moved
 two positions first. Survived on the 530 (device mode) and on the 840
 (offline mode + Export + OpenMTP). See Doc rev 126.
+
+---
+
+## G. startup.txt offline (#145) -- 2026-09-29
+
+**G3 and G7 are the regression risks; do those even if you skip the
+rest.** G3 covers code I just refactored that has produced the same bug
+three times, and G7 is the device path, which the refactor also touched.
+
+| # | Step | Expect | Result |
+|---|---|---|---|
+| G1 | Offline mode on a folder with NO startup.txt, click Startup Message | Says to copy startup.txt off the device into this folder; message box and controls disabled; no crash | |
+| G2 | Copy a real startup.txt into that folder, re-enter the panel | Loads; message text and display seconds both populated | |
+| G3 | **Open it, change NOTHING, click Back** | **NO "unsaved changes" warning** | |
+| G4 | Edit the message and change display seconds, click Save | Dialog pre-filled `startup.txt`; saves where you choose | |
+| G5 | **Open the saved file in BBEdit** | Garmin's header comments intact and unchanged; `<display = N>` shows your new value; NO stray `?` characters anywhere | |
+| G6 | Save into a folder you create from inside the save dialog | Works -- no error (this one failed until the headless test caught it) | |
+| G7 | **REGRESSION: 530 connected, device mode, Startup Message** | Reads, edits, saves and backs up exactly as before | |
+
+**G5 is the one only you can do.** The `?`-character and BOM bugs were
+both found by opening the raw file in an editor, never by the GUI, which
+only ever shows the editable message half.
+
+**Not a defect:** a folder with no startup.txt is an ordinary state --
+the file is optional on the device too, and an 840 owner may simply
+never have pulled it.
