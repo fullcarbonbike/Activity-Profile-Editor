@@ -1993,6 +1993,37 @@ class ViewScreensPanel(wx.Panel):
             if answer == wx.YES:
                 dest = os.path.join(os.path.dirname(dest), suggested)
 
+        # CRC FIRST, before anything is written. Doug asked whether the
+        # CRC was checked on export and assumed it was; it wasn't -- only
+        # a byte-for-byte read-back, which proves the COPY is faithful,
+        # not that the FILE is valid. Device mode has always had both:
+        # PreflightPanel runs a real CRC check and a diff against the
+        # staged copy before Deploy is enabled.
+        #
+        # Offline had the weaker half of that pair, which is the wrong
+        # way round -- the offline path ends in a MANUAL MTP transfer,
+        # so it is the one where a bad file travels furthest before
+        # anyone notices.
+        try:
+            with open(source, "rb") as f:
+                src_bytes = f.read()
+            expected = struct.unpack('<H', src_bytes[-2:])[0]
+            computed = fit_crc(src_bytes[:-2])
+        except (OSError, struct.error) as e:
+            wx.MessageBox(f"Couldn't read the working copy: {e}",
+                          "Export failed", wx.OK | wx.ICON_ERROR)
+            return
+        if computed != expected:
+            wx.MessageBox(
+                f"File integrity check FAILED before export -- the working "
+                f"copy's checksum (0x{expected:04x}) doesn't match its own "
+                f"contents (0x{computed:04x}).\n\nNothing has been "
+                f"exported. Don't put this file on the device. This "
+                f"indicates a real bug rather than a normal state, so it's "
+                f"worth reporting.",
+                "File integrity check failed", wx.OK | wx.ICON_ERROR)
+            return
+
         try:
             garmin_device.export_profile(source, dest)
         except (garmin_device.GarminDeviceError, OSError) as e:
@@ -2005,7 +2036,9 @@ class ViewScreensPanel(wx.Panel):
         self.frame.last_export_dir = os.path.dirname(dest)
         wx.MessageBox(
             f"Exported to:\n{dest}\n\n"
-            f"Verified: the copy was read back and matches byte for byte.\n\n"
+            f"Verified twice: the file's own checksum matches its contents "
+            f"(CRC 0x{expected:04x}), and the copy was read back and matches "
+            f"the source byte for byte.\n\n"
             f"To put it on the Edge, copy it into the device's "
             f"Garmin/NewFiles/ folder, then disconnect and restart the "
             f"device. Keep the filename exactly as it is.",
