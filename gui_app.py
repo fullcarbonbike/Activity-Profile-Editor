@@ -4501,6 +4501,8 @@ class DeployPanel(wx.Panel):
         self._refresh()
 
     def on_eject_auto(self, event):
+        if not self.frame.assert_mode(False, "Ejecting the device"):
+            return
         eject_target = garmin_device._volume_mount_point(self.frame.garmin_root)
         answer = wx.MessageBox(
             f"Eject '{eject_target}' now?\n\nThe device will restart "
@@ -6152,6 +6154,18 @@ class MainFrame(wx.Frame):
         Guard for any path that only makes sense in one mode. Returns
         True if it's safe to proceed; otherwise explains and returns
         False.
+
+        TWO HANDLERS TOUCH garmin_root AND DELIBERATELY DO NOT CALL THIS.
+        Recorded here so the #142 audit's output is fully explained and
+        the next person doesn't "fix" them:
+
+          DetectPanel.on_detect   -- this IS the entry into device mode.
+              Guarding it would refuse the act of LEAVING offline mode,
+              which is the one thing it exists to do.
+          StartupTxtPanel.on_show -- runs whenever the panel becomes
+              active, so a modal here would fire on arrival rather than
+              on an action. It handles root=None inline instead, with
+              mode-aware wording.
 
         This exists because of how this class of bug fails. A device
         operation attempted offline doesn't produce a tidy error -- it
