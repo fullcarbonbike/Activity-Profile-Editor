@@ -131,43 +131,64 @@ Two consequences:
 
 ## Phase C — the field-ID census   [BENCH] then [CODE]
 
-Current state, measured 2026-09-29:
+Current state, measured 2026-09-30:
 
 ```
-FIELD_ID_NAMES holds          : 172 names
-Unnamed ids actually IN USE   : 3  (520, 578, 579)
-530 profiles: 87 distinct ids, 84 named
-840 profiles: 35 distinct ids, 32 named
+names in FIELD_ID_NAMES            : 172
+distinct ids seen in ANY profile   :  97
+ids in use with no name            :   3   (520, 578, 579)
+names held that have NEVER been
+  seen placed in a profile         :  78   <- id already confirmed
 ```
 
-There is **no backlog from what has been pulled**. The gap is between
-what the table knows and what the 840 *offers*, and only the manual can
-size that.
+**What Phase C is NOT.** It is not "ids unique to the 840". Those exist
+(`0, 29, 30, 55, 240, 491, 511, 529, 725` appear in 840 profiles and not
+in the 530s on hand) but mostly because of which screens happen to be
+configured, not because the 530 lacks the field.
 
-- [ ] **[BENCH]** List the data field names the 840's manual documents.
-- [ ] **[LAB]** Subtract the 172 known names — that difference is the
-      real scoping number.
-- [ ] **[BENCH]** Place-and-pull the remainder in **small batches**.
-- [ ] **[CODE]** Add confirmed ids; move any that resist to
-      `KNOWN_UNRESOLVED_IDS`.
+**What it IS:** fields the device OFFERS that have never been placed in
+any profile we have read, so no id is known for them at all. There is no
+backlog from what has been pulled — only 3 unnamed ids are in use, and
+all three are narrowed.
 
-**The 2026-08-17 lesson applies hard here.** That batch went wrong
-through a screen transposition and had to be unpicked from raw bytes.
-So: small batches, a **unique first data field per screen**, and written
-notes of what went where *before* pulling.
+### C1. Find the targets — scan for ABSENCES   [BENCH]
 
-**Shortcut worth trying:** Garmin's ID space is grouped — the Power
-Phase family landed contiguously, as did the eBike cluster (491, 494,
-579). Placing a few from each category the manual lists will likely
-reveal neighbours by proximity.
+`KNOWN_FIELD_NAMES.md` lists all 172 known names, sorted by name.
 
-Known unresolved, with what's been narrowed:
-- **520, 578** — on the 840's Workout screen, alongside 522 Duration
-  and 511 Workout Comparison.
+**Open the Edge's own field picker beside it and note what the device
+offers that is NOT on the list.** Looking for absences is far less work
+than transcribing the whole picker, and the picker beats the manual as a
+source — it is current with the installed firmware, where a manual can
+lag it.
+
+That difference IS the scoping number, and nothing else can produce it.
+
+### C2. Place-and-pull the targets   [BENCH]
+
+**Small batches. This is where the 2026-08-17 batch went wrong** — a
+screen transposition that had to be unpicked from raw bytes afterwards.
+
+- a **unique first data field per screen**, so a dump can be matched to
+  the notes even if display order shifts
+- written notes of what went where, *before* pulling
+- set it in Garmin's editor, pull, read — never write the ids and read
+  back our own guess
+
+**Shortcut worth trying:** Garmin's id space is grouped. The Power Phase
+family landed contiguously, as did the eBike cluster (491, 494, 579).
+Placing a few from each category the picker shows will likely reveal
+neighbours by proximity, so the whole list may not need placing.
+
+### C3. Add what is confirmed   [CODE]
+
+Anything that resists identification goes to `KNOWN_UNRESOLVED_IDS`
+rather than being guessed at.
+
+Already narrowed:
+- **520, 578** — on the 840's Workout screen, with 522 Duration and 511
+  Workout Comparison.
 - **579** — on both STEPS Metrics and eBike Metrics, between 491 Assist
   Mode and 494 Travel Range. An eBike/drivetrain field.
-
----
 
 ## Phase D — named screen types still unidentified   [BENCH]
 
