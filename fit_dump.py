@@ -642,7 +642,18 @@ NAMED_SCREEN_TYPES = {
     # Road profiles the census had been reading, which is why it looked
     # unseen. A type can be per-SPORT as well as per-model.
     128: "Unnamed type 128",
-    223: "Unnamed type 223",
+    # 223 IDENTIFIED 2026-09-30 by forcing it ACTIVE and letting the
+    # device name it (ACTION_PLAN D1, Doug's idea). It appeared in the
+    # 840's own Screens editor as "RADAR" -- five half-width data fields
+    # stacked down one side with the full-height radar strip beside
+    # them. The match is unambiguous: 223 is the only one of the three
+    # unknowns carrying f3=5, and the editor showed exactly five fields.
+    #
+    # Reached by a route Garmin's editor does not offer at all: the
+    # record ships f1=0 and the menu never lists it, so short of pairing
+    # the hardware it was invisible. Setting f1=1 made the device
+    # display it.
+    223: "Radar",
     # 30 NAMED 2026-09-28 from the device's own editor: Doug added every
     # named screen the 840 offers, and the one he recorded as "Music
     # Control" came back as f10=30 with f3=2 holding Timer and Distance,
@@ -1105,6 +1116,22 @@ MODEL_LAYOUTS = {
                   'states': [(2, 0)], 'grids': {2: [[0, 1]]}},
             30:  {'label': 'Music Control', 'content': 'top',
                   'states': [(2, 0)], 'grids': {2: [[0, 1]]}},
+            # Radar -- states measured on-device 2026-09-30: the editor
+            # offers 0, 5/A and 5/B, where A and B differ only in WHICH
+            # SIDE the radar strip sits on (fields left / radar right,
+            # or the mirror). Ordinal like every other 840 type: A=0,
+            # B=1.
+            #
+            # NO 'grids' ENTRY ON PURPOSE. This layout is a COLUMN --
+            # five half-width fields stacked vertically beside a
+            # full-height element -- and NAMED_SCREEN_LAYOUTS' grid model
+            # describes rows of positions. Forcing it into rows would
+            # draw a diagram that is simply wrong. layout_grid()
+            # returning None already means "don't draw", which callers
+            # handle. Second type to break the row model (Stamina's
+            # stacked 2-field is the other) -- see ACTION_PLAN A2.
+            223: {'label': 'Radar', 'content': 'top',
+                  'states': [(0, 0), (5, 0), (5, 1)], 'grids': {}},
             162: {'label': 'GroupRide', 'content': 'top',
                   'states': [(0, 0)], 'grids': {0: []}},
             # Segment -- COMPLETE, every state measured on hardware from
