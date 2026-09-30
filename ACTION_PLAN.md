@@ -208,7 +208,10 @@ but creating one that never existed is untested. If it is ignored, fall
 back to replacing a profile that can be restored from backup. And pull
 the profile back afterwards either way: whether the records survived is
 half the result.
-- [ ] **`f10=223`** — factory Road profile, inactive, `f3=5`.
+- [x] ~~**`f10=223`**~~ **= RADAR, identified 2026-09-30** (Doc rev 128).
+      States 0, 5/A, 5/B; A and B swap which side the radar strip sits
+      on. In the code with no `grids` entry -- it is a column layout and
+      the grid model describes rows.
 - [ ] **`f10=26` Virtual Partner** is 530-only. Kept in the global table
       and in the 840's no-field-edit set deliberately: a 530 profile can
       be deployed to an 840, so an 840 session can still meet the
@@ -239,9 +242,19 @@ half the result.
   strips on import. A firmware that carries types its current build
   does not expose would explain it, but nothing tests that yet.
 
-  **Pending:** pull `F10TEST` back off the device. If 64 and 128 are
-  gone, they were erased on import. If they are present but still
-  unlisted, something else is gating them.
+  **RESOLVED 2026-09-30 (Doc rev 128 §4).** `F10TEST` was pulled back:
+  slots 8 (`f10=64`) and 14 (`f10=128`) came back **erased, every field
+  `0xFF`**, while slot 19 (Radar) returned byte for byte. Only those two
+  records differ.
+
+  So the strip is keyed on **`f10` type** — not `f1` (all three were
+  active), not hardware (no radar paired, Radar kept), not `f9` (all
+  three clean). Consistent with Census3, where 223 survived at `f1=0`
+  and 64 was erased: two experiments, same answer, opposite `f1` states.
+
+  What remains unexplained is why the 840 ships 64 and 128 in its own
+  factory profiles and then strips them. **Naming those two now needs a
+  different route entirely** — they cannot be reached by activation.
 - **The inactive/removed split is provisional.** It rests on `f9`/`f10`
   surviving, inferred from two models; the 840's own Remove behaviour
   has never been tested.

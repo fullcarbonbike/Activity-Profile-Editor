@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-09-29, at Doc rev 127.*
+> *Last updated 2026-09-30, at Doc rev 128.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -363,6 +363,102 @@ profiles by filename and will otherwise overwrite an existing one.
   that established it go in the code comment beside it (Doc rev 119).
 
 ---
+
+*Doc rev 128 — refreshed 2026-09-30.* **`f10=223` is RADAR, identified by
+forcing it ACTIVE and letting the device name it — Doug's idea, and it
+reached a screen type Garmin's own editor will not offer at all. The
+same experiment settled what the 840 does on import: it strips certain
+screen records by TYPE, independently of `f1`, of paired hardware and of
+`f9`. And it falsified a reading this file had been carrying since rev
+123.**
+
+### 1. The experiment
+
+Three unidentified types (`f10` 64, 128, 223) sit in 840 factory
+profiles at `f1=0`, which means Garmin's editor never lists them. Short
+of owning the matching hardware they were unreachable.
+
+`--un-remove` was retired in v1.13.0, so there is no CLI path to set
+`f1=1` — but `patch_screen()` takes a raw `def_num -> bytes` dict and
+writes it directly. The retired flag was a convenience, not the
+capability.
+
+The factory INDOOR profile is the only one holding all three. Cloned to
+`F10TEST`, the three slots set `f1=1`, `f12=0`, and non-colliding `f9`
+of 57/58/59 so they landed last and disturbed nothing. Deployed via
+`NewFiles/` under a brand-new filename.
+
+### 2. ⚠ `f10=223` = Radar
+
+The 840's own Screens editor listed it as **RADAR** — five half-width
+data fields stacked down one side, the full-height radar strip beside
+them. Unambiguous: 223 is the only one of the three carrying `f3=5`,
+and the editor showed exactly five.
+
+States measured on-device: **0, 5/A, 5/B**, where A and B differ only
+in WHICH SIDE the radar strip sits on. Ordinal like every other 840
+type.
+
+**No `grids` entry, deliberately.** This is a COLUMN — fields stacked
+vertically beside a full-height element — and `NAMED_SCREEN_LAYOUTS`
+describes ROWS. Forcing it into rows would draw a diagram that is
+simply wrong; `layout_grid()` returning None already means "don't
+draw". Second type to break the row model after Stamina, which turns
+that from a per-type quirk into a structural question.
+
+### 3. ⚠ The "waiting on hardware" reading was WRONG
+
+Rev 123 §5 described the switched-off records as the profile's reserve
+pool, and successive revs repeated that anything the editor does not
+offer is "waiting on hardware you haven't paired". That went into
+user-facing CLI text.
+
+**Doug owns no Varia radar and has none paired. Radar appeared anyway.**
+The editor decides what to list from the RECORD, not from attached
+hardware. Corrected in `fit_dump.py`'s CLI output, its
+`classify_screens()` comment, and ACTION_PLAN Phase E.
+
+### 4. What the device actually does on import
+
+The profile was pulled back after deployment. Diffed against what was
+sent:
+
+| Slot | Sent | Returned |
+|---|---|---|
+| 8 (`f10=64`) | `f1=1 f3=2 f9=57` | **erased — every field `0xFF`** |
+| 14 (`f10=128`) | `f1=1 f3=2 f9=58` | **erased — every field `0xFF`** |
+| 19 (`f10=223`) | `f1=1 f3=5 f9=59` | unchanged, byte for byte |
+
+**Only those two records differ. Everything else came back identical.**
+
+So the strip is keyed on **`f10` TYPE**:
+
+- not on `f1` — all three were `f1=1`
+- not on hardware — no radar paired, Radar kept
+- not on `f9` — all three had clean, non-colliding values
+
+It also matches Census3, where 223 survived a NewFiles import at `f1=0`
+while 64 was erased. Two experiments, same answer, opposite `f1` states.
+
+**And the odd part, stated rather than explained: the 840 shipped 64 and
+128 in its OWN factory profiles.** The device wrote records it then
+strips on import. Firmware carrying types its current build does not
+expose would account for it. Nothing tests that yet.
+
+### 5. Method note — file SIZE is not a round-trip check
+
+The returned file is **65 bytes LARGER** than what was sent, with no
+message-type count changed and no semantic difference beyond the two
+erased records. The clone had shortened the profile name and the device
+rewrote the file to its own layout.
+
+**So a whole-file byte compare after a device round trip is not a valid
+verification** — it will fail on a file the device merely normalised.
+Compare at RECORD level, keyed on `message_index`, which is what caught
+this cleanly. `export_profile()`'s read-back compare is unaffected: that
+compares a local copy against its local source with no device involved.
+
+Prior rev (127, 2026-09-29) follows.*
 
 *Doc rev 127 — refreshed 2026-09-29.* **v1.5.0 is feature-complete and
 tested on both models. Phase 2 built #142, #141 and #145; the version
