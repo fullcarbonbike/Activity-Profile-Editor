@@ -188,7 +188,26 @@ lag it.
 
 That difference IS the scoping number, and nothing else can produce it.
 
-### C2. Place-and-pull the targets   [BENCH]
+### C2. Place-and-pull the targets   [BENCH] — sheet ready
+
+`FIELD_ID_BUILD_SHEET.md` lays out all 34 across FOUR user screens in
+one profile, one pull. Doug's plan; the sheet adds the safeguards.
+
+**Slot 0 of every screen is a known anchor field, different on each**
+(Speed 48, Cadence 3, Heart Rate 13, Power 36). Four slots spent to make
+a screen transposition impossible to miss -- if the anchors come back
+out of order, we know immediately and exactly what happened. That is the
+2026-08-17 failure mode, and it was only caught last time by dropping to
+raw bytes after the fact.
+
+**Screens are grouped by CATEGORY**, which is independently
+self-identifying: a screen coming back with twelve contiguous ids where
+Force was expected corroborates the anchor rather than relying on it.
+
+**A field the picker does not offer is DATA, not a failure.** Note it as
+not-offered and move on -- it bounds what the toolkit can ever place.
+The 12-field Force category is the most likely to be hardware-gated in
+bulk.
 
 **Small batches. This is where the 2026-08-17 batch went wrong** — a
 screen transposition that had to be unpicked from raw bytes afterwards.
