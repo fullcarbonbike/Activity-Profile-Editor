@@ -1136,6 +1136,19 @@ MODEL_LAYOUTS = {
             # stacked 2-field is the other) -- see ACTION_PLAN A2.
             223: {'label': 'Radar', 'content': 'top',
                   'states': [(0, 0), (5, 0), (5, 1)], 'grids': {}},
+            # Workout -- COMPLETE with no new measurement needed. The
+            # 840's editor offers NO layout choice for this type (Doug,
+            # 2026-09-28: "there's no option to change the layout"), so
+            # the single observed state IS the whole set. f3=6 with six
+            # real fields, where the 530 ships this type unconfigured
+            # at f1=255.
+            #
+            # No grids: only two of the six render as ordinary data
+            # fields at the bottom of the screen, and what the other
+            # four do is unknown. Drawing a six-row diagram would assert
+            # a shape nobody has seen.
+            38: {'label': 'Workout', 'content': 'top',
+                 'states': [(6, 0)], 'grids': {}},
             162: {'label': 'GroupRide', 'content': 'top',
                   'states': [(0, 0)], 'grids': {0: []}},
             # Segment -- COMPLETE, every state measured on hardware from
