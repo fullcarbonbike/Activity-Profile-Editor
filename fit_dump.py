@@ -1093,9 +1093,20 @@ MODEL_LAYOUTS = {
         'named': {
             # Compass -- the defect that prompted all of this. The 840's
             # editor offers 0, 1 or 2 where the 530 locks 2. (0,0) and
-            # (2,0) are stored bytes; count 1's variant is the ONLY
-            # inference here, from "no alternates offered at any count"
-            # plus f8=0 at both other counts. Flagged rather than hidden.
+            # (2,0) are stored bytes.
+            #
+            # ⚠ COUNT 1's VARIANT IS AN INFERENCE AND IT IS NOW SUSPECT.
+            # It was assumed f8=0 from "no alternates offered at that
+            # count" plus f8=0 at both other counts. On 2026-09-30
+            # Stamina falsified exactly that reasoning: its counts 4 and
+            # 5 offer no letter choice either and BOTH store f8=1. So a
+            # single-option count does NOT imply f8=0 on this device.
+            #
+            # If (1,0) is wrong and the real value is (1,1), this entry
+            # REFUSES a legal one-field Compass -- the very defect
+            # v1.5.0 shipped to fix. Needs measuring: set Compass to 1
+            # field on-device, pull, read f8. Until then it is the only
+            # unmeasured value in this table.
             35: {'label': 'Compass', 'content': 'top',
                  'states': [(0, 0), (1, 0), (2, 0)],
                  'grids': {0: [], 1: [[0]], 2: [[0, 1]]}},
