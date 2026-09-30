@@ -236,3 +236,12 @@ exist" rather than "does it differ". Now content-based via
 
 G8b and G8d are the ones that matter: the warning exists to stop real
 work being thrown away, and must still fire.
+
+**Section G result: PASS (2026-09-29).** Offline editor verified after
+three rounds of fixes -- the entry point was unreachable, Back went to
+the wrong screen, and the Done button had been relabelled without being
+rewired. Device mode re-verified afterwards: a modified startup.txt
+written to the 530 and confirmed in BBEdit.
+
+All of section G's failures were reachability and wording, not data
+handling. The file round trip itself was right from the first build.

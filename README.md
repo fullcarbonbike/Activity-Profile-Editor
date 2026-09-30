@@ -540,6 +540,52 @@ Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
 
+*Doc rev 80 — refreshed 2026-09-29.* **v1.5.0: offline mode, Export,
+and per-model layout rules.** See `RELEASE_NOTES_v1.5.0.md` for the
+user-facing summary.
+
+**Work without a device.** "Work Without a Device..." takes a folder of
+`.fit` profiles in place of a mounted Edge, and everything downstream
+behaves the same. This is what makes the toolkit usable at all on models
+that connect over MTP and can never be mounted (540, 840, 1040, 1050) —
+but it is also simply how you edit a profile you pulled last week with
+nothing plugged in. **Export** replaces Deploy: it writes to a folder
+you choose, checks the file's own CRC before writing anything, then
+reads the copy back and byte-compares before reporting success. The save
+dialog pre-fills the profile's ORIGINAL filename, because the device
+matches by filename on import and silently ignores anything else —
+no error, no indication, the profile simply does not change.
+`startup.txt` gets the same treatment.
+
+**Layout rules are per-model.** Every table in this toolkit was measured
+on an Edge 530 and applied to every device. With two models that started
+REFUSING states the hardware permits — Compass is locked at 2 fields on
+a 530 and the 840 offers 0, 1 or 2. The model is now read from
+`file_id.product` in the profile itself, so it works offline and on
+backups, and each model's rules apply only to that model. **Where a
+model has not been measured, the toolkit advises instead of refusing**:
+it will say a count looks unusual and write it anyway, rather than
+blocking an edit on hardware it has never seen. The 840's measured rules
+are included.
+
+Why it cannot be derived: Segment stores different values on the two
+models for the same screen type, the same visible layout and the same
+field geometry. No rule generates that, so unmeasured combinations are
+allowed rather than guessed at.
+
+**Fixes.** The guard protecting your last visible data screen counted
+switched-off screens as active — on an 840 profile with exactly one user
+screen it counted seven, and now counts one. Switched-off screens (the
+hardware-conditional ones an 840 holds in reserve) were listed as
+ordinary editable screens and are now shown separately. New screens on
+an 840 were named absurdly ("Screen 164"). The window stretched to
+screen width on a long details block, which is now a scrolling pane that
+never widens the window. The screens list shows ten rows rather than
+six. Backing out of a profile you only looked at no longer warns about
+unsaved edits. Four new data field names.
+
+Prior rev (79, 2026-09-12) follows.*
+
 *Doc rev 79 — refreshed 2026-09-12.* **Documentation only, no code
 change: which Edge models this actually works with.** Newer Edge models —
 reported for the 540, 840, 1040 and 1050 — connect over MTP rather than

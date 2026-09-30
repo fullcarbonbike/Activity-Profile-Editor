@@ -9,12 +9,17 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-09-29, at Doc rev 126.*
+> *Last updated 2026-09-29, at Doc rev 127.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
-named screens. `fit_dump.py` 2.8.0, `fit_patch.py` 1.17.0, `gui_app.py`
-0.22.0, `garmin_device.py` 0.12.8. Docs at PROJECT_NOTES rev 116,
-README Changelog rev 79.
+named screens.
+
+**READY TO SHIP: `v1.5.0`** — offline mode, Export, per-model layout
+rules. `fit_dump.py` 2.10.0, `fit_patch.py` 1.18.0, `gui_app.py` 0.23.0,
+`garmin_device.py` 0.13.0, `fit_census.py` 1.1.0. Docs at PROJECT_NOTES
+rev 127, README Changelog rev 80, `RELEASE_NOTES_v1.5.0.md` written.
+Tested on both models; `TEST_PLAN_v1.5.0.md` sections A, F and G pass.
+**All that remains is the merge and tag** — see the procedure below.
 
 ### ⚠ READ FIRST — uncommitted work lives on a branch
 
@@ -22,10 +27,8 @@ README Changelog rev 79.
 `v1.4.0` / rev 117 and must stay that way until v1.5.0 is tested.**
 Nothing is pushed; the branch is local only.
 
-**Version strings are deliberately NOT bumped** — `gui_app.py` still
-reads 0.22.0, `garmin_device.py` 0.12.8, while both contain v1.5.0 work.
-In this project a bumped version means shipped, so the mismatch IS the
-"untested" marker. #143 bumps them when the release is real.
+**Version strings are now BUMPED** (2026-09-29, #143) — the release is
+tested on hardware and the mismatch marker has served its purpose.
 
 **When v1.5.0 is actually ready, in this order:**
 
@@ -349,6 +352,99 @@ profiles by filename and will otherwise overwrite an existing one.
   that established it go in the code comment beside it (Doc rev 119).
 
 ---
+
+*Doc rev 127 — refreshed 2026-09-29.* **v1.5.0 is feature-complete and
+tested on both models. Phase 2 built #142, #141 and #145; the version
+strings are bumped and `main` is ready to receive the merge. Four
+user-reported GUI failures in this phase, and EVERY ONE of them was
+reachability or wording rather than data handling -- which is the
+sharpest pattern this release produced.**
+
+### 1. What shipped
+
+- **#142** device paths inert offline. `assert_mode()` had existed
+  since the offline backend landed and was called from NOWHERE. Now
+  called at every device-only entry point, with the controls made
+  VISIBLY UNAVAILABLE rather than clickable-then-refused.
+- **#141** Export replacing Deploy, with the save dialog pre-filling
+  the ORIGINAL profile filename. A CRC check was added after Doug asked
+  whether the CRC was verified and it was not -- device mode had always
+  had both checks via Pre-Flight, and the offline path is the one where
+  a bad file travels furthest, ending in a manual MTP transfer.
+- **#145** `startup.txt` offline, with `read_startup_txt()` /
+  `write_startup_txt()` reduced to thin wrappers over path-based cores
+  so the BOM strip, line-ending normalisation and smart-character fix
+  cannot drift between the two paths.
+- Versions bumped: `fit_dump` 2.10.0, `fit_patch` 1.18.0, `gui_app`
+  0.23.0, `garmin_device` 0.13.0, `fit_census` 1.1.0.
+
+### 2. ⚠ The pattern: four failures, none of them data handling
+
+| Reported | Actual cause |
+|---|---|
+| "The per-model feature does nothing" | `profile_product` set on the wrong object, read `None` everywhere |
+| "I don't see a way to edit startup.txt" | Panel built and working, with no route to it offline |
+| "Back takes me to Detect" | One hardcoded destination, two entry points |
+| "Done -- Back to Profiles goes to Detect" | Button relabelled, handler never rewired |
+
+**Not one of these was a file being written wrongly.** The FIT handling
+has been reliable throughout -- the round trips, the CRC checks, the
+CIQ placement maintenance, the byte compares. What broke, repeatedly,
+was the seams between panels: where a value is set, where a button
+leads, whether a feature can be reached from where the user stands.
+
+Two of these the project had already recorded as lessons and repeated
+anyway. The unreachable panel is the README/MTP mistake -- *checking a
+feature EXISTS is not checking it is REACHABLE from the state the user
+is in* -- made again four days later in the same release. The inert
+feature is the [LAB]/[GUI TEST] split, written two days before being
+ignored.
+
+**What actually caught things, when anything did, was STRUCTURAL
+verification rather than exercising paths.** A static audit ("every
+handler touching `garmin_root` must call `assert_mode`") found three
+gaps reading the code had not, including BOTH definitions of
+`on_eject_auto` -- the name appeared twice in the output and was
+dismissed as noise. A sizer check ("which row does each button land
+in") caught four buttons that would have been invisible. Exercising the
+paths I thought of found nothing I had not already thought of.
+
+### 3. The reused-panel hazard, twice in two days
+
+`StartupTxtPanel` is one instance shown in both modes, so anything set
+in one mode persists into the other unless something puts it back. It
+bit twice: a "Save to Device" label surviving into an offline session,
+and hidden eject buttons staying hidden after reconnecting. Both fixed
+by having device mode explicitly restore what offline mode changes.
+
+Worth stating as a rule, because the class will recur as more panels
+become mode-aware: **a mode-dependent change to a reused widget needs a
+matching restore in the other mode, written at the same time.**
+
+### 4. Also fixed, and pre-existing
+
+The false "unsaved edits" warning on Back. `ViewScreensPanel.on_edit()`
+creates the scratch working copy when a screen is OPENED -- its own
+comment says "first edit of this session" but it runs on entering the
+editor -- and the warning asked whether that file EXISTED rather than
+whether it DIFFERED. Pre-existing since v0.16.14; offline mode surfaced
+it because opening a profile just to look at it is a normal thing to do
+there. Now a byte compare, which also gets the case the old test never
+could: change something, change it back, and there is nothing to lose.
+
+And the window-width bug's seventh occurrence, fixed at the CLASS level
+by changing widget type -- a `StaticText` has no wrapping so the sizer
+grows the WINDOW to fit its longest line; a `TextCtrl` wraps internally
+and never widens its parent. Seven occurrences is sufficient evidence
+that "remember to wrap" was the wrong control.
+
+### 5. Ready to merge
+
+`main` is untouched at v1.4.0. The merge-and-tag procedure is in State
+of play: merge to `main`, tag ON `main` and never on the branch, then
+push. That is Doug's step, not this file's.
+
+Prior rev (126, 2026-09-29) follows.*
 
 *Doc rev 126 — refreshed 2026-09-29.* **The toolkit was used for real
 work, on both models, and the hardest-won machinery in the project held:

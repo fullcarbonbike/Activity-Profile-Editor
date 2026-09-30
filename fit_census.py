@@ -60,7 +60,7 @@ from collections import defaultdict
 import fit_raw_walk
 import fit_dump
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"  # Added a `model` column so a whole folder of backups is attributable in one command, and f4/f6/f11 columns -- three mesg-14 fields present on BOTH models that this project had never decoded, surfaced because anything without a column lands in `extra`. f7_active (the first f3 entries) is now reported separately from f7_nonempty: f7 is a fixed 10-slot array and only the first f3 entries are read by the device, the rest being stale ids left by an earlier shrink. Treating trailing slots as content is how the 2026-08-17 field-ID batch went wrong.
 
 DATA_SCREEN_MESG_NUM = 14
 FILE_ID_MESG_NUM = 0

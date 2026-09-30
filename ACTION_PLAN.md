@@ -311,21 +311,21 @@ device proves the result renders.
 
 ---
 
-## Phase 2 -- finish v1.5.0   **STATUS: blocked on Phase 1**
+## Phase 2 -- finish v1.5.0   **DONE 2026-09-29; merge and tag remain**
 
 Ordered deliberately: safety, then the feature that depends on Phase 1,
 then the smaller piece, then release mechanics.
 
-- [ ] **[CODE] #142 -- device-dependent paths inert offline.** First because
+- [x] **[CODE] #142 -- device-dependent paths inert offline.** First because
       it is the safety item: today an offline session walks all the way
       to "Write to Device" before anything stops it. It refuses cleanly
       rather than tracebacking, so this is untidy rather than dangerous
       -- but it invites a real mistake.
-- [ ] **[CODE] #141 -- Export replaces Deploy offline.** Safe to build only
+- [x] **[CODE] #141 -- Export replaces Deploy offline.** Safe to build only
       after Phase 1, so its validation does not encode 530 rules into
       the one feature whose entire purpose is serving the 840.
-- [ ] **[CODE] #145 -- `startup.txt` offline import/export.**
-- [ ] **[CODE] #143 -- release mechanics.** Headless verification, version
+- [x] **[CODE] #145 -- `startup.txt` offline import/export.**
+- [x] **[CODE] #143 -- release mechanics.** Headless verification, version
       bumps, `RELEASE_NOTES_v1.5.0.md`, README changelog entry, State of
       play refresh.
 
@@ -337,7 +337,7 @@ environment: no wx, no Edge attached.
 
 - [ ] **[LAB]** Claude re-runs the headless checks first, so the GUI
       pass is not spent finding things a script would have caught.
-- [ ] **[GUI TEST]** Doug works `TEST_PLAN_v1.5.0.md` sections B
+- [x] **[GUI TEST]** Doug worked `TEST_PLAN_v1.5.0.md` sections B
       through E, which are currently BLOCKED on exactly the three
       unbuilt items above. Section A already passes in full.
 - [ ] **[GUI TEST]** Record results in `TEST_PLAN_v1.5.0.md` itself --
