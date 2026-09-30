@@ -178,9 +178,20 @@ Decide the nudge-vs-warning wording from a real cross-MODEL test — and
 note that a cross-model deploy has now been done successfully
 (FLDTEST, a 530 profile, onto the 840), so that test is partly answered.
 
-### Where the build stands (2026-09-29)
+### Where the build stands (2026-09-30)
 
-**ACTION_PLAN.md is the live worklist**; this block is the summary.
+**`v1.5.0` SHIPPED 2026-09-29** — merged to `main`, tagged (annotated),
+pushed, GitHub Release published. Offline mode, Export, per-model layout
+rules. `fit_dump` 2.10.0, `fit_patch` 1.18.0, `gui_app` 0.23.0,
+`garmin_device` 0.13.0, `fit_census` 1.1.0.
+
+**`ACTION_PLAN.md` was rewritten 2026-09-30 for v1.6.0** and is the live
+worklist. The phase numbering restarted: the old Phases 0-2 are done and
+tagged, and the new Phases A-F are the per-model table completion, the
+per-SPORT gap, the field-ID census, the unnamed screen types, open
+questions and carried-over items.
+
+**Historical, from the v1.5.0 plan:**
 
 - **Phase 0 (model identity) — DONE.** `file_id.product` distinguishes
   530 (3121) from 840 (4062), works offline and on backups.
@@ -191,7 +202,7 @@ note that a cross-model deploy has now been done successfully
 - **Phase 1 [GUI TEST] — PASSED on hardware 2026-09-28** (rev 124 SS1):
   Compass edited through the GUI, deployed via `NewFiles/`, rendered,
   pulled back and diffed.
-- **Phase 2 (#142, #141, #145, #143) — NEXT, all [CODE].**
+- **Phase 2 (#142, #141, #145, #143) — DONE, shipped in v1.5.0.**
 - **Phase 3 (v1.6.0 per-model tables) — UNBLOCKED (rev 125).** Decided:
   per-type-per-model is required for `states`, but `grids` travel
   between models unchanged.

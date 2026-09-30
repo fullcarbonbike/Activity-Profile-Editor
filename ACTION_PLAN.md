@@ -1,415 +1,284 @@
-# Action plan -- moving the GUI forward with two device models
+# Action plan — v1.6.0 and beyond
 
-*Working document, like `TEST_PLAN_v1.5.0.md`. Meant to be edited as
-things land, not preserved as history. The permanent record is
-`PROJECT_NOTES.md`; this file is the worklist.*
+*Working document. Edit as things land; it is the worklist, not the
+history. `PROJECT_NOTES.md` is the permanent record — if the two
+disagree, the newest Doc rev wins and this file is stale.*
 
-*Written 2026-09-28, after Doc rev 123.*
-
----
-
-## Where things stand
-
-**Branch:** all work is on local `v1.5.0-wip`. `main` is clean at
-`v1.4.0` / Doc rev 117 and nothing is pushed. Version strings are
-deliberately NOT bumped -- in this project a bumped version means
-shipped, so the mismatch between version and contents is the marker
-that this is untested. The merge-and-tag procedure is written into
-`PROJECT_NOTES.md` / State of play.
-
-**Committed on the branch so far:**
-
-| Commit | What |
-|---|---|
-| `ba5605b` | v1.5.0 offline mode, backend done, GUI half unbuilt |
-| `0c16307` | `fit_census.py` + Doc rev 121 |
-| `ce5758b` | Doc rev 122 -- A/B/C decoded, 3 new field IDs |
-| `b9d4db4` | `f1` is the state, not `f9` -- classification + guard fix |
-| `96a0108` | #146 -- the 840's screen types enter the code |
-| `8921f06` | Withdraw the "Lights" name for `f10=64` |
-| `23970ad` | Census3 -- `f10=30` is Music Control, reserve pool |
-| `aea524b` | Doc rev 123 |
-
-**Unbuilt in v1.5.0:** #141 Export, #142 device paths inert offline,
-#145 `startup.txt` offline, #143 verify/docs/version bumps.
+*Rewritten 2026-09-30, after v1.5.0 shipped. Supersedes the v1.5.0 plan
+entirely; Phases 0–2 of that plan are done and tagged.*
 
 ---
 
-## The finding this plan is built around
+## Read this first if you're picking the project up cold
 
-The iPhone Garmin Connect app and the 840's own on-device editor
-disagree about Compass: the device offers 0, 1 or 2 data fields, the app
-shows the count greyed out and uneditable.
+**Shipped:** `v1.5.0`, tagged and pushed 2026-09-29. `fit_dump` 2.10.0,
+`fit_patch` 1.18.0, `gui_app` 0.23.0, `garmin_device` 0.13.0,
+`fit_census` 1.1.0. Docs at PROJECT_NOTES rev 127, README Changelog
+rev 80.
 
-**First read (WRONG, recorded so it is not re-derived): "the app carries
-a conservative cross-device table."** Two checks killed that:
+**Hardware:** Edge **530** (USB mass storage, the regression baseline)
+and Edge **840** (MTP, no mass-storage mode). The 840 is why offline
+mode and Export exist.
 
-1. Doug set Compass to 0 on-device. The app then DISPLAYS 0 correctly
-   but still greys out the selector. So the app's READ path is
-   model-accurate; only its edit-capability entry is wrong.
-2. Cross-checking every other named type, the app agrees with the device
-   exactly -- eBike Metrics at 1-8, Lap Summary's count-0 state, Segment
-   4/C, all offered. A conservative table would have clamped those too.
+**The one idea that shapes everything now:** layout rules are **per
+model**, and they cannot be derived. Segment stores different `f8`
+values on the two devices for the same screen type, the same visible
+layout and the same field geometry. Measurement is the only source.
 
-So it is **one bad entry, not a policy** -- most likely device firmware
-ahead of the app's revision, or simply an app bug.
-
-**Rules adopted:**
-
-- The **device's own editor is the authority.**
-- The **Connect app is a usable survey instrument** -- much faster to
-  enumerate options in than walking on-device menus -- **but confirm
-  on-device anything that appears LOCKED**, since a greyed-out control
-  is exactly where its one known failure mode lives. Everything it
-  OFFERS has matched the device so far.
-
-Confirmed on-device 2026-09-28, for USER-DEFINED screens, app and device
-agreeing exactly:
-
-| Field count | Alternate layouts |
-|---|---|
-| 1, 2 | none |
-| 3 through 9 | **A / B / C** |
-| 10 | none |
-
-That confirms the range Doc rev 120 took from the app, which had been
-flagged as needing on-device backing.
-
----
-
-## What is actually broken today -- three classes
-
-Checked against what `NAMED_SCREEN_LAYOUTS` and the guards actually
-hold, not from memory.
-
-**Class 1 -- the toolkit REFUSES what the 840 permits (hard blocks):**
-
-| Type | 530 rule | 840 offers |
-|---|---|---|
-| **Compass (35)** | `[(2,0)]`, count LOCKED | 0, 1 or 2 |
-| **Workout (38)** | in `NO_FIELD_EDIT_TYPES` -- no field editing at all | layout can't change, but scrolling reaches the fields and offers to change them |
-
-**Class 2 -- validation range too narrow (refuses an edit; no symptom
-until you make one):**
-
-| Type | 530 table | 840 offers |
-|---|---|---|
-| **eBike Metrics (58)** | 1-4 | 1-8 -- and the 840 SHIPS it at 5, already outside the table |
-| **STEPS Metrics (95)** | 1-4 | 1-8 |
-| **Lap Summary (74)** | 1-4, no variants | 0, 1/A, 1/B, 2/A, 2/B, 3, 4 |
-| **Segment (56)** | 0, 2, 4/A, 4/B, 6 | adds **4/C**, and 6 gains A/B |
-
-**Class 3 -- no table entry at all, so they fall through to GENERIC
-user-screen geometry:**
-
-Power Guide (125, fixed 2), Music Control (30, fixed 2), GroupRide
-(162, zero fields), Stamina (127, 0/2A/2B/4/5/6), plus 64, 128, 223.
-Not a refusal -- the layout picker just offers the wrong shape, which
-for a fixed-2 type means offering counts the device will not honour.
-
-**Phase 1 below fixes classes 1 and 2. Class 3 needs actual table
-entries -- no amount of loosening supplies a grid that is not there.**
+**The posture that follows from it:** refuse only when the model is
+known AND the state is known-illegal. For an unmeasured model or
+combination, allow it, say it's unverified, and never rewrite what
+wasn't explicitly edited. `fit_dump.model_rule_known()` is where that
+decision lives.
 
 ---
 
 ## Who does what
 
-Every task below is tagged. This was missing in the first draft and
-caused exactly the confusion it should have prevented -- Doug read
-Phase 0 as something to run and found no script to run it with.
+- **[CODE]** — written by Claude. Nothing for Doug until it exists.
+- **[BENCH]** — Doug, on the device or in the Connect app. Cannot be
+  done from a file, which is exactly why it's his.
+- **[LAB]** — Claude verifies headlessly against files on disk. No
+  device, no GUI.
+- **[GUI TEST]** — Doug, running the app on real hardware. The only
+  verification that can't be automated; there's no wx in the build
+  environment and no Edge attached.
 
-- **[CODE]** -- Claude writes it. Nothing for Doug to do until it exists.
-- **[BENCH]** -- Doug, on the device or in the Connect app. Cannot be
-  done from a file, which is exactly why it is his.
-- **[LAB]** -- Claude verifies it headlessly against files already on
-  disk. No device, no GUI, nothing for Doug to run.
-- **[GUI TEST]** -- Doug, running the app against real hardware. The
-  build environment has no wx and no Edge attached, so this is the one
-  kind of verification that CANNOT be automated here.
-
-### So what does Doug actually do, start to finish?
-
-Only two things. Everything else is mine.
-
-1. **[BENCH]** -- look at the device or the app and report what it
-   offers. Currently: the three lock checks below, and Segment 4/A/B/C.
-2. **[GUI TEST]** -- run the app on hardware and work through
-   `TEST_PLAN_v1.5.0.md`. That file is the live record; tick results
-   there rather than relaying passes through chat.
-
-If a step involves reading a `.fit` file, running a toolkit command
-against one, or comparing bytes, it is **[LAB]** and it is mine -- even
-when it is listed under "Verify". Doug never needs to synthesise test
-files.
+**Doug only ever does [BENCH] and [GUI TEST].** Anything that reads a
+`.fit`, runs a toolkit command or compares bytes is [LAB] — even under
+a heading called "Verify".
 
 ---
 
-## Phase 0 -- model identity   **DONE 2026-09-28**
+## Phase A — complete the per-model tables   **the v1.6.0 core**
 
-Small, headless, foundational. Everything below depends on it and
-nothing else does.
+Phase 1B of the last plan landed the measured 840 entries early, so
+this is **completion, not construction.**
 
-`file_id.product` already distinguishes the models and is present in
-every profile, so this needs no connected device and works on backups
-and offline folders:
+### A1. Finish the 840 entry   [BENCH] then [CODE]
 
-| Model | `file_id.product` |
-|---|---|
-| Edge 530 | 3121 |
-| Edge 840 | 4062 |
+Deliberately absent from `MODEL_LAYOUTS[4062]` today, because their
+A/B/C → `f8` mapping is unknown and the 530 proves it can't be guessed:
 
-**Tasks**
+- [ ] **[BENCH] Lap Summary (74)** — 840 offers 0, 1/A, 1/B, 2/A, 2/B,
+      3, 4. Counts known, `f8` values for the B variants unknown.
+- [ ] **[BENCH] Stamina (127)** — 840 offers 0, 2/A, 2/B, 4, 5, 6.
+- [ ] **[CODE]** Add both once measured. **A partial entry is worse
+      than none** — it makes `model_rule_known()` return True and starts
+      refusing legal states. That's why Segment was held out until every
+      state was measured.
 
-- [x] **[CODE]** `fit_dump.profile_model()` -- returns `(product_id,
-      name)`, `(id, None)` for an unrecognised device, `(None, None)` if
-      the file doesn't say. Never raises. Takes a path OR an
-      already-decoded messages dict.
-- [x] **[CODE]** `KNOWN_MODELS` = {3121: Edge 530, 4062: Edge 840}, and
-      `SURVEYED_MODELS` = {3121} -- deliberately SEPARATE sets.
-      Recognising a product id is not the same as knowing what that
-      device's editor offers, and conflating the two is how a 530
-      measurement came to be applied to an 840 in the first place.
-- [x] **[CODE]** `model_label()` and `model_is_surveyed()`.
-- [x] **[CODE]** `fit_dump.py screens` prints a **Device model:** line
-      first, plus a NOTE when the model is unsurveyed. Doug's report:
-      `screens` never said which device, and `dump` said it only amid
-      everything else.
-- [x] **[CODE]** `fit_census.py` gains a **model** column, so a whole
-      folder of backups is attributable in one command.
+**Method, proven on Segment:** set each variant in Garmin's own editor
+across several profiles, pull them in one session, read `f8` from the
+stored bytes. One profile holds only one of each named type, so each
+variant needs its own file. **Record what each one LOOKS like, not just
+its menu letter** — the letter is what's under test, so it can't also be
+the evidence. That's what settled Segment when a plausible hypothesis
+was wrong.
 
-**How to use it -- for Doug, whenever it is useful. Not a required step.**
+### A2. Stamina's geometry is the awkward one   [CODE]
 
-One profile, with the model on the first line:
+Stamina's 2-field layout renders **stacked** where every other named
+type renders side by side. `NAMED_SCREEN_LAYOUTS`' grid model assumes
+rows of positions, so this may not be expressible as-is. Decide whether
+the grid model needs a vertical/horizontal flag before writing the
+entry, rather than forcing it.
 
-    python3 fit_dump.py screens <file.fit>
+### A3. Consider whether `grids` should stay global   [CODE]
 
-A whole folder, or several, in one pass:
-
-    python3 fit_census.py <folder> [<folder> ...] --out models.csv
-
-then read the `model` column. Files the toolkit doesn't recognise show
-an empty `model` with the raw id still in `product` -- that id is what
-to report so a new device can be added.
-
-**[LAB] Verified 2026-09-28**
-
-- [x] Sweep of `ClaudeCowork` + the Census uploads: 1178 records Edge
-      530 (3121), 217 Edge 840 (4062), nothing unrecognised.
-- [x] `screens` on an 840 profile prints the unsurveyed NOTE; on a 530
-      profile it prints the model and no note.
+Doc rev 125 found that **geometry travels between models while variant
+numbering doesn't** — the 840's Segment grids are identical to the
+530's. So the per-model dimension may only be needed on `states`, not
+on `grids`. Confirm across more types before committing to that shape;
+if it holds, the refactor is half the size it looks.
 
 ---
 
-## Phase 1 PREREQUISITE -- three bench checks   **DONE 2026-09-28**
+## Phase B — the 840 picture is really a ROAD picture   [BENCH] + [LAB]
 
-Three types were count-LOCKED in the table on 530 evidence alone and had
-never been checked on the 840. **All three confirmed LOCKED at 2 on the
-840 as well** (Doug, 2026-09-28, checked on-device AND in the app):
+Doc rev 123 recorded `f10=128` as "not yet seen in a pulled profile". It
+had been there all along — in the factory **INDOOR** profile, not Road,
+which is all the census had ever been pointed at.
 
-- [x] **[BENCH] Elevation (44)** -- fixed 2 half-width fields at the
-      bottom of the screen. App: layout selection greyed out, shows 2.
-- [x] **[BENCH] Cycling Dynamics (63)** -- same.
-- [x] **[BENCH] ClimbPro (104)** -- same.
+**So a screen type can be per-SPORT as well as per-model**, and "we
+surveyed the 840" is currently overstated.
 
-**Result: NO new class-1 defects. Compass remains the only one.**
-
-Two consequences, both good:
-
-1. **Part B gets smaller.** These three agree with the 530, so the 840
-   table needs NO entries for them -- it only carries the types that
-   actually differ. An 840 entry that merely restates the 530's rule
-   would be duplication waiting to drift.
-2. **The "one bad app entry" reading is now supported by three negative
-   controls.** The app was checked on all three and agrees with the
-   device every time. So the app is not conservative about fixed-2 types
-   in general -- it is wrong about Compass specifically.
-
-That makes the coherent story: **840 firmware added variable field
-counts to Compass, and the app's table predates that change.** The other
-three fixed-2 types did not change, which is exactly why the app is
-still right about them. Doug's firmware-ahead-of-app-revision hypothesis,
-now with controls rather than a single observation.
+- [ ] **[LAB]** Census the INDOOR and MOUNTAIN factory profiles already
+      in `Test4`: `python3 fit_census.py <folder> --summary`. Costs
+      nothing; they're on disk.
+- [ ] **[BENCH]** If either holds types or states Road never showed,
+      walk that profile's Screens menu the way the Road one was walked.
 
 ---
 
-## Phase 1 -- stop refusing what the device permits   **DONE 2026-09-28 (A and B)**
+## Phase C — the field-ID census   [BENCH] then [CODE]
 
-**This is the safety fix, and it is NOT the per-model tables.** It only
-changes the posture from *"I know the rules"* to *"I know the 530's
-rules."* Per Doc rev 120 SS4:
+Current state, measured 2026-09-29:
 
-> Refuse only when the model is **known** AND the state is
-> **known-illegal**. For an unsurveyed model, or a combination absent
-> from that model's table: allow it, say plainly that it is unverified,
-> and never rewrite what was not explicitly edited.
+```
+FIELD_ID_NAMES holds          : 172 names
+Unnamed ids actually IN USE   : 3  (520, 578, 579)
+530 profiles: 87 distinct ids, 84 named
+840 profiles: 35 distinct ids, 32 named
+```
 
-**Tasks -- part A, scope the existing rules to the model**
+There is **no backlog from what has been pulled**. The gap is between
+what the table knows and what the 840 *offers*, and only the manual can
+size that.
 
-- [x] **[CODE]** `count_is_locked(f10, product)` locks only for a
-      SURVEYED model. New `layout_rules_enforced(product)` carries the
-      policy in one place.
-- [x] **[CODE]** Layout validation (`fit_patch.py`) routes its four
-      refusals through `_layout_problem()`: `parser.error` on a surveyed
-      model, the SAME text to stderr as a NOTE otherwise.
-- [x] **[CODE]** ~~`NO_FIELD_EDIT_TYPES` per-model~~ **DONE IN PART B,
-      2026-09-28.** Blanket-loosening it for unsurveyed models would also
-      unblock GroupTrack List (f10=57) and GroupRide (162) on the 840 --
-      both device-generated with f3=0 -- re-opening the v0.21.2 bug where
-      the field picker opened on a screen whose contents the device
-      writes. That set is about "the device generates this screen", which
-      is structural rather than a count rule, so it needs a per-model
-      ENTRY (Workout differs on the 840) and not a policy switch.
-- [x] **[CODE]** v1.4.0's read-side flag gates on model-surveyed.
-- [x] **[CODE]** GUI shows "Profile written by: <model>" and, when
-      unsurveyed, says plainly that it won't block what it doesn't
-      recognise and that any warning shown came from a 530.
+- [ ] **[BENCH]** List the data field names the 840's manual documents.
+- [ ] **[LAB]** Subtract the 172 known names — that difference is the
+      real scoping number.
+- [ ] **[BENCH]** Place-and-pull the remainder in **small batches**.
+- [ ] **[CODE]** Add confirmed ids; move any that resist to
+      `KNOWN_UNRESOLVED_IDS`.
 
-**Tasks -- part B, a FIRST 840 table (plan change, 2026-09-28)**
+**The 2026-08-17 lesson applies hard here.** That batch went wrong
+through a screen transposition and had to be unpicked from raw bytes.
+So: small batches, a **unique first data field per screen**, and written
+notes of what went where *before* pulling.
 
-Part A alone leaves the 840 permissive-with-advisories, which means the
-toolkit stops catching real mistakes on the device doing all the
-research. Since the measurements already exist, populate them:
+**Shortcut worth trying:** Garmin's ID space is grouped — the Power
+Phase family landed contiguously, as did the eBike cluster (491, 494,
+579). Placing a few from each category the manual lists will likely
+reveal neighbours by proximity.
 
-- [x] **[CODE]** An 840 entry carrying ONLY what has been personally measured --
-      Compass 0/1/2, eBike Metrics 1-8, STEPS Metrics 1-8, Lap Summary's
-      full set, Segment's known states, user screens A/B/C at 3-9.
-      **Nothing inferred, nothing copied across from the 530 to fill a
-      gap.** An absent entry must fall back to permissive, not to the
-      530's rule.
-- [x] **[CODE]** Class 3 entries for the types with no geometry at all: Power Guide
-      (fixed 2), Music Control (fixed 2), GroupRide (0). **Stamina is
-      deliberately EXCLUDED here** -- its 2-field layout renders STACKED
-      where other named types render side-by-side, so its grid needs
-      care rather than speed. It stays permissive until Phase 3.
-
-This is Phase 3's shape arriving early for the types already known. It
-is in scope because the data exists and the alternative is knowingly
-shipping no validation for the 840; it is NOT licence to start
-inferring per-model rules that have not been measured.
-
-**Verify -- ALL [LAB], nothing here for Doug**
-
-Every one of these runs against files already on disk. The "fake
-product id" case is a copy of a real profile with two bytes patched by
-a throwaway script -- a lab fixture, not something to create by hand.
-
-- [x] **[LAB]** 530 profiles: every existing refusal still fires.
-- [x] **[LAB]** 840 Compass accepts 1 field; 530 Compass still refused.
-- [x] **[LAB]** 840 Workout allows field edits; 530 Workout still
-      refuses them.
-- [x] **[LAB]** 840 eBike Metrics accepts 7; refuses 9. 530 unchanged.
-- [x] **[LAB]** An 840 profile produces no read-side out-of-range flag.
-- [x] **[LAB]** Fake product id 9999 (a real 840 profile with two bytes
-      patched and the CRC recomputed): refuses nothing, advises instead.
-- [x] **[LAB]** `fit_census.py` output unchanged.
-
-**Then, and only then, [GUI TEST] -- READY FOR DOUG NOW:** confirm on
-real hardware that an 840 Compass screen can be edited to 0, 1 or 2
-fields through the GUI and deployed, and that the layout picker offers
-exactly those three. The lab checks prove the rules changed; only the
-device proves the result renders.
+Known unresolved, with what's been narrowed:
+- **520, 578** — on the 840's Workout screen, alongside 522 Duration
+  and 511 Workout Comparison.
+- **579** — on both STEPS Metrics and eBike Metrics, between 491 Assist
+  Mode and 494 Travel Range. An eBike/drivetrain field.
 
 ---
 
-## Phase 2 -- finish v1.5.0   **DONE 2026-09-29; merge and tag remain**
+## Phase D — named screen types still unidentified   [BENCH]
 
-Ordered deliberately: safety, then the feature that depends on Phase 1,
-then the smaller piece, then release mechanics.
-
-- [x] **[CODE] #142 -- device-dependent paths inert offline.** First because
-      it is the safety item: today an offline session walks all the way
-      to "Write to Device" before anything stops it. It refuses cleanly
-      rather than tracebacking, so this is untidy rather than dangerous
-      -- but it invites a real mistake.
-- [x] **[CODE] #141 -- Export replaces Deploy offline.** Safe to build only
-      after Phase 1, so its validation does not encode 530 rules into
-      the one feature whose entire purpose is serving the 840.
-- [x] **[CODE] #145 -- `startup.txt` offline import/export.**
-- [x] **[CODE] #143 -- release mechanics.** Headless verification, version
-      bumps, `RELEASE_NOTES_v1.5.0.md`, README changelog entry, State of
-      play refresh.
-
-**Verify -- this phase is where Doug's testing lives.**
-
-The four tasks above are [CODE]. What follows them is **[GUI TEST]**,
-and it is the one kind of verification that cannot happen in the build
-environment: no wx, no Edge attached.
-
-- [ ] **[LAB]** Claude re-runs the headless checks first, so the GUI
-      pass is not spent finding things a script would have caught.
-- [x] **[GUI TEST]** Doug worked `TEST_PLAN_v1.5.0.md` sections B
-      through E, which are currently BLOCKED on exactly the three
-      unbuilt items above. Section A already passes in full.
-- [ ] **[GUI TEST]** Record results in `TEST_PLAN_v1.5.0.md` itself --
-      that file is the live record. Bring failures to chat; passes cost
-      the same to relay and produce nothing actionable.
+- [ ] **`f10=64`** — carries 316 "Lights Connected" and 319 "Light
+      Mode". Named "Lights" once and **withdrawn**: field contents are a
+      stamped template, not proof of identity, and the 840's Screens
+      menu offers no Lights entry. Census3 killed the competing Music
+      reading (Music is `f10=30`), leaving Lights as the only hypothesis
+      standing — **which is not evidence.** Naming it needs the editor
+      to actually offer the screen, i.e. paired lights.
+- [ ] **`f10=128`** — factory INDOOR profile, inactive, `f3=2` holding
+      Speed and Distance. See Phase B.
+- [ ] **`f10=223`** — factory Road profile, inactive, `f3=5`.
+- [ ] **`f10=26` Virtual Partner** is 530-only. Kept in the global table
+      and in the 840's no-field-edit set deliberately: a 530 profile can
+      be deployed to an 840, so an 840 session can still meet the
+      record.
 
 ---
 
-## Phase 3 -- v1.6.0, per-model layout tables   **STATUS: blocked on Segment 4/A/B/C [BENCH]**
+## Phase E — open questions, none blocking
 
-Do NOT start this inside v1.5.0.
-
-Phase 1 part B already lands the measured 840 entries, so this phase is
-now COMPLETION rather than construction: the remaining types, Stamina's
-stacked geometry, and whatever a third model turns out to need.
-
-**Blocked on one measurement:** Segment's 4/A, 4/B and 4/C `f8` values
-on the 840. The 530 INVERTS the mapping for Segment -- 4/A stores
-`f8=2`, 4/B stores `f8=1`, backwards from every ordinary screen -- so
-whether the 840 keeps the inversion decides whether letter-to-`f8` can
-be stored per-type or has to be per-type-per-model. Nothing else
-currently distinguishes those two designs.
-
-**What is already measured, for the 840 column:**
-
-| Type | 530 | 840 |
-|---|---|---|
-| User screens | A/B at 3-7 | **A/B/C at 3-9**, none at 1, 2, 10 |
-| Compass (35) | LOCKED at 2 | 0, 1 or 2; default 2 (Speed, Distance) |
-| eBike Metrics (58) | 1-4 | 1-8, no A/B/C |
-| STEPS Metrics (95) | -- | 1-8, no A/B/C |
-| Lap Summary (74) | 1-4, no variants | 0, 1/A, 1/B, 2/A, 2/B, 3, 4 |
-| Segment (56) | 0, 2, 4/A, 4/B, 6 | 0, 2, 4/A, 4/B, **4/C**, 6/A, 6/B |
-| Stamina (127) | -- | 0, 2/A, 2/B, 4, 5, 6 |
-| Power Guide (125) | -- | fixed 2 |
-| Music Control (30) | -- | fixed 2 |
-| GroupRide (162) | -- | 0 fields |
-| Map (25) | 0/A, 0/B, 1, 2 | identical |
-
-## Open questions, none blocking
-
-- **`f10=64`** -- "Lights" was named from field contents and withdrawn
-  (Doc rev 123 SS3). Music turned out to be `f10=30`, killing the
-  competing reading, so Lights is the only hypothesis left standing --
-  which is not evidence. Naming it needs the 840's editor to actually
-  offer the screen, which probably means paired lights.
-- **`f10` 128 and 223** -- unnamed. 223 ships inactive on the 840 with
-  five real fields; 128 has not been seen in a pulled profile at all.
-- **Field ids 520, 578, 579** -- in `KNOWN_UNRESOLVED_IDS`. 520 and 578
-  are Workout fields, 579 is eBike/drivetrain.
-- **`f4`, `f6`, `f11`** -- three decoded-but-unexplained `mesg 14`
-  fields, present on both models. `f11=2` appears only on INDOOR Map
-  screens; whether it tracks the sport or the screen type is untested.
-- **The inactive/removed split** rests on `f9`/`f10` surviving, which is
-  an inference from two models. The 840's own Remove behaviour is
-  untested.
+- **The device erases some reserve records on import.** A NewFiles
+  import wiped `f10=64` and the user-Removed record, while `f10=223` —
+  in the identical state — survived. Recorded as observed; no
+  explanation. Plausible: the device rebuilds the reserve pool from
+  what the hardware currently supports. Untested.
+- **The inactive/removed split is provisional.** It rests on `f9`/`f10`
+  surviving, inferred from two models; the 840's own Remove behaviour
+  has never been tested.
+- **`f4`, `f6`, `f11`** — three `mesg 14` fields present on both models
+  and never decoded. `f4` reads `1..10` on factory screens and `255` on
+  any screen added later, even by Garmin's own editor. `f11` is `1`
+  almost everywhere and `2` on exactly the INDOOR Map screens. Whether
+  `f11` tracks the sport or the screen type is untested.
+- **Named-screen appearance is EDITOR PREVIEW, not live rendering.**
+  Everything recorded about what Segment, ClimbPro, Workout and
+  GroupTrack look like comes from the editor's static mock. Not
+  load-bearing — `f8` values are stored bytes and field geometry is
+  identical across variants — but it should not be read as a sighting.
 
 ---
 
-## Standing disciplines, because they have each earned their place
+## Phase F — carried over, unbuilt
+
+- [ ] **#106 odometer** (`Totals.fit`). Substantially de-risked: a
+      hand-modified file was written via `NewFiles/` over MTP and
+      accepted, the format is confirmed by writing, and the device does
+      not rewrite totals on import. Still unbuilt. Note what the format
+      *cannot* hold: no ascent, descent, speed, heart rate, cadence or
+      power — four of Garmin Connect's twenty columns have anywhere to
+      go, and any feature should say so rather than implying a fuller
+      restore.
+- [ ] **Cross-device profile check** — the other half of the serial
+      work. Serial-keyed backups shipped in v1.5.0; warning when a
+      profile meets a device it didn't come from did not. Decide
+      nudge-vs-warning wording from a real cross-model test; note a
+      cross-model deploy has already succeeded (FLDTEST, a 530 profile,
+      onto the 840), so it is not automatically wrong.
+- [ ] **`save_working_dir()` read-modify-write** — latent bug, no longer
+      a prerequisite for anything after the backup layout changed. Worth
+      fixing on its own merits.
+
+---
+
+## Standing disciplines — each one earned its place
+
+**Evidence**
 
 - **The device is the author.** A profile file is evidence about a
   device only if the device wrote it. Set states in Garmin's editor,
   then pull and read.
-- **Write down what you set, as you set it** -- count, menu letter,
+- **Write down what you set, as you set it** — count, menu letter,
   screen position. `f8` values are uninterpretable without it.
-- **Give each screen a unique first data field**, so a dump can be
-  matched to the notes even if display order shifts.
-- **Build screens up rather than shrinking them**; shrinking leaves
-  stale ids in `f7`'s trailing slots. Only the first `f3` entries are
-  real.
-- **Doc revs are superseded, never rewritten** once committed.
-- **No personal ride statistics** in `PROJECT_NOTES.md` or `README.md`
-  -- the repo is public.
-- **No provenance in user-facing strings.**
+- **When a label is what you're testing, anchor on something the label
+  can't contaminate.** Matching Segment variants by appearance rather
+  than menu letter is what proved a confident hypothesis wrong.
+- **Only the first `f3` entries of `f7` are real**; the rest are stale
+  ids from an earlier shrink. Reading trailing slots as content is how
+  the 2026-08-17 batch went wrong.
+- For undocumented FIT messages trust `fit_raw_walk.parse_fit()`, not
+  the garmin-fit-sdk decoder.
+
+**Verification**
+
+- **Structural checks beat exercising paths.** A static audit over
+  every handler found three gaps that reading the code had not; a sizer
+  check caught four buttons that would have been invisible. Exercising
+  the paths you thought of finds only what you already thought of.
+- **When a change can't be exercised in the build environment, "it
+  works" is a HYPOTHESIS until hardware says otherwise — say so.** The
+  per-model feature shipped inert for a day because twelve passing CLI
+  tests were treated as covering the GUI.
+- **Checking a feature EXISTS is not checking it's REACHABLE** from the
+  state the user is actually in. This has now happened twice.
+
+**Code**
+
+- **A mode-dependent change to a reused widget needs a matching restore
+  in the other mode, written at the same time.** Panels are reused
+  across modes; anything set in one persists into the other.
+- **Wrap at the point of display, not at each append** — or better, use
+  a widget that can't widen its parent. The window-width bug has seven
+  occurrences.
+- **Omission is meaningful** in `MODEL_LAYOUTS`: a type absent from a
+  model's entry is unenforced, not governed by the 530's rule. That is
+  what lets the table hold only measured facts.
+
+**Documentation**
+
+- Doc revs are **superseded, never rewritten** once committed. Check
+  `git log` before amending a recent rev.
+- **No personal ride statistics** in `PROJECT_NOTES.md` or `README.md` —
+  the repo is public.
+- **No provenance in user-facing strings.** A dialog says what will
+  happen and why it matters; the test, date and hardware go in the
+  code comment beside it.
+
+---
+
+## Release procedure
+
+1. Finish and test on hardware.
+2. Bump the `__version__` strings; write `RELEASE_NOTES_vX.Y.Z.md`; add
+   the README `## Changelog` entry; refresh PROJECT_NOTES State of play.
+3. Work on a branch; `main` stays at the last release until tested.
+4. `git checkout main && git merge <branch>` (fast-forward if `main`
+   hasn't moved).
+5. **Tag on `main`, never on the branch**, and use `-a` or `-F` —
+   `git push --follow-tags` skips lightweight tags silently, which is
+   how v1.3.0 ended up with no tag message.
+6. `git push origin main --follow-tags`, then `git branch -d <branch>`.
