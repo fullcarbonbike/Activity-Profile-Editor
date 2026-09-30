@@ -94,22 +94,40 @@ if it holds, the refactor is half the size it looks.
 
 ---
 
-## Phase B — the 840 picture is really a ROAD picture   [BENCH] + [LAB]
+## Phase B — per-SPORT differences   **DONE 2026-09-30**
 
-Doc rev 123 recorded `f10=128` as "not yet seen in a pulled profile". It
-had been there all along — in the factory **INDOOR** profile, not Road,
-which is all the census had ever been pointed at.
+Ran against the three factory profiles already on disk; no pull needed.
 
-**So a screen type can be per-SPORT as well as per-model**, and "we
-surveyed the 840" is currently overstated.
+**Result: no previously-unknown types, and nothing to add to the table.**
+`f10=128` is confirmed the only type unique to one sport (INDOOR). Every
+other type across all three appears in at least two.
 
-- [ ] **[LAB]** Census the INDOOR and MOUNTAIN factory profiles already
-      in `Test4`: `python3 fit_census.py <folder> --summary`. Costs
-      nothing; they're on disk.
-- [ ] **[BENCH]** If either holds types or states Road never showed,
-      walk that profile's Screens menu the way the Road one was walked.
+**But the comparison turned up something else, and it is bigger than
+what Phase B asked.** These are PRE-SETUP pulls, and the pre-setup ROAD
+profile is not like the others:
 
----
+| Profile | distinct `f10` | unconfigured slots |
+|---|---|---|
+| factory ROAD (pre-setup) | **12** | **19** |
+| factory INDOOR | 20 | 11 |
+| Census1 (post-setup Road clone) | **19** | **11** |
+
+Pre-setup ROAD genuinely lacks Segment, Stamina, Radar and Power Guide.
+The post-setup Road profile has them. **The device POPULATED the reserve
+pool during setup** — it is something the device maintains and changes,
+not a fixed factory stamp.
+
+Two consequences:
+
+- **"Sport difference" and "pre/post-setup difference" are confounded**
+  in any comparison using the Test4 pulls. The 128-is-INDOOR-only
+  finding survives, since 128 appears in no post-setup profile either,
+  but anything else drawn from a ROAD-vs-INDOOR comparison of those
+  files needs the post-setup versions instead.
+- It joins the import-strips-by-type finding (Doc rev 128 §4) as a
+  second case of **the device rewriting which screen records exist**,
+  rather than merely which are active. Whatever maintains that pool
+  runs at setup and at import.
 
 ## Phase C — the field-ID census   [BENCH] then [CODE]
 
