@@ -151,7 +151,32 @@ any profile we have read, so no id is known for them at all. There is no
 backlog from what has been pulled — only 3 unnamed ids are in use, and
 all three are narrowed.
 
-### C1. Find the targets — scan for ABSENCES   [BENCH]
+### C1. Find the targets   **DONE 2026-09-30 — 34 remain**
+
+Doug cross-referenced the 840 manual's data-field appendix against the
+known list and produced `EDGE840_NEW_FIELDS_CHECKLIST.md`: **37 field
+names with no 530 counterpart**, grouped by category, with notes on
+which are likely renames rather than new fields.
+
+**Three were resolved immediately, two of them with no device at all:**
+
+| Field | id | How |
+|---|---|---|
+| Compass | **529** | confirmed by experiment 2026-09-29 |
+| Map | **725** | same screen, same experiment |
+| Smart Travel Range | **579** | matched to positions already in Doug's own on-device notes for two different screens |
+
+That last one is the method worth repeating: the checklist supplied a
+NAME, and existing notes already recorded that name's position in two
+screens whose other ids were independently confirmed. No new measurement
+— just two records that could not be connected until the name existed.
+
+**34 remain.** Notable clusters: a 12-field **Force** category that may
+not exist on the 530 at all, a 6-field **Vertical Descent Speed** family
+paralleling VAM, and several likely renames (Trainer Controls vs the
+530's Trainer Resistance; Primary/Secondary Target vs 521 Target).
+
+### C1b. If more scanning is wanted — look for ABSENCES   [BENCH]
 
 `KNOWN_FIELD_NAMES.md` lists all 172 known names, sorted by name.
 

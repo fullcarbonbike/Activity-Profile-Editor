@@ -372,6 +372,23 @@ FIELD_ID_NAMES = {
     529: "Compass",
     725: "Map",
     240: "Location",
+
+    # ---- 2026-09-30, resolved WITHOUT touching the device --------------
+    # Doug cross-referenced the 840 manual's data-field appendix against
+    # this table and produced a list of names with no 530 counterpart.
+    # "Smart Travel Range" matched a position already recorded in his own
+    # on-device notes for two DIFFERENT screens:
+    #
+    #   eBike Metrics (f10=58): 491, 579, 494, 56, 6
+    #     = Assist Mode, SMART TRAVEL RANGE, Range, Timer, Distance
+    #   STEPS Metrics (f10=95): 491, 579, 180, 494
+    #     = Assist Mode, SMART TRAVEL RANGE, Rear Gear, Range
+    #
+    # Both put 579 in the same named position, and both are anchored by
+    # ids already independently confirmed (56 Timer, 6 Distance, 180 Rear
+    # Gear). Two screens agreeing is what makes this a reading rather
+    # than a guess.
+    579: "Smart Travel Range",
     45:  "Workout Step",
     100: "Last Lap Power",
     258: "Lap Time Standing",
@@ -1563,7 +1580,7 @@ def screen_type_name(f10):
 # association with the f10=32 Conditional record they happened to be
 # seen on -- they aren't GroupTrack-specific at all, just two ordinary
 # lap-stat fields that record used them for other purposes.)
-KNOWN_UNRESOLVED_IDS = {520, 578, 579}
+KNOWN_UNRESOLVED_IDS = {520, 578}
 # Repopulated 2026-09-27 (Doc rev 123), closing rev 117's follow-up.
 # All three are REAL 840 field ids that the 530 does not have -- rev 117
 # confirmed the 530 renders them as a silent "Speed" fallback rather
@@ -1572,9 +1589,10 @@ KNOWN_UNRESOLVED_IDS = {520, 578, 579}
 # Rev 122 narrowed what they belong to:
 #   520, 578 -- on the 840's Workout screen (f10=38), alongside 522
 #               "Duration" and 511 "Workout Comparison"
-#   579      -- on BOTH STEPS Metrics (f10=95) and eBike Metrics
-#               (f10=58), sitting between 491 "Assist Mode" and 494
-#               "Travel Range", so an eBike/drivetrain field
+#   579      -- RESOLVED 2026-09-30, see FIELD_ID_NAMES: "Smart Travel
+#               Range". Doug's cross-reference of the 840 manual's field
+#               appendix named it; two independent screens then placed
+#               id 579 at exactly that position.
 # Naming them needs the on-device editor to display the screen that
 # holds them, which on the 840 means the relevant hardware present.
 
