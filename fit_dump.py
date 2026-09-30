@@ -1095,18 +1095,18 @@ MODEL_LAYOUTS = {
             # editor offers 0, 1 or 2 where the 530 locks 2. (0,0) and
             # (2,0) are stored bytes.
             #
-            # ⚠ COUNT 1's VARIANT IS AN INFERENCE AND IT IS NOW SUSPECT.
-            # It was assumed f8=0 from "no alternates offered at that
-            # count" plus f8=0 at both other counts. On 2026-09-30
-            # Stamina falsified exactly that reasoning: its counts 4 and
-            # 5 offer no letter choice either and BOTH store f8=1. So a
-            # single-option count does NOT imply f8=0 on this device.
+            # Count 1 MEASURED 2026-09-30: f8=0. The earlier inference
+            # was right -- and it was right by luck, not by method.
             #
-            # If (1,0) is wrong and the real value is (1,1), this entry
-            # REFUSES a legal one-field Compass -- the very defect
-            # v1.5.0 shipped to fix. Needs measuring: set Compass to 1
-            # field on-device, pull, read f8. Until then it is the only
-            # unmeasured value in this table.
+            # It had been assumed f8=0 from "no alternates offered at
+            # that count". Stamina and Lap Summary both falsify that
+            # reasoning: Stamina 4/5/6 and Lap Summary 3/4 offer no
+            # letter choice either and ALL store f8=1. A single-option
+            # count says nothing about its f8 on this device.
+            #
+            # Kept as a warning rather than deleted: the table now
+            # contains no inferred values at all, and it should stay
+            # that way.
             35: {'label': 'Compass', 'content': 'top',
                  'states': [(0, 0), (1, 0), (2, 0)],
                  'grids': {0: [], 1: [[0]], 2: [[0, 1]]}},
@@ -1147,6 +1147,33 @@ MODEL_LAYOUTS = {
             # stacked 2-field is the other) -- see ACTION_PLAN A2.
             223: {'label': 'Radar', 'content': 'top',
                   'states': [(0, 0), (5, 0), (5, 1)], 'grids': {}},
+            # Lap Summary -- COMPLETE, every state measured on-device
+            # 2026-09-30. Fields sit ABOVE the device-generated content
+            # area, hence content='bottom', matching the 530 entry.
+            #
+            # Note 1/A and 1/B share a grid: both are a single
+            # full-width field and differ only in its HEIGHT (small vs
+            # large). The grid model describes positions, not sizes, so
+            # that distinction is invisible here -- recorded rather than
+            # faked.
+            74: {'label': 'Lap Summary', 'content': 'bottom',
+                 'states': [(0, 0), (1, 0), (1, 1), (2, 0), (2, 1),
+                            (3, 1), (4, 1)],
+                 'grids': {0: [],
+                           (1, 0): [[0]], (1, 1): [[0]],
+                           (2, 0): [[0], [1]], (2, 1): [[0, 1]],
+                           3: [[0], [1, 2]],
+                           4: [[0, 1], [2, 3]]}},
+            # Stamina -- COMPLETE, measured 2026-09-30. Fields sit BELOW
+            # the content area (Power/HR graphs), so content='top'.
+            127: {'label': 'Stamina', 'content': 'top',
+                  'states': [(0, 0), (2, 0), (2, 1), (4, 1), (5, 1),
+                             (6, 1)],
+                  'grids': {0: [],
+                            (2, 0): [[0], [1]], (2, 1): [[0, 1]],
+                            4: [[0, 1], [2, 3]],
+                            5: [[0], [1, 2], [3, 4]],
+                            6: [[0, 1], [2, 3], [4, 5]]}},
             # Workout -- COMPLETE with no new measurement needed. The
             # 840's editor offers NO layout choice for this type (Doug,
             # 2026-09-28: "there's no option to change the layout"), so
@@ -1324,7 +1351,20 @@ def layout_grid(f10, count, variant=0, product=None):
     """
     entry = named_layout(f10, product)
     if entry is not None:
-        return entry['grids'].get(count)
+        # Keyed by (count, variant) FIRST, plain count second.
+        #
+        # Measuring the 840's Lap Summary and Stamina (2026-09-30) found
+        # the same count rendering two different SHAPES depending on the
+        # variant: Lap Summary 2/A is two full-width fields stacked,
+        # 2/B is two half-width side by side. A grids dict keyed by
+        # count alone cannot say that -- it would draw one of them wrong.
+        #
+        # Backwards compatible: every existing entry keys by plain count
+        # and still resolves through the fallback.
+        grid = entry['grids'].get((count, variant))
+        if grid is None:
+            grid = entry['grids'].get(count)
+        return grid
     return LAYOUT_GRIDS.get(count, {}).get(variant)
 
 
