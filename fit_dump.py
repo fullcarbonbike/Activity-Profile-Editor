@@ -984,6 +984,21 @@ def profile_model(path_or_messages):
     and "no identity at all" call for different handling, and the raw id
     is what a user would report when asking for a new model to be added.
 
+    ⚠ THIS REPORTS WHICH DEVICE THE PROFILE BELONGS TO, NOT WHICH ONE
+    AUTHORED ITS CONTENTS. Confirmed 2026-09-30: a 530-authored profile
+    deployed cross-model onto an 840 comes back reporting the 840's
+    product and serial -- the device rewrites `file_id` on import.
+
+    That is the RIGHT answer for the question this function is asked,
+    since callers want to know whose rules apply when the profile is
+    rendered. But it means authoring provenance is lost at the first
+    cross-model deploy, and a profile can legitimately hold a layout
+    state its CURRENT model does not offer. The v1.4.0 read-side flag
+    exists for exactly that and fires correctly: an FLDTEST pulled off
+    the 840 holds a 4-field Lap Summary at f8=0, legal on the 530 where
+    it was written and not offered by the 840, which clamps at render
+    time and leaves the file alone.
+
     NEVER raises: callers enumerate folders that may hold junk.
     """
     try:
