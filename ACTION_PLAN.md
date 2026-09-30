@@ -162,6 +162,51 @@ Known unresolved, with what's been narrowed:
       to actually offer the screen, i.e. paired lights.
 - [ ] **`f10=128`** — factory INDOOR profile, inactive, `f3=2` holding
       Speed and Distance. See Phase B.
+
+### D1. The activation experiment   [BENCH] — file already built
+
+Doug's idea, 2026-09-30, and it reaches something nothing else does:
+**force the unknown types ACTIVE and let the device say what they are.**
+
+`CyclingIndoor_CycleF10TEST.fit` is built and waiting in the working
+folder. It is the factory INDOOR profile — the only one holding all
+three unknowns — cloned to the display name `F10TEST`, with slots 8
+(`f10=64`), 14 (`f10=128`) and 19 (`f10=223`) set to `f1=1`, `f12=0`
+and non-colliding `f9` values of 57/58/59, so they land as the LAST
+three screens and disturb nothing above them.
+
+Identify them on-device by content, in scroll order after Power Guide:
+
+| Position | `f10` | Fields |
+|---|---|---|
+| 12th | 64 | Lights Connected, Light Mode |
+| 13th | 128 | Speed, Distance |
+| 14th | 223 | Timer, Speed, Distance, Grade, Time of Day |
+
+**Method note:** `--un-remove` was retired in v1.13.0, so there is no
+CLI path to set `f1=1`. `patch_screen()` takes a raw `def_num -> bytes`
+dict and writes it directly — the retired flag was a convenience, not
+the capability.
+
+**What each outcome tells us:**
+
+- **They appear and render** — the types are identified, and the
+  toolkit can reach screens Garmin's own editor won't offer.
+- **They appear in the editor but render blank** — they are real types
+  gated on hardware or a ride condition.
+- **The device erases them on import** — then the purge that took
+  `f10=64` out of Census3 is about the TYPE, not the `f1` state, which
+  explains the 64-survives-223 asymmetry differently and is worth
+  knowing on its own.
+
+All three are findings. There is no wasted outcome.
+
+**Caveats.** The filename is new, so the device may create a new profile
+or may ignore it — NewFiles is confirmed to RECREATE a deleted profile
+but creating one that never existed is untested. If it is ignored, fall
+back to replacing a profile that can be restored from backup. And pull
+the profile back afterwards either way: whether the records survived is
+half the result.
 - [ ] **`f10=223`** — factory Road profile, inactive, `f3=5`.
 - [ ] **`f10=26` Virtual Partner** is 530-only. Kept in the global table
       and in the 840's no-field-edit set deliberately: a 530 profile can
