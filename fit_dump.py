@@ -619,7 +619,11 @@ NAMED_SCREEN_TYPES = {
     # as f10=30, not 64. That leaves the Lights reading as the only one
     # still standing, and Doug adding EVERY named screen the 840 offers
     # left 64 and 223 still inactive, consistent with both being gated on
-    # hardware or a runtime condition rather than merely unlisted.
+    # NOT explained -- see the note below. An earlier reading, that these
+    # are "waiting on hardware you haven't paired", was FALSIFIED on
+    # 2026-09-30: Radar (f10=223) was forced active with f1=1 and the
+    # 840's editor listed it with no radar unit paired at all. The
+    # editor reads the RECORD, not the hardware.
     # Still NOT renamed: "the only surviving hypothesis" is not evidence,
     # and the original error was naming a type from a stamped field
     # template. Naming it needs the editor to actually offer the screen,
@@ -1854,7 +1858,9 @@ def cmd_screens(args):
         print("  not a pile of dead records. The 530 ships these types Active")
         print("  instead, which is why the bucket is normally empty there.")
         print("  Anything left here after the editor's Add Screen list is")
-        print("  exhausted is gated on hardware or a runtime condition.")
+        print("  exhausted has NOT been explained. Radar (f10=223) was made")
+        print("  to appear by setting f1=1 with no radar hardware paired, so")
+        print("  the editor lists a type from its RECORD, not from hardware.")
         print("  Their f9 values can DUPLICATE an active screen's, so the")
         print("  position column is blank -- they are not in the scroll order,")
         print("  and the device RENUMBERS f9 across the whole profile when one")

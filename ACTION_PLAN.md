@@ -193,7 +193,8 @@ the capability.
 - **They appear and render** — the types are identified, and the
   toolkit can reach screens Garmin's own editor won't offer.
 - **They appear in the editor but render blank** — they are real types
-  gated on hardware or a ride condition.
+  NOT explained. See Phase E -- the "waiting on hardware" reading was
+  falsified on 2026-09-30.
 - **The device erases them on import** — then the purge that took
   `f10=64` out of Census3 is about the TYPE, not the `f1` state, which
   explains the 64-survives-223 asymmetry differently and is worth
@@ -217,11 +218,30 @@ half the result.
 
 ## Phase E — open questions, none blocking
 
-- **The device erases some reserve records on import.** A NewFiles
-  import wiped `f10=64` and the user-Removed record, while `f10=223` —
-  in the identical state — survived. Recorded as observed; no
-  explanation. Plausible: the device rebuilds the reserve pool from
-  what the hardware currently supports. Untested.
+- **The device erases some reserve records on import — and it is NOT
+  about hardware.** A NewFiles import wiped `f10=64` and the
+  user-Removed record while `f10=223`, in the identical state,
+  survived. The obvious reading was that the device rebuilds the
+  reserve pool from what the hardware supports.
+
+  **That reading is FALSIFIED (2026-09-30).** Radar (`f10=223`) was
+  forced active and the 840's editor listed it **with no Varia radar
+  paired at all** — so the editor reads the RECORD, not the hardware.
+  And in the same profile `f10=64` and `f10=128` were forced active
+  the same way and did NOT appear.
+
+  So the pattern holds by TYPE across both experiments: 223 survives,
+  64 does not, now with 128 alongside it. Whatever the device is doing,
+  it is keyed on `f10` rather than on `f1` or on paired hardware.
+
+  Peculiar, and worth stating plainly: **the 840 shipped 64 and 128 in
+  its own factory profiles**, so the device wrote records it then
+  strips on import. A firmware that carries types its current build
+  does not expose would explain it, but nothing tests that yet.
+
+  **Pending:** pull `F10TEST` back off the device. If 64 and 128 are
+  gone, they were erased on import. If they are present but still
+  unlisted, something else is gating them.
 - **The inactive/removed split is provisional.** It rests on `f9`/`f10`
   surviving, inferred from two models; the 840's own Remove behaviour
   has never been tested.
