@@ -1,5 +1,9 @@
 # Edge 840 — Fields Not in the Edge 530 Census
 
+**STATUS 2026-09-30: 3 of 37 resolved — Compass (529), Map (725), Smart
+Travel Range (579) — leaving 34 that need a device. Two of the three
+needed no device at all.**
+
 *Cross-referenced against the 530's 169-entry known-ID list and 185 unique
 field names from the Edge 840 manual appendix. These 37 are the ones with
 no corresponding entry on the 530 side — either genuinely new hardware/
@@ -8,8 +12,12 @@ already has. Fill in ID # as you confirm each one on-device.*
 
 ## eBike (1)
 
-- [ ] **Smart Travel Range** — ID: ____
-  The estimated remaining distance the eBike will provide assistance, taking into account local terrain.
+- [x] **Smart Travel Range** — **ID: 579** — RESOLVED 2026-09-30, no device needed.
+  Matched against positions already in the on-device notes for TWO screens:
+  eBike Metrics `491, 579, 494, 56, 6` and STEPS Metrics `491, 579, 180, 494`.
+  Both place 579 where "Smart Travel Range" was recorded, anchored by ids
+  already independently confirmed. This checklist is what made the match
+  possible -- the records existed, the name did not.
 
 ## Elevation — Vertical Descent Speed family (6)
 
@@ -41,8 +49,12 @@ already has. Fill in ID # as you confirm each one on-device.*
 
 ## Graphical (5)
 
-- [ ] **Compass** — ID: ____ — Listed as a plain field on the 840; on the 530 this is a dedicated screen type (f10=35), not a droppable field. Worth checking whether the 840 treats it the same way (per the Garmin forum finding — likely fixed-anchor, not freely placeable).
-- [ ] **Map** — ID: ____ — Same caveat as Compass (530's f10=25 screen type).
+- [x] **Compass** — **ID: 529** — CONFIRMED BY EXPERIMENT 2026-09-29, and the
+  caveat is answered: it IS freely placeable on the 840. Placed in a
+  half-width slot it renders as a miniature compass gauge, with no text
+  fallback -- unlike the Graph/Bars family.
+- [x] **Map** — **ID: 725** — CONFIRMED the same way on the same screen.
+  Renders as a small live map area in a half-width slot.
 - [ ] **HR Zone Bar** — ID: ____ — Bar-graph variant, parallel to the Bars cluster (347-350) already found on the 530, but for HR zone specifically.
 - [ ] **3s Power Bar** — ID: ____
 - [ ] **3s Power Graph** — ID: ____
