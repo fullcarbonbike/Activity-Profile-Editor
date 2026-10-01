@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-09-30, at Doc rev 128.*
+> *Last updated 2026-10-01, at Doc rev 129.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,76 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 129 — refreshed 2026-10-01.* **First measurement of the Edge
+840's PLAIN USER SCREEN geometry — and it matches the 530's grids
+exactly, on all four states tested. But the A/B/C variant LABELS do not
+line up, and that is recorded as unresolved rather than resolved, because
+this is the Segment trap in a new place.**
+
+Doug reported the rendered layout of the five census screens in
+`CyclingRoadCensus4.fit`:
+
+| Sheet | `f3` | `f8` | Rendered geometry | Doug's label |
+|---|---|---|---|---|
+| A | 10 | 0 | 5 half-width rows × 2 fields | *(no letter given)* |
+| B | 9 | 0 | 1 full-width, then 4 half rows × 2 | 9/A |
+| C | 7 | **1** | 2 half, 1 full, then 2 half rows × 2 | **7/A** |
+| D | 9 | 0 | same as B | 9/A |
+| E | 5 | 0 | 5 full-width stacked | 5/A |
+
+**What this settles.** Every one of those four geometries is what the
+530's grids predict for that `(count, variant)` pair, including Screen
+C's asymmetric 7-field arrangement under variant 1. So the GRIDS travel
+between models unchanged, which is consistent with what Segment already
+showed on the named types: the geometry crossed models, only the stored
+`f8` differed.
+
+**What this does NOT settle, and must not be written down as if it
+did.** Doug's letters map `f8=0 → A` three times (B, D, E) and
+`f8=1 → A` once (C). Those cannot both be right. Two readings, and this
+project has been wrong in exactly this way before:
+
+1. Screen C is really 7/**B** and the letter is a slip. Most likely on
+   the balance of three-against-one, and the geometry matches what the
+   530 calls B.
+2. The 840 genuinely labels that state "A", in which case the
+   letter→`f8` mapping is per-model — which is **precisely** what
+   Segment turned out to be on the 530, where the menu's "A" stores
+   `f8=2` rather than 0. That was found only by saving A, pulling,
+   saving B and pulling again; a single pull left the wrong assumption
+   intact (`fit_dump.py` v2.8.0).
+
+One re-check of Screen C's letter in the device's own editor decides it.
+Until then neither is recorded.
+
+**A second, independent reason the letters need their own survey.** The
+530 offers an A/B choice for counts 3–7 only (`COUNTS_WITH_B_VARIANT`).
+Doug's labels include **9/A**, and he separately reported from the iPhone
+Connect app's profile editor that the 840 offers **A, B and C for counts
+3 through 9**. If that holds, then on the 840:
+
+- the set of counts that HAVE variants is larger (3–9, not 3–7), and
+- there are THREE options, not two.
+
+The constant's own name — `COUNTS_WITH_B_VARIANT` — presumes exactly two
+and is therefore 530-specific in its very spelling. Not renamed in this
+pass (it is a live re-export from `fit_patch.py`), but flagged: a third
+variant has nowhere to go in a structure whose name says "B".
+
+**Why `MODEL_LAYOUTS` gains NOTHING from this.** Tempting, and wrong.
+Four `(count, variant)` states on one model is not that model's layout
+rule — counts 1, 2, 3, 4, 6 and 8 are untested, and every B and C
+variant is untested. Right now `model_rule_known()` returns False for
+840 user screens, so the toolkit ADVISES instead of refusing. Adding a
+partial entry would flip it to enforcing, and a partially-measured grid
+that refuses a legal state is the exact Compass failure from Doc rev
+123: the 530's rule hard-locked Compass at 2 fields when the 840's own
+editor offers 0, 1 or 2. **Omission is meaningful, and four states out
+of a dozen is an omission.** The measurements are recorded here, in
+prose, where they inform a future survey without governing a write.
 
 ---
 

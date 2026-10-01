@@ -1229,6 +1229,24 @@ def is_profile_file(path):
 # proves that mapping is per-type rather than ordinal (Segment stores
 # 4/A as f8=2 and 4/B as f8=1, inverted). Writing plausible values would
 # be exactly the error Doc rev 123 SS3 was about.
+# NOT IN THIS TABLE, on purpose: the Edge 840's PLAIN USER SCREENS.
+# Doug measured four of their states on 2026-10-01 -- (10,0), (9,0), (7,1)
+# and (5,0) -- and all four render exactly what the 530's grids predict.
+# That is a real result (the grids travel between models unchanged, same as
+# Segment showed) and it is recorded in PROJECT_NOTES.md Doc rev 129, in
+# prose, deliberately NOT here. Four states out of a dozen is not a layout
+# rule: counts 1/2/3/4/6/8 are untested and every B and C variant is
+# untested. An entry here would make model_rule_known() return True and flip
+# the toolkit from advising to ENFORCING on a partial grid -- which is the
+# Compass failure of Doc rev 123 exactly, where a 530 rule hard-locked
+# Compass at 2 fields while the 840's own editor offered 0, 1 or 2.
+# Omission is meaningful in this table, and this omission is deliberate.
+#
+# Also unresolved and relevant: the letter -> f8 mapping for 840 user
+# screens. Doug's labels put f8=0 at "A" three times and f8=1 at "A" once,
+# which cannot both hold, and he reports the 840 offering A/B/C for counts
+# 3-9 where the 530 has A/B for 3-7 only. Segment is the precedent for why
+# that is not guessable: its menu "A" stores f8=2 on the 530.
 MODEL_LAYOUTS = {
     4062: {                                    # Edge 840
         'label': 'Edge 840',
@@ -1593,7 +1611,31 @@ def layout_rules_enforced(product):
                            behaviour rather than silently going
                            permissive -- the safe direction to fail.
       surveyed model    -> ENFORCE. Rules were measured on this device.
+      model with its
+      OWN entry in
+      MODEL_LAYOUTS     -> ENFORCE. Something was measured on it, so a
+                           mismatch CAN be grounds to refuse -- but only
+                           for the types that entry actually covers, and
+                           that is model_rule_known()'s job, not this
+                           one's. The 840 reaches this branch.
       any other model   -> DO NOT ENFORCE. Advise, never refuse.
+
+    CORRECTED 2026-10-01 (Doc rev 129). The three-case contract above
+    used to list only the first, second and last of those, and said
+    plainly that "any other model" does not enforce -- which stopped
+    being true for the 840 the moment MODEL_LAYOUTS gained a 4062 entry,
+    because of the `or model_layout_entry(...) is not None` below. The
+    prose also claimed this is "NOT the same question as 'do we have a
+    table for this model'" while the code asks exactly that. Behaviour is
+    unchanged and was never wrong; the description was.
+
+    CURRENTLY UNREFERENCED. Nothing in fit_patch.py or gui_app.py calls
+    this -- enforcement is gated per (model, type) by model_rule_known()
+    alone, which is the finer and more correct question. Kept because the
+    asymmetric None-means-ENFORCE contract is the right default for any
+    future caller, but do not assume reading it tells you what the
+    toolkit does today. Checked with grep on 2026-10-01; if you wire it
+    up, say so here.
 
     Doc rev 120 SS4's posture, made callable: "refuse only when the model
     is KNOWN and the state is KNOWN-ILLEGAL." Every table in this file
