@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-01, at Doc rev 131.*
+> *Last updated 2026-10-01, at Doc rev 132.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,119 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 132 — refreshed 2026-10-01.* **The nine missing 840 user-screen
+grids are MEASURED and WIRED. All ten predicted `f8` values came back
+correct. Two corrections to my own previous two revs, one of which is that
+rev 131 declared something unresolved that this project had already
+measured — and said so in a comment two lines above the data I was
+reading.**
+
+`CyclingRoadLayouts.fit`, Doug's plan: ten user screens, one per state,
+each with a different known field at slot 0, one pull. Every `f8` as
+predicted — C=2 at counts 3,4,5,6,7,8,9 and B=1 at counts 5,8,9.
+
+**The anchors were load-bearing here, not belt-and-braces.** Screens 6/7
+are both 8 fields and 8/9 are both 9 fields; after the pull those pairs
+differ *only* by `f8`, the quantity being measured. Without a distinct
+slot-0 field there would have been no way to say which was saved as B and
+which as C.
+
+### The nine grids
+
+| State | Rows | Note |
+|---|---|---|
+| (3,2) | `[0] [1] [2]` | FW **tall**, FW **tall**, FW normal |
+| (4,2) | `[0] [1] [2,3]` | FW **tall**, FW **tall**, 2 HW |
+| (5,2) | `[0] [1] [2] [3,4]` | FW norm, FW **tall**, FW norm, 2 HW |
+| (6,2) | `[0] [1] [2,3] [4,5]` | FW norm, FW **tall**, 2 HW, 2 HW |
+| (7,2) | `[0,1] [2,3] [4] [5,6]` | all normal height |
+| (8,1) | `[0,1] [2] [3] [4,5] [6,7]` | |
+| (8,2) | `[0,1] [2,3] [4] [5] [6,7]` | |
+| (9,1) | `[0,1] [2] [3,4] [5,6] [7,8]` | |
+| (9,2) | `[0,1] [2,3] [4] [5,6] [7,8]` | |
+
+Only these nine are in `user_grids`. The other fifteen keep falling
+through to the global `LAYOUT_GRIDS`, which was separately confirmed
+correct on this model — duplicating a table that already agrees just
+creates something that can drift.
+
+### CORRECTION 1 — rev 131 understated what was already known
+
+Rev 131 wrote that the letter→`f8` mapping was "genuinely unresolved" and
+recorded A=0 as *inferred*. **Both wrong.** The comment immediately above
+`MODEL_LAYOUTS[4062]['user_states']` already read: *"5/B=1, 5/C=2, 3/C=2,
+8/C=2, 4/B=1, 10=0. So A=0, B=1, C=2, count-independent (Doc rev 122)."*
+
+So the mapping was measured weeks ago, at five states across four counts.
+I was reading the `user_states` list in that same dict and did not read
+the comment above it.
+
+Consequences, stated plainly:
+
+- **Screen 10 (5/B) was a pure duplicate.** It re-measured `5/B=1`, which
+  rev 122 already had.
+- **Three of the nine** — (3,2), (5,2), (8,2) — had their `f8` already
+  recorded. Only their *grids* were new.
+- **The capture's main value is undamaged.** Rev 122 measured `f8` values,
+  never geometry. All nine grids were genuinely unknown, and nine grids is
+  what this was for.
+
+The failure mode is worth naming because it is not the usual one: nothing
+was *wrong* in the code or the file, and no check would have caught it.
+I asked a question the project had answered, and the answer was adjacent to
+the data I was using. **Read the comment above the table, not just the
+table.**
+
+### CORRECTION 2 — `AddScreenPanel`'s justification outlived its conclusion
+
+Its comment said: a plain user screen has no `f10` to be aware of, so the
+global table is right. The **premise still holds** — `on_create()` takes
+its `f10` from `next_available_field10()`, which never returns a named
+type. The **conclusion no longer follows**, because plain-user-screen
+geometry is now model-dependent too.
+
+`product` was *not* threaded through, deliberately, because the real
+defect there is bigger than a missing argument: `COUNTS_WITH_B_VARIANT` is
+the 530's shape (counts 3–7, **two** variants) and that panel's A/B radio
+pair is built on it, while the 840 offers counts 3–9 with **three**. So on
+an 840 **that panel cannot create a C variant at all, nor any variant of 8
+or 9.** Passing `product` would only have made the diagram right for
+states the radios can already reach — every one of which resolves
+correctly through the global table anyway. A half-fix that looked like a
+fix.
+
+The panel is **correct for what it creates and limited in what it
+creates**. Workaround: create the screen there, change its layout in
+`EditScreenPanel`, which is model-aware as of v0.25.0. Scoped follow-up,
+not done.
+
+### Not inert, and checked rather than assumed
+
+`gui_app.py` v0.25.0 threads `product` into `graph_bars_warnings()`,
+`graph_bars_warning_text()` and `EditScreenPanel`'s `layout_grid()` call.
+Without that the nine grids would have changed nothing a user sees:
+`is_position_full_width()` returns `None` for an unknown state, callers
+treat `None` as "no opinion", so the Graph/Bars and Connect IQ advisories
+stayed **silent** on all nine.
+
+Verified by exercising the function directly: a Power Graph at position 0
+of a 9/C screen now warns with `product` and did not without; the same
+field at position 4, which genuinely *is* full width there, correctly
+stays silent; the 530 is identical across all thirty of its states with
+and without. That check exists because v1.5.0 shipped the whole per-model
+feature inert on a `None` that meant "enforce the 530's rules".
+
+### Height, still unmodelled
+
+Counts 3–6 variant C mix **normal and larger** full-width rows, which a
+grid of row memberships cannot express. `is_position_full_width()` is
+unaffected (it asks a width question); the GUI diagram is schematic rather
+than faithful on those four. **Open question, not an assertion:**
+Graph/Bars fields are known to need full width — whether they also want
+the *taller* row has never been tested.
 
 ---
 
