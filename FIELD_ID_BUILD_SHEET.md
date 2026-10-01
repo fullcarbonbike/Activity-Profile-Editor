@@ -55,20 +55,28 @@ prior failure.
 | 7 | Lap Vertical Descent Speed | |
 | 8 | Lap Ascent | |
 
-## Screen C — anchor **Heart Rate** + Graphical, Navigation, Temperature   (10)
+## Screen C — anchor **Heart Rate** + Graphical, Navigation, Temperature   (9)
+
+HR Zone Bar was here; it is resolved (= id 23, "HR Zone Graph") and the
+row is gone, so this screen is 9 fields, not 10. **Slots renumbered —
+place in the order below, not the order you may have already written
+down.**
 
 | Slot | Field | ID found |
 |---|---|---|
 | 0 | **Heart Rate** *(anchor — id 13)* | 13 |
 | 1 | Lap Descent | |
-| 2 | ~~HR Zone Bar~~ **already known: id 23, "HR Zone Graph"** — skip, use a spare target here | |
-| 3 | 3s Power Bar | |
-| 4 | 3s Power Graph | |
-| 5 | Dist. to Point | |
-| 6 | Next Waypoint | |
-| 7 | Time to Point | |
-| 8 | 24-Hour Minimum Temperature | |
-| 9 | 24-Hour Maximum Temperature | |
+| 2 | 3s Power Bar | |
+| 3 | 3s Power Graph | |
+| 4 | Dist. to Point | |
+| 5 | Next Waypoint | |
+| 6 | Time to Point | |
+| 7 | 24-Hour Minimum Temperature | |
+| 8 | 24-Hour Maximum Temperature | |
+
+Four of this screen's eight targets (slots 2, 3, 4, 6) are on the Step 0
+pre-check list. If the picker settles them as renames, Screen C may
+shrink to three or four fields — worth doing Step 0 before building it.
 
 ## Screen D — anchor **Power** + Workouts, Trainer, carried-over   (8)
 
@@ -89,7 +97,7 @@ screen if the device caps a screen at 8 for some layout you pick.)*
 
 ---
 
-## Before you start — check the name-mismatch pairs first
+## Step 0 — check the name-mismatch pairs first
 
 `EDGE840_NEW_FIELDS_CHECKLIST.md` now lists six manual names that
 resemble something already known. One scroll through the picker tells
