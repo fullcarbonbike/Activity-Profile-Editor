@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-01, at Doc rev 133.*
+> *Last updated 2026-10-01, at Doc rev 134.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,57 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 134 — refreshed 2026-10-01.* **CORRECTION to rev 133, same day.
+Rev 133 made a general rule out of one app, one version, one feature. The
+narrowed version is more useful than the claim it replaces: Connect IQ room
+requirements are per-app AND per-version, change when an app updates, and
+are therefore not facts this toolkit can hold at all.**
+
+**What rev 133 claimed.** That "height gates functionality, not just
+legibility" and that "full width is not always sufficient" — stated as
+properties of the layout, in a Doc rev and in `fit_dump.py`'s changelog.
+
+**Doug's narrowing.** WindField operates in **any** size data field.
+Usefulness merely *starts* at a normal full-width one — it does not
+*require* full width. And the taller-row need arrived with a **recent
+version** of the app, rather than being inherent to it. Other Connect IQ
+fields have entirely different requirements.
+
+So the observation is sound and the generalisation was not. One app, one
+version, one feature is not a geometric property of anything.
+
+**What follows instead, and it is a stronger conclusion.** Connect IQ room
+requirements are **per-app and per-version**. They can change under the
+user's feet when an app updates, with no change to the profile, the layout
+or anything this toolkit can see. They are not stable facts, so they are
+not facts this project can encode.
+
+That is not a new position — it **reinforces one already in writing**.
+`gui_app.py` v0.21.0's changelog says of the CIQ half-width advisory:
+*"advisory only, never a block, since how much room an app needs is its
+author's business."* The WindField case is evidence **for** that posture.
+Read correctly it is an argument against ever building a per-app geometry
+table, not an invitation to start one.
+
+**What stands from rev 133:**
+
+- **Tier 1 and tier 2 are unaffected.** `GRAPH_OR_BARS_FIELD_IDS` and
+  `SMALL_SLOT_UNUSABLE_FIELD_IDS` (529 Compass, 725 Map) describe
+  **Garmin's own** fields, whose behaviour is fixed by the firmware rather
+  than by a third-party author who can ship an update. The tier-2 advisory
+  built in v0.26.0 is untouched.
+- **The `(3,0)` versus `(3,1)` point stands and is independent of any of
+  this.** Two legal 530 states with identical rows differing only in
+  height is a fact about Garmin's own layouts, observed in this project's
+  own table, and is still the sharpest argument that height is unmodelled.
+- **`row_height_note()` stands.** It consolidates observations and makes no
+  claim about what any field needs.
+
+**The generic CIQ advisory keeps its generic wording.** Nothing to change
+in the code beyond the correction notes.
 
 ---
 
