@@ -122,7 +122,7 @@ Consumers must not assume these two have a static on-device label.
 
 | ID | Edge 530 | Edge 840 |
 |---|---|---|
-| 478 | `EPOC` | `LOAD` *(Garmin's own rename)* |
+| 478 | `EPOC` | `LOAD` *(Garmin's own rename — see citation)* |
 | 32 | `Next Pt Location` | `WPT NEXT` |
 
 The 530 strings are kept; the 840 strings are in trailing comments. **Two is
@@ -130,9 +130,49 @@ below the count that would justify making display names per-model** the way
 `MODEL_LAYOUTS` is. That count is the thing to watch — the principle was
 never in doubt, only whether it was worth the change to every read path.
 
+**478 is confirmed from the vendor, not inferred.** Garmin's own manual
+defines the field: Load is *"the training load for the current activity.
+Training load is the amount of excess post-exercise oxygen consumption
+(EPOC), which indicates the strenuousness of your workout."* So this is one
+field under two names across product generations, not two metrics that
+happen to look alike — which is a stronger basis than any of this project's
+other rename conclusions, all of which rest on observation.
+
 Separately, **294** is a *menu versus rendered* difference on one model, not
 a cross-model one: the picker says "Trainer Controls", the field renders
 `RESISTANCE`. Stored as "Resistance".
+
+### The picker now states the device label — six fields
+
+Doug's call: the picker should say what will actually appear, even where that
+disagrees with the stored name. `AMBIGUOUS_DEVICE_LABELS` (fit_dump.py
+v2.12.0) holds the six ids where the on-device label does not identify the
+field on its own, and `FieldPickerDialog` (gui_app.py v0.24.0) appends it to
+the row:
+
+```
+Avg Force       (id=847, shows as "Average")
+Max. Force      (id=849, shows as "MAX")
+Max. Lap Force  (id=850, shows as "MAX LAP")
+Last Lap Force  (id=854, shows as "LAST LAP")
+Primary Target  (id=520, no label on-device)
+Secondary Target (id=578, no label on-device)
+```
+
+**Six, not thirty-three.** The many fields that render a space abbreviation —
+`3S FRC`, `LAP W/KG`, `30S DES SPD` — are deliberately not flagged: that is
+the same wording shortened and a reader goes straight through it. A note on
+nearly every new field becomes wallpaper. `Average` is the one that genuinely
+matters, since it collides in meaning with every other average field in the
+catalog and a list box cannot reproduce the glyph that disambiguates it.
+
+Doug's observation, worth keeping on the record: it is unclear why Garmin
+did not just use `AVG FRC`, which would have been both short and
+unambiguous.
+
+Note the four abbreviated-but-clear Force entries — 860 `FORCE`, 851
+`3S FRC`, 848 `LAP FRC` — are **not** in that table. Their text still says
+force.
 
 ---
 
