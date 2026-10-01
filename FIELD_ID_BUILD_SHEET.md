@@ -92,8 +92,36 @@ built on its own.
 | 7 | Lap %HRR | |
 | 8 | Lap Watts/kg | |
 
-*(Screen D has 9 rows including the anchor; drop Lap Watts/kg to a fifth
-screen if the device caps a screen at 8 for some layout you pick.)*
+*(Screen D has 9 rows including the anchor; drop Lap Watts/kg to Screen E
+if the device caps a screen at 8 for some layout you pick.)*
+
+## Screen E — anchor **Odometer** + Stamina   (5)
+
+Added 2026-09-30. The Stamina category was not in the manual appendix and
+so was not in the original four screens — Doug found it in the picker.
+
+Kept as its own screen rather than appended to C or D, because the sheet's
+second safeguard is that a screen's category is self-identifying: four
+contiguous unknown ids under a Stamina anchor corroborate each other even
+if the anchor itself were somehow wrong.
+
+| Slot | Field | ID found |
+|---|---|---|
+| 0 | **Odometer** *(anchor — id 95)* | 95 |
+| 1 | Stamina | |
+| 2 | Potential | |
+| 3 | Estimated Distance | |
+| 4 | Estimated Time | |
+
+**Anchor choice is deliberate:** Odometer (95), not Timer (56). 56 is
+`DEFAULT_FILLER_FIELD_ID` — the toolkit stamps it into slots when a layout
+change grows a screen — so a 56 appearing in a pull is ambiguous between
+"the anchor Doug placed" and "filler the device or toolkit added". An
+anchor has to be unambiguous or it is not an anchor.
+
+**These four are NOT the Stamina screen.** `f10=127` is a named screen
+type, already known, layouts already measured. These are ordinary data
+fields that happen to share the word. Place them on a plain user screen.
 
 ---
 

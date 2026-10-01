@@ -1,9 +1,28 @@
 # Edge 840 — Fields Not in the Edge 530 Census
 
-**STATUS 2026-09-30: 6 of 37 resolved — Compass (529), Map (725), Smart
+**STATUS 2026-09-30: 6 of 41 resolved — Compass (529), Map (725), Smart
 Travel Range (579), HR Zone Bar (= 23), 3s Power Bar (= 350) and 3s Power
-Graph (= 346) — leaving **31**. Not one of the six needed a screen built:
+Graph (= 346) — but the list GREW by 4 (the Stamina category), so **35**
+are open, not 31. Not one of the six resolutions needed a screen built:
 three were desk work, three were a scroll through the picker.**
+
+## ⚠ The manual appendix is not a complete source
+
+This checklist was built from the 840 manual's data-field appendix. On
+2026-09-30 Doug found a whole **Stamina** category in the picker — four
+fields — that the appendix does not list. So the appendix undercounts.
+
+That cuts both ways, and both ways have now been demonstrated in a single
+day: the appendix lists fields under names the picker does not use (three
+struck as renames), and the picker holds fields the appendix omits (four
+added). **The picker is the authority; the appendix was only a starting
+point.**
+
+Worth doing before the capture screens are built: walk the picker's
+category headings top to bottom and compare the list of CATEGORIES
+against this file's section headings. Finding a missing category costs one
+scroll; finding it after the capture pull costs a whole second round
+trip.
 
 ## ⚠ Check these in the picker BEFORE placing anything
 
@@ -126,6 +145,27 @@ already has. Fill in ID # as you confirm each one on-device.*
 ## Smart Trainer (1)
 
 - [ ] **Trainer Controls** — ID: ____ — Possibly just the 840's name for the 530's still-open **Trainer Resistance**, not a separate field. Check whether the 840's picker shows both names or just this one before assuming it's new.
+
+## Stamina (4) — whole new category, and NOT from the manual appendix
+
+Found 2026-09-30 by Doug reading the picker directly, not the manual.
+None of the four is in `FIELD_ID_NAMES` (173 entries) and none was on
+this checklist, because this checklist was built from the 840 manual's
+data-field appendix and the appendix does not list them.
+
+**Do not confuse these with the Stamina SCREEN**, `f10=127`, which is
+already known and has its layouts measured (0/2A/2B/4/5/6). That is a
+named screen type; these are four ordinary data fields in the picker,
+placeable on any user screen. Two separate namespaces, same word.
+
+- [ ] **Stamina** — ID: ____ — Current stamina remaining.
+- [ ] **Potential** — ID: ____ — Stamina potential.
+- [ ] **Estimated Distance** — ID: ____ — **NOT a rename of 27 "Distance
+  to Destination" or 65 "Distance to Go"**, despite the name similarity.
+  Those are course/navigation metrics; this is how much further you can
+  go at current effort. Different quantity, needs its own id.
+- [ ] **Estimated Time** — ID: ____ — Same caution against 28 "Time to
+  Destination" and 68 "Time to Go".
 
 ## Workouts (4)
 
