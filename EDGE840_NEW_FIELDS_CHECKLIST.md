@@ -57,13 +57,21 @@ of independent evidence matter more than the anchors here:
    for eight of the Force family.** Categories are self-identifying, which
    was the build sheet's second safeguard.
 
-### ⚠ One anomaly, and one naming decision
+### ✅ The 220 anomaly is RESOLVED — 2026-10-01, visual pass
 
-**220 "Avg. Vertical Descent Speed" sits nowhere near 786/787/788**, the
-other three of its family. Every permutation of Screen B's order still
-places 220 inside the VDS family, so 220 IS one of those four; *which* one
-rests on placement order alone. **Worth one confirmation that Screen B went
-in as listed.** Recorded rather than smoothed over.
+220 sat nowhere near 786/787/788, so *which* VDS field it was rested on
+placement order alone. The device settled it **without reference to
+placement**: all four render distinct labels of their own.
+
+| ID | Renders |
+|---|---|
+| 786 | `DESC SPD` |
+| **220** | **`AVG DESCENT`** |
+| 787 | `30S DES SPD` |
+| 788 | `LAP DESCENT` |
+
+Garmin simply assigned this one an id from a lower block. No ordering
+assumption is left anywhere in the batch.
 
 **The Force family was not hardware-gated.** All 12 appeared, falsifying
 the build sheet's own guess that they needed a newer force sensor. Same
@@ -72,17 +80,59 @@ paired, so the long-standing hypothesis that the 530's "Trainer
 Resistance" needed a paired FE-C trainer to show in the picker is **not
 supported** — at least not on the 840.
 
-### Display text is provisional for several entries
+### Display text — checked 2026-10-01, and the convention broke
 
-This dict's convention is the on-device DISPLAY label, not the manual's
-name, and most of these names came from the manual. "24-Hour Minimum
-Temperature" is far too long to be what a data field actually renders. The
-ids are solid; the strings need a pass with the GUI picker open beside the
-device.
+Every id was compared against what the data field actually displays. The
+literal rendered string now sits in a trailing comment on each
+`FIELD_ID_NAMES` entry. **The stored values were deliberately NOT changed to
+match**, which overrides this dict's own stated convention, for two
+independent reasons:
 
-**294 is the one that was confirmed**, and it is the clearest example of
-why: the picker MENU says "Trainer Controls", but Doug reports the rendered
-field says **"Resistance"**. Stored as "Resistance".
+**1. The Force family's labels are incomplete without an icon.** Doug: *"all
+of the Force related data field labels are preceded with an icon to
+represent force."* So 847 renders `Average`, 849 `MAX`, 850 `MAX LAP`, 854
+`LAST LAP` — the word Force appears nowhere in the text; a glyph carries it.
+Storing "Average" would put a label in the GUI picker that identifies
+nothing and collides in meaning with every other average field. A list box
+cannot show the glyph, so the text has to re-absorb what the glyph carried.
+**This is the first field family where the rendered label is not a
+self-sufficient identifier.**
+
+**2. The rest are space abbreviations, not different wording** — `3S FRC`,
+`LAP N FRC`, `LL N FRC`, `30S DES SPD`, `LAP W/KG`. There is already
+precedent for normalising these: 151 was reported as "MAX Power" and stored
+as "Max Power" back in v2.4.16. So the convention was always *the device's
+wording, normalised* — never a literal transcription of a space-constrained
+all-caps string.
+
+The ids are confirmed, the values are the readable form of the device's own
+wording, and no literal string was lost.
+
+### 520/578 carry no label at all — and that CONFIRMS them
+
+Both render a bare `--` with **no label text** when no workout is running.
+That is not a gap: a workout-target field has nothing to name until a step
+defines the target. It is a **third independent line of evidence** for
+Primary/Secondary Target, alongside their presence on the device's own
+Workout screen template and the positional mapping.
+
+Consumers must not assume these two have a static on-device label.
+
+### Exactly two cross-model divergences
+
+| ID | Edge 530 | Edge 840 |
+|---|---|---|
+| 478 | `EPOC` | `LOAD` *(Garmin's own rename)* |
+| 32 | `Next Pt Location` | `WPT NEXT` |
+
+The 530 strings are kept; the 840 strings are in trailing comments. **Two is
+below the count that would justify making display names per-model** the way
+`MODEL_LAYOUTS` is. That count is the thing to watch — the principle was
+never in doubt, only whether it was worth the change to every read path.
+
+Separately, **294** is a *menu versus rendered* difference on one model, not
+a cross-model one: the picker says "Trainer Controls", the field renders
+`RESISTANCE`. Stored as "Resistance".
 
 ---
 
