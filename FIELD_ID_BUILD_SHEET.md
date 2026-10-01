@@ -82,7 +82,7 @@ built on its own.
 
 | Slot | Field | ID found |
 |---|---|---|
-| 0 | **Power** *(anchor — id 36)* | 36 |
+| 0 | **Power** *(anchor — id 36)* — **pick from the plain Power category, NOT Power Graphical** (see warning below) | 36 |
 | 1 | Load | |
 | 2 | Trainer Controls | |
 | 3 | Segment Time | |
@@ -96,6 +96,26 @@ built on its own.
 screen if the device caps a screen at 8 for some layout you pick.)*
 
 ---
+
+## ⚠ Screen D's anchor — pick it from the right category
+
+Doug found that the **Power Graphical** category lists **Power** as well as
+Power Bars and Power Graph. That is probably plain id 36 cross-listed under
+a second heading, which Garmin does, **but it has not been proven**, and
+the whole point of an anchor is that its id is not in question.
+
+If that entry turns out to be a distinct graphical-power field, Screen D's
+anchor would come back as an unknown id — and an anchor whose value is
+unknown cannot detect a transposition, which is the one thing it is there
+for. The safeguard would fail silently, exactly as the per-model feature
+once shipped inert.
+
+**So pick Power from the plain Power category.** Cheap, and it keeps the
+anchor an anchor.
+
+(Worth capturing separately: if the Graphical "Power" is in fact a distinct
+field, it is a 32nd unknown nobody has counted. Placing it somewhere other
+than slot 0 would settle that. Not required for this pull.)
 
 ## Step 0 — check the name-mismatch pairs first
 

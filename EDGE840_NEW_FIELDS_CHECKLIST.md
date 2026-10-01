@@ -1,8 +1,9 @@
 # Edge 840 — Fields Not in the Edge 530 Census
 
-**STATUS 2026-09-30: 4 of 37 resolved — Compass (529), Map (725), Smart
-Travel Range (579) and HR Zone Bar (= 23, already known) — leaving **33**.
-Three of the four needed no device at all.**
+**STATUS 2026-09-30: 6 of 37 resolved — Compass (529), Map (725), Smart
+Travel Range (579), HR Zone Bar (= 23), 3s Power Bar (= 350) and 3s Power
+Graph (= 346) — leaving **31**. Not one of the six needed a screen built:
+three were desk work, three were a scroll through the picker.**
 
 ## ⚠ Check these in the picker BEFORE placing anything
 
@@ -14,15 +15,23 @@ it.** If it shows both, they are genuinely separate and need capturing.
 
 | Manual name | Possible existing match | Picker shows both? |
 |---|---|---|
-| 3s Power Bar | Power Bars (350) | |
-| 3s Power Graph | Power Graph (346) | |
+| ~~3s Power Bar~~ | **= 350** | rename — struck |
+| ~~3s Power Graph~~ | **= 346** | rename — struck |
 | Dist. to Point | Distance to Next (29) | |
 | Time to Point | Time to Next (30) | |
 | Trainer Controls | Trainer Resistance *(530's own open item)* | |
 | Primary Target | Target (521) | |
 
-Six entries, one scroll through the picker, no screens built. Could cut
-the list before any device work starts.
+Six entries, one scroll through the picker, no screens built. **Three are
+already struck this way** — the method is paying for itself, so finish the
+other three before building anything.
+
+**Watch the category headings, not just the names.** The 840 groups the
+picker by category and a field can appear under more than one heading:
+"Power" is listed under **Power Graphical** alongside Power Bars and Power
+Graph. That is almost certainly plain id 36 cross-listed, but it is not
+proven, and it matters — see the anchor warning in
+`FIELD_ID_BUILD_SHEET.md`.
 
 **Not on this list, and worth saying so:** the 12-field **Force** family.
 Force and Power are different quantities and the name similarity is
@@ -83,23 +92,23 @@ already has. Fill in ID # as you confirm each one on-device.*
   2026-09-30 by Doug checking the picker: the device offers **HR Zone Graph**
   and no "HR Zone Bar". A manual-vs-device naming difference, not a new
   field. 23 is already in `FIELD_ID_NAMES` and in `GRAPH_OR_BARS_FIELD_IDS`.
-- [~] **3s Power Bar** — **NOT OFFERED under this name** — 2026-09-30, Doug
-  checked the 840's picker: no entry by this name. Candidate match
-  Power Bars (350), already known from the 530. Resolution depends on one
-  remaining check: does the picker offer the PLAIN name? If yes, the
-  manual's "3s " prefix is a naming difference and this is already
-  known. If the plain name is also absent, the field is genuinely not
-  offered on this firmware and the id stays unknown — which is still a
-  bounded answer, not a gap.
+- [x] **3s Power Bar** — **ID: 350, already known as "Power Bars"** — RESOLVED
+  2026-09-30, Doug, two picker checks. First: no entry by the manual's
+  name. Second, the deciding one: the Power Graphical category offers
+  **Power, Power Bars, Power Graph** — the plain name IS present. So the
+  manual's "3s " prefix is a naming difference, not a separate field;
+  350 has been known from the 530 census all along. Likely the 530's
+  field always WAS a 3-second average and the 840's manual simply names
+  it more precisely.
 
-- [~] **3s Power Graph** — **NOT OFFERED under this name** — 2026-09-30, Doug
-  checked the 840's picker: no entry by this name. Candidate match
-  Power Graph (346), already known from the 530. Resolution depends on one
-  remaining check: does the picker offer the PLAIN name? If yes, the
-  manual's "3s " prefix is a naming difference and this is already
-  known. If the plain name is also absent, the field is genuinely not
-  offered on this firmware and the id stays unknown — which is still a
-  bounded answer, not a gap.
+- [x] **3s Power Graph** — **ID: 346, already known as "Power Graph"** — RESOLVED
+  2026-09-30, Doug, two picker checks. First: no entry by the manual's
+  name. Second, the deciding one: the Power Graphical category offers
+  **Power, Power Bars, Power Graph** — the plain name IS present. So the
+  manual's "3s " prefix is a naming difference, not a separate field;
+  346 has been known from the 530 census all along. Likely the 530's
+  field always WAS a 3-second average and the 840's manual simply names
+  it more precisely.
 
 - [ ] **Load** — ID: ____ — Training load (EPOC-based). Distinct from the 530's plain EPOC field (478) — check whether it's a different display of the same underlying data or a genuinely separate field.
 
