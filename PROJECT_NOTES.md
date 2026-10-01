@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-01, at Doc rev 129.*
+> *Last updated 2026-10-01, at Doc rev 130.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,60 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 130 — refreshed 2026-10-01.* **CORRECTION to Doc rev 129, same
+day, before anything was built on it. Rev 129 claimed the toolkit only
+ADVISES on Edge 840 plain user screens and that `MODEL_LAYOUTS` holds
+nothing about them. Both are false. The 840's entry already carries a
+`user_states` list and those screens ARE enforced against it.**
+
+**How the error happened, because the shape of it matters.** The check
+was `model_rule_known(4062, 0)`. The signature is
+`model_rule_known(f10, product)` — the arguments were reversed. That call
+returns False for an entirely unrelated reason (there is no
+`MODEL_LAYOUTS[0]`), and False was the answer that fit the story being
+written, so it was not questioned. A reversed-argument call that returns
+a plausible value is the same failure class as the per-model feature
+shipping inert in v1.5.0: the result looked like confirmation, so nobody
+looked again. Rev 129's prose went into the file and the commit message
+before the second check.
+
+**What is actually true.** `MODEL_LAYOUTS[4062]['user_states']` holds 24
+states: `(1,0)`, `(2,0)`, `(10,0)`, and counts **3 through 9 with three
+variants each** — `(3,0) (3,1) (3,2) … (9,0) (9,1) (9,2)`. That came from
+Doug's report of the iPhone Connect profile editor offering **A, B and C
+for layout numbers 3 through 9**. So:
+
+- `model_rule_known(f10=0, 4062)` is **True**
+- 840 user screens are **enforced**, against the 840's own measured list
+- the 530's `COUNTS_WITH_B_VARIANT` (3–7, two options) does not govern
+  them, and rev 129's worry that "a third variant has nowhere to go" was
+  misplaced — `MODEL_LAYOUTS` keys on `(count, variant)` tuples and
+  already holds three per count. Only the 530-specific constant's *name*
+  presumes two, which is cosmetic.
+
+**What rev 129 got right, and it is the part worth keeping.** The STATE
+SPACE was already recorded; the **GRID** was not, and still is not. Which
+positions share a row lives in `LAYOUT_GRIDS`, which is **global and not
+per-model**. Doug's four measurements — `(10,0)`, `(9,0)`, `(7,1)`,
+`(5,0)` — all match the 530's grid exactly, so nothing differs yet. But
+if a model's grid ever did differ, **there is nowhere in the code to say
+so**. That is a real structural gap, latent rather than active, and it is
+the genuine finding of the last two revs. Four of twenty-four states
+confirmed is not grounds to close it either way.
+
+**Also still open, unchanged from rev 129:** which letter the device puts
+on which `f8`. All of `(7,0)`, `(7,1)`, `(7,2)` are legal, and Doug
+labelled an `f8=1` screen "7/A" while labelling three `f8=0` screens
+"A". Segment remains the precedent for why that is not guessable — its
+menu "A" stores `f8=2` on the 530.
+
+**Rev 129's third item stands as written:** `layout_rules_enforced()`'s
+docstring did contradict its implementation, and the function is
+genuinely unreferenced. That correction was verified by grep, not by a
+function call, and is unaffected.
 
 ---
 

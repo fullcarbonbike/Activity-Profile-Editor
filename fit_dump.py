@@ -1229,24 +1229,33 @@ def is_profile_file(path):
 # proves that mapping is per-type rather than ordinal (Segment stores
 # 4/A as f8=2 and 4/B as f8=1, inverted). Writing plausible values would
 # be exactly the error Doc rev 123 SS3 was about.
-# NOT IN THIS TABLE, on purpose: the Edge 840's PLAIN USER SCREENS.
-# Doug measured four of their states on 2026-10-01 -- (10,0), (9,0), (7,1)
-# and (5,0) -- and all four render exactly what the 530's grids predict.
-# That is a real result (the grids travel between models unchanged, same as
-# Segment showed) and it is recorded in PROJECT_NOTES.md Doc rev 129, in
-# prose, deliberately NOT here. Four states out of a dozen is not a layout
-# rule: counts 1/2/3/4/6/8 are untested and every B and C variant is
-# untested. An entry here would make model_rule_known() return True and flip
-# the toolkit from advising to ENFORCING on a partial grid -- which is the
-# Compass failure of Doc rev 123 exactly, where a 530 rule hard-locked
-# Compass at 2 fields while the 840's own editor offered 0, 1 or 2.
-# Omission is meaningful in this table, and this omission is deliberate.
+# ON THE EDGE 840'S PLAIN USER SCREENS -- read this before adding anything.
 #
-# Also unresolved and relevant: the letter -> f8 mapping for 840 user
-# screens. Doug's labels put f8=0 at "A" three times and f8=1 at "A" once,
-# which cannot both hold, and he reports the 840 offering A/B/C for counts
-# 3-9 where the 530 has A/B for 3-7 only. Segment is the precedent for why
-# that is not guessable: its menu "A" stores f8=2 on the 530.
+# Its 'user_states' below ALREADY records the state space: counts 3-9 each
+# carry three variants (0/1/2), matching Doug's report that the iPhone
+# Connect profile editor offers A, B and C for layout numbers 3 through 9,
+# plus single-variant (1,0), (2,0) and (10,0). So model_rule_known(f10=0,
+# 4062) returns TRUE and 840 user screens ARE enforced against that list.
+#
+# What is NOT recorded, and has nowhere to go, is the GRID for each state --
+# which positions share a row. That lives in LAYOUT_GRIDS, which is GLOBAL
+# and NOT per-model, so a model whose grid differed would have nowhere to
+# say so. Doug measured four 840 states on 2026-10-01 -- (10,0), (9,0),
+# (7,1), (5,0) -- and all four render exactly what the 530's grid predicts,
+# so nothing differs yet and the gap is latent rather than active. Four of
+# the twenty-four states below, though; see PROJECT_NOTES.md Doc rev 130.
+#
+# CORRECTED 2026-10-01: an earlier version of this comment, and Doc rev 129,
+# claimed model_rule_known() returned False here and that the toolkit merely
+# advised on 840 user screens. Both wrong -- the error came from calling
+# model_rule_known(4062, 0) with the arguments reversed, which returns False
+# for an unrelated reason. Doc rev 130 supersedes that part of rev 129.
+#
+# Still genuinely unresolved: which LETTER the device puts on which f8 for
+# user screens. All three of (7,0), (7,1), (7,2) are legal below, and Doug
+# labelled an f8=1 screen "7/A" while labelling three f8=0 screens "A".
+# Segment is the precedent for why that is not guessable -- its menu "A"
+# stores f8=2 on the 530.
 MODEL_LAYOUTS = {
     4062: {                                    # Edge 840
         'label': 'Edge 840',
