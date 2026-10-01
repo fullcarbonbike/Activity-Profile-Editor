@@ -55,28 +55,28 @@ prior failure.
 | 7 | Lap Vertical Descent Speed | |
 | 8 | Lap Ascent | |
 
-## Screen C — anchor **Heart Rate** + Graphical, Navigation, Temperature   (9)
+## Screen C — anchor **Heart Rate** + Navigation, Temperature   (7)
 
-HR Zone Bar was here; it is resolved (= id 23, "HR Zone Graph") and the
-row is gone, so this screen is 9 fields, not 10. **Slots renumbered —
-place in the order below, not the order you may have already written
-down.**
+**This screen has been renumbered TWICE — use the table below, not any
+copy you wrote down earlier.** Three of its original targets came off
+during Step 0: HR Zone Bar (= id 23 "HR Zone Graph"), and 3s Power Bar
+and 3s Power Graph, neither of which the 840's picker offers under those
+names. It is 7 fields now, down from 10, and the Graphical category is
+gone from it entirely.
 
 | Slot | Field | ID found |
 |---|---|---|
 | 0 | **Heart Rate** *(anchor — id 13)* | 13 |
 | 1 | Lap Descent | |
-| 2 | 3s Power Bar | |
-| 3 | 3s Power Graph | |
-| 4 | Dist. to Point | |
-| 5 | Next Waypoint | |
-| 6 | Time to Point | |
-| 7 | 24-Hour Minimum Temperature | |
-| 8 | 24-Hour Maximum Temperature | |
+| 2 | Dist. to Point | |
+| 3 | Next Waypoint | |
+| 4 | Time to Point | |
+| 5 | 24-Hour Minimum Temperature | |
+| 6 | 24-Hour Maximum Temperature | |
 
-Four of this screen's eight targets (slots 2, 3, 4, 6) are on the Step 0
-pre-check list. If the picker settles them as renames, Screen C may
-shrink to three or four fields — worth doing Step 0 before building it.
+Slots 2 and 4 are still on the Step 0 list. If those also fall, Screen C
+is down to four fields and should be merged into Screen D rather than
+built on its own.
 
 ## Screen D — anchor **Power** + Workouts, Trainer, carried-over   (8)
 

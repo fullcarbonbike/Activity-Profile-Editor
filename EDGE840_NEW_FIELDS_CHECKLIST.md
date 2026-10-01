@@ -83,10 +83,23 @@ already has. Fill in ID # as you confirm each one on-device.*
   2026-09-30 by Doug checking the picker: the device offers **HR Zone Graph**
   and no "HR Zone Bar". A manual-vs-device naming difference, not a new
   field. 23 is already in `FIELD_ID_NAMES` and in `GRAPH_OR_BARS_FIELD_IDS`.
-- [ ] **3s Power Bar** — ID: ____
-- [ ] **3s Power Graph** — ID: ____
+- [~] **3s Power Bar** — **NOT OFFERED under this name** — 2026-09-30, Doug
+  checked the 840's picker: no entry by this name. Candidate match
+  Power Bars (350), already known from the 530. Resolution depends on one
+  remaining check: does the picker offer the PLAIN name? If yes, the
+  manual's "3s " prefix is a naming difference and this is already
+  known. If the plain name is also absent, the field is genuinely not
+  offered on this firmware and the id stays unknown — which is still a
+  bounded answer, not a gap.
 
-## Heart Rate (1)
+- [~] **3s Power Graph** — **NOT OFFERED under this name** — 2026-09-30, Doug
+  checked the 840's picker: no entry by this name. Candidate match
+  Power Graph (346), already known from the 530. Resolution depends on one
+  remaining check: does the picker offer the PLAIN name? If yes, the
+  manual's "3s " prefix is a naming difference and this is already
+  known. If the plain name is also absent, the field is genuinely not
+  offered on this firmware and the id stays unknown — which is still a
+  bounded answer, not a gap.
 
 - [ ] **Load** — ID: ____ — Training load (EPOC-based). Distinct from the 530's plain EPOC field (478) — check whether it's a different display of the same underlying data or a genuinely separate field.
 
