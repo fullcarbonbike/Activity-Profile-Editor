@@ -931,6 +931,25 @@ NO_FIELD_EDIT_TYPES = {26, 38, 57, 162}
 # reference (B just renders the top field smaller) -- that size
 # difference isn't representable by row/column grouping alone, so it is
 # noted here rather than faked into the geometry.
+#
+# 2026-10-01: THIS IS THE SHARPEST ARGUMENT THAT HEIGHT BELONGS IN THE
+# MODEL, and it predates the 840 work entirely. (3,0) and (3,1) are two
+# distinct legal states whose ONLY difference is height, so the grid
+# structure cannot tell them apart at all -- this table returns the same
+# rows for both and is simply silent about the thing that distinguishes
+# them. The 840's counts 3-6 variant C are the same situation found again
+# on another model, not a new one.
+#
+# And Doug confirmed 2026-10-01 that the difference is FUNCTIONAL, not
+# cosmetic: a normal-height full-width row restricted WindField's
+# "Forecast" option where a taller row did not. See the note beside
+# MODEL_LAYOUTS[4062]['user_grids'].
+#
+# The fact is currently recorded in THREE places -- this comment, the
+# inline comment on 3's variant 1 below, and a hardcoded note string
+# duplicated at two call sites in gui_app.py ("B: top field renders
+# smaller on-device"). That scattering is precisely how LAYOUT_GRIDS and
+# COUNTS_WITH_B_VARIANT drifted apart before v2.8.0 consolidated them.
 LAYOUT_GRIDS = {
     1: {0: [[0]]},
     2: {0: [[0], [1]]},
@@ -1313,12 +1332,32 @@ MODEL_LAYOUTS = {
         #     a position has its row to itself, which is a width question.
         #   - the GUI's layout diagram will draw those rows equal-height,
         #     so it is schematic rather than faithful on counts 3-6 C.
-        #   - OPEN QUESTION, not an assertion: Graph/Bars fields are known
-        #     to need a FULL-WIDTH row (GRAPH_OR_BARS_FIELD_IDS). Whether
-        #     they also want the TALLER row to render well has never been
-        #     tested. If they do, the advisory could be sharpened from
-        #     "needs full width" to "needs the tall full-width row" -- but
-        #     that is a guess until someone places one and looks.
+        #   - ANSWERED 2026-10-01, and the answer is stronger than the
+        #     question. Doug, from his own riding setup: he had to change
+        #     the layout he normally used for WindField because a NORMAL
+        #     height full-width row restricted that app's "Forecast"
+        #     option; moving it to a TALLER row in a different layout made
+        #     the feature work again, at the cost of one field from the
+        #     count. So HEIGHT GATES FUNCTIONALITY, not merely legibility,
+        #     and full width is NOT always sufficient.
+        #
+        #     That makes the existing Connect IQ advisory incomplete: it
+        #     says these fields "usually need full width to be readable",
+        #     which is true and no longer the whole story.
+        #
+        #     Doug's wider observation, worth recording as the shape of
+        #     the problem rather than a rule -- degradation has THREE
+        #     tiers, not two:
+        #       1. DEPRECATES TO TEXT. Bars and Graphs in a small
+        #          half-width slot render as plain text. This is the tier
+        #          GRAPH_OR_BARS_FIELD_IDS already covers.
+        #       2. RENDERS BUT UNUSABLE. Compass and Map work in a
+        #          half-width slot and are too small to be of any use.
+        #          Legal, unflagged, and arguably worth a word.
+        #       3. FEATURE-GATED BY HEIGHT. The WindField case above. Full
+        #          width, correct row, and a capability still missing
+        #          because the row is not tall enough.
+        #     Only tier 1 is modelled today.
         'named': {
             # Compass -- the defect that prompted all of this. The 840's
             # editor offers 0, 1 or 2 where the 530 locks 2. (0,0) and

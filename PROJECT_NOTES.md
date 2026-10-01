@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-01, at Doc rev 132.*
+> *Last updated 2026-10-01, at Doc rev 133.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,57 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 133 — refreshed 2026-10-01.* **Row HEIGHT gates functionality,
+not just legibility — confirmed from Doug's own riding setup. And the
+sharpest evidence that height belongs in the layout model has been sitting
+in `LAYOUT_GRIDS` since long before the 840 work: `(3,0)` and `(3,1)` are
+two distinct legal states whose ONLY difference is height.**
+
+**The finding.** Doug had to change the layout he normally used for
+WindField: a **normal-height** full-width row restricted that app's
+"Forecast" option, and moving it to a **taller** row in a different layout
+made the feature work again — at the cost of one field from the count. So
+full width is **not always sufficient**, and the existing Connect IQ
+advisory ("usually need full width to be readable") is true but no longer
+the whole story.
+
+**Degradation has three tiers, not two.** Doug's wider observation,
+recorded as the shape of the problem rather than as a rule:
+
+| Tier | Behaviour | Examples | Modelled? |
+|---|---|---|---|
+| 1 | **Deprecates to text** — renders as plain text instead of the widget | Bars, Graphs in a small half-width slot | **yes** — `GRAPH_OR_BARS_FIELD_IDS` |
+| 2 | **Renders but unusable** — technically works, far too small to read | Compass, Map in a half-width slot | no |
+| 3 | **Feature-gated by height** — full width, right row, capability still missing | WindField "Forecast" | no |
+
+Only tier 1 exists in the code today.
+
+**The pre-existing evidence, which I had treated as an 840 discovery.**
+`LAYOUT_GRIDS[3]` holds `0: [[0],[1],[2]]` and `1: [[0],[1],[2]]` —
+*identical rows*. The comment above it has always said so: "B just renders
+the top field smaller… that size difference isn't representable by
+row/column grouping alone." So the model has never been able to
+distinguish two legal 530 states, and the 840's counts 3–6 variant C are
+**the same situation found again on another model**, not a new one. Rev
+132 framed height as newly surfaced; it was newly *noticed*.
+
+**The fact is currently recorded in three places**, which is the warning
+sign: the `LAYOUT_GRIDS` header comment, the inline comment on count 3
+variant 1, and a hardcoded note string **duplicated verbatim at two
+`gui_app.py` call sites** (lines 3036 and 3787, `"B: top field renders
+smaller on-device"`). Scattering a geometric fact across prose and
+hardcoded strings is exactly how `LAYOUT_GRIDS` and
+`COUNTS_WITH_B_VARIANT` drifted apart before v2.8.0 consolidated them, and
+that drift was invisible because each copy was internally consistent.
+
+**Nothing about height has been built.** The data on hand is partial —
+840 counts 3–6 variant C from Doug's descriptions, 530 count 3 A/B from
+the existing comment — and designing a third dimension into the layout
+model on two fragments is how the Compass defect happened. Recorded here;
+scope decision separate.
 
 ---
 
