@@ -1,8 +1,32 @@
 # Edge 840 — Fields Not in the Edge 530 Census
 
-**STATUS 2026-09-30: 3 of 37 resolved — Compass (529), Map (725), Smart
-Travel Range (579) — leaving 34 that need a device. Two of the three
-needed no device at all.**
+**STATUS 2026-09-30: 4 of 37 resolved — Compass (529), Map (725), Smart
+Travel Range (579) and HR Zone Bar (= 23, already known) — leaving **33**.
+Three of the four needed no device at all.**
+
+## ⚠ Check these in the picker BEFORE placing anything
+
+The manual and the on-device picker do not use identical names. HR Zone
+Bar was one; these may be more. Each is a pair where the manual's name
+resembles something already known — **if the picker shows only ONE of
+the two, it is a rename and the entry can be struck without placing
+it.** If it shows both, they are genuinely separate and need capturing.
+
+| Manual name | Possible existing match | Picker shows both? |
+|---|---|---|
+| 3s Power Bar | Power Bars (350) | |
+| 3s Power Graph | Power Graph (346) | |
+| Dist. to Point | Distance to Next (29) | |
+| Time to Point | Time to Next (30) | |
+| Trainer Controls | Trainer Resistance *(530's own open item)* | |
+| Primary Target | Target (521) | |
+
+Six entries, one scroll through the picker, no screens built. Could cut
+the list before any device work starts.
+
+**Not on this list, and worth saying so:** the 12-field **Force** family.
+Force and Power are different quantities and the name similarity is
+coincidental — treat those as genuinely new.
 
 *Cross-referenced against the 530's 169-entry known-ID list and 185 unique
 field names from the Edge 840 manual appendix. These 37 are the ones with
@@ -55,7 +79,10 @@ already has. Fill in ID # as you confirm each one on-device.*
   fallback -- unlike the Graph/Bars family.
 - [x] **Map** — **ID: 725** — CONFIRMED the same way on the same screen.
   Renders as a small live map area in a half-width slot.
-- [ ] **HR Zone Bar** — ID: ____ — Bar-graph variant, parallel to the Bars cluster (347-350) already found on the 530, but for HR zone specifically.
+- [x] **HR Zone Bar** — **ID: 23, already known as "HR Zone Graph"** — RESOLVED
+  2026-09-30 by Doug checking the picker: the device offers **HR Zone Graph**
+  and no "HR Zone Bar". A manual-vs-device naming difference, not a new
+  field. 23 is already in `FIELD_ID_NAMES` and in `GRAPH_OR_BARS_FIELD_IDS`.
 - [ ] **3s Power Bar** — ID: ____
 - [ ] **3s Power Graph** — ID: ____
 

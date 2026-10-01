@@ -61,7 +61,7 @@ prior failure.
 |---|---|---|
 | 0 | **Heart Rate** *(anchor — id 13)* | 13 |
 | 1 | Lap Descent | |
-| 2 | HR Zone Bar | |
+| 2 | ~~HR Zone Bar~~ **already known: id 23, "HR Zone Graph"** — skip, use a spare target here | |
 | 3 | 3s Power Bar | |
 | 4 | 3s Power Graph | |
 | 5 | Dist. to Point | |
@@ -88,6 +88,16 @@ prior failure.
 screen if the device caps a screen at 8 for some layout you pick.)*
 
 ---
+
+## Before you start — check the name-mismatch pairs first
+
+`EDGE840_NEW_FIELDS_CHECKLIST.md` now lists six manual names that
+resemble something already known. One scroll through the picker tells
+you whether each is a rename or a real field, and anything that turns
+out to be a rename comes off the sheet before you build a single screen.
+
+HR Zone Bar already went that way: the device offers **HR Zone Graph**,
+which is id 23 and has been known all along.
 
 ## Before you start
 
