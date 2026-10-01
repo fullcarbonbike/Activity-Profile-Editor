@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-01, at Doc rev 130.*
+> *Last updated 2026-10-01, at Doc rev 131.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,63 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 131 — refreshed 2026-10-01.* **The 840's count-7 user-screen
+variants are fully described, the letter→`f8` ordering is the obvious one
+(Segment's exception did NOT recur), and rev 130's "latent" structural gap
+is now ACTIVE and counted: 9 of the 840's 24 legal user-screen states have
+no grid anywhere in the code.**
+
+**Screen C was a typo — it is 7/B, not 7/A** (Doug, 2026-10-01). With that
+fixed, all three count-7 variants are described and two of them check out
+against the 530's own table:
+
+| 840 letter | `f8` | Rows (reading order) | 530's grid for that `f8` |
+|---|---|---|---|
+| **A** | 0 *(inferred)* | `[0] [1] [2] [3,4] [5,6]` | **identical** |
+| **B** | **1 — MEASURED** | `[0,1] [2] [3,4] [5,6]` | **identical** |
+| **C** | 2 *(by elimination)* | `[0,1] [2,3] [4] [5,6]` | **no such grid exists** |
+
+A and B are *exactly* what the 530's `f8=0` and `f8=1` grids produce. That
+is a third and fourth confirmation that **the grids travel between models**,
+and it is stronger than the earlier four because here the 530's table
+predicted a specific asymmetric arrangement and the device matched it.
+
+**The Segment exception did not recur.** On the 530, Segment's menu "A"
+stores `f8=2` rather than 0, which is why no letter→`f8` mapping in this
+project is ever assumed. For 840 *user* screens the plain ordering holds:
+A=0, B=1, C=2. B is measured from Screen C's stored byte; A rests on the
+530 grid matching Doug's description of A; C is what is left. Recorded as
+inference where it is inference.
+
+**Rev 130 warned that a model-specific grid would have nowhere to go. It
+now has somewhere it needs to go.** 840 7/C — `[0,1] [2,3] [4] [5,6]` — is
+a legal state on that device (it is in `user_states`) whose geometry the
+global `LAYOUT_GRIDS` cannot express at all. Counted across the whole
+entry:
+
+- **15 of 24** states have a grid the global table can express
+- **9 of 24 do not**: `(3,2) (4,2) (5,2) (6,2) (7,2) (8,1) (8,2) (9,1)
+  (9,2)` — every "C" variant, plus 8/B, 8/C, 9/B and 9/C
+
+**Consequence, and it is a silence rather than a wrong answer.** For those
+nine states `is_position_full_width()` returns `None`, which callers are
+contractually required to treat as "no opinion". So the full-width
+advisory, the Graph/Bars full-width warning and the layout diagram all go
+quiet on a 7/C screen instead of misreporting. That is the safe failure
+direction and it is working as designed — but a user on an 840 editing one
+of those nine states gets none of the three advisories and is told nothing
+about why.
+
+**A caution about the scratch code that produced this table.** A helper
+written to collapse the FW/HW sequence into rows did not handle `None`, and
+for `(7,2)` it emitted `[0,1] [2,3] [4,5] [6,7]` — an **eight**-position
+layout for a seven-field screen. It was obvious here only because the count
+was small and wrong by one row. `None` is the most important value this API
+returns and the easiest to silently absorb; the diagnostic is in the commit
+and was not kept.
 
 ---
 
