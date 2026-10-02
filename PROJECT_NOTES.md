@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-02, at Doc rev 136.*
+> *Last updated 2026-10-02, at Doc rev 137.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,101 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 137 — refreshed 2026-10-02. SCOPING ONLY, nothing built at Doug's
+explicit request.* **Doug proposed a dummy "Radar" data field type that
+would occupy the radar cells and refuse edits to itself. The file says the
+radar strip is NOT a data field at all — and the mechanism he is describing
+already exists under another name. But his instinct about the SEMANTICS is
+exactly right, and one consequence he could not have seen makes the whole
+question more urgent than it looks.**
+
+### What the bytes say
+
+Radar's record, in both Census4 and Layouts:
+
+```
+f10=223  f3=5  f8=0
+f7[:5] = Timer, Speed, Distance, Percent Grade, Time of Day (TOD)
+```
+
+**`f3` is 5, not 6.** Doug described six visible cells — five half-width
+fields in a left column plus the full-height radar strip on the right — and
+the file accounts for exactly five. **The radar strip occupies no `f7`
+slot.** So a field-based model contradicts the file: a dummy field type
+would have to either inflate `f3` to 6, which is a lie about the bytes, or
+exist only in the display layer, at which point it is not a field type.
+
+### The mechanism already exists: it is a CONTENT AREA
+
+`NAMED_SCREEN_LAYOUTS` already models "device-generated region that is not
+a user field" — `content_area_position()`, drawn as a dashed block,
+unselectable and uneditable. Map, Segment and Lap Summary all use it, and
+Lap Summary already proved the position is not fixed, since its content
+sits BELOW the fields where everything else has it above.
+
+Doug's "they wouldn't allow changes to themselves" **is** content-area
+behaviour. He reinvented the right concept from the outside, which is a good
+sign about the concept.
+
+`content_area_position(223)` currently returns **None** — Radar has no
+content entry at all. That, not a missing field type, is why its diagram has
+nothing to draw.
+
+So the minimal correct change, if it is ever built: give Radar a content
+area with a **side** position. `content_area_position` supports top and
+bottom today; Radar needs left/right. No new field ids, no `f7` fiction,
+nothing written to the file.
+
+### The consequence neither of us had seen, and it matters
+
+A naive Radar-5 grid would be written `[[0],[1],[2],[3],[4]]` — five rows of
+one position each. `is_position_full_width()` returns True whenever a row
+holds one position. So the toolkit would report **all five half-width cells
+as FULL WIDTH.**
+
+That is not a cosmetic error. It feeds the Graph/Bars advisory, which would
+then **stay silent** for a graph field dropped into a Radar slot — a field
+that will deprecate to text there. A wrong answer, not a missing one.
+
+**This retroactively justifies v0.26.3.** Drawing Radar blank is not merely
+honest about the picture, it is the only state that does not mis-advise.
+Filling the grid in naively would have been worse than leaving it empty, and
+`NAMED_LAYOUT_CAPTURE.md`'s instruction to measure Radar last now has a
+second reason behind it.
+
+### Doug's hardware observation, and a real asymmetry
+
+He assumed Radar appears as a named-screen choice only with a Varia paired,
+and noted that comparable things — the trainer screen, various data fields —
+are selectable with nothing paired.
+
+Both halves hold, and together they are a clean rule worth recording:
+
+- **Data FIELDS are ungated.** Trainer Controls (294) appeared in the picker
+  with no smart trainer paired, which is what falsified the long-standing
+  guess that the 530's "Trainer Resistance" needed an FE-C trainer to show.
+- **Named SCREENS are gated** in the Add-Screen list. Radar is not offered.
+
+And the two are not in tension with the earlier Radar finding. Radar was
+reached by forcing `f1=1` on its reserve record, after which the editor
+listed and rendered it. So: **the Add list is gated; the editor's handling
+of a record that already exists is not.** Which is the same conclusion as
+Doc rev 128's — the editor lists a type from its RECORD, not from hardware —
+stated from the other direction.
+
+### Verdict on the idea
+
+Right semantics, wrong mechanism, and the mechanism it is reaching for is
+already in the codebase. The work it implies is **one new content-area
+position value plus a width model that can express a column**, which is
+smaller than a dummy field type and does not touch the file format.
+
+Still not built. The column problem is shared with the height problem (Doc
+rev 133) and both are arguments for revisiting the geometry model as one
+piece rather than patching a third special case into it.
 
 ---
 
