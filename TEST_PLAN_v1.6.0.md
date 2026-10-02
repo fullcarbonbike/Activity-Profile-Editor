@@ -74,6 +74,25 @@ Open any screen → **Add Field**.
 
 ---
 
+## Does any of this need a pull? — NO, for B through F
+
+Asked 2026-10-02. **Every check in B through F is either a display
+assertion or a write to the toolkit's own staged copy.** Nothing reads
+anything back off the device, so no pull is required and nothing needs
+deploying.
+
+More than that: **B, C, D, E and F can all be done in OFFLINE mode with no
+device connected at all**, using `CyclingRoadLayouts.fit` and any 530
+profile from your folder. That works because `frame.profile_product` is
+derived from `file_id.product` **in the file**, which was the point of
+making it a property in v1.5.0 — model identity travels with the profile,
+not with the USB connection. Worth knowing precisely because section C is
+the inert-feature test and it depends on that value arriving.
+
+**But there IS a gap the plan did not cover, and it needs a round trip.**
+See section G. It is optional for signing off B–F and important before
+release.
+
 ## F — Layout variant dropdown (v0.26.1, replaces the A/B radios)
 
 **New since you ran section A. Section A does NOT need re-running** — those
@@ -136,3 +155,41 @@ returns `[0, 1, 2]` — the data layer has been model-aware all along. Only
 the GUI's `else` branch ignores it in favour of the 530 constant. Three
 sites need it: that branch, `on_layout_choice()`'s refusal test, and
 `_apply_field_list()`'s equivalent.
+
+---
+
+## G — OPTIONAL, but the real write-side gap (needs a deploy and a pull)
+
+**Not required to finish B–F. Required before release.**
+
+Every one of the nine 840 layout states was measured from a profile **the
+device itself authored**. v0.26.1 now lets the *toolkit* author them — and
+nothing has confirmed that a toolkit-written `f8=2` survives the NewFiles
+process and renders as expected on the device.
+
+That is a different question from everything above, and it is the question
+this project has been burned by before: the toolkit can write the byte, the
+file can pass CRC and read-back, and the device can still do something
+else with it. ClimbPro, Compass and the CIQ Timer-fallback were all found
+exactly there.
+
+| | Step | Expect |
+|---|---|---|
+| G1 | On an 840 profile, set a user screen to **9 fields, layout C** using the new dropdown. Deploy | Writes cleanly, pre-flight CRC and content checks pass |
+| G2 | Let the device run NewFiles, then look at that screen **on the 840** | Renders as **2 HW rows, 2 HW rows, 1 FW, 2 HW rows** — the 9/C structure, matching what the toolkit drew |
+| G3 | Pull the profile back and send it to me | `f8` is still **2** on that record, and the field array is intact |
+| G4 | Repeat for one **8/C** screen | Same |
+
+> **If G2 renders something other than 9/C**, the grid is not the suspect —
+> it was measured from the device's own file. The suspect is the write:
+> either `f8` did not land, or the device re-derived the layout from
+> something else on import, which is the behaviour it already shows when it
+> **strips screen records by type** and when it **clamps over-range counts
+> at render without rewriting the file**.
+>
+> **If G3 comes back with `f8` changed**, that is a new device behaviour
+> and more interesting than the feature.
+
+G1 and G2 alone are worth the bench time. G3 is cheap once the device is
+already connected, and it is the only step that proves the byte persisted
+rather than merely rendered once.
