@@ -220,3 +220,34 @@ exactly there.
 G1 and G2 alone are worth the bench time. G3 is cheap once the device is
 already connected, and it is the only step that proves the byte persisted
 rather than merely rendered once.
+
+---
+
+## H — Named screens, 530 vs 840 (v0.26.3)
+
+**Added 2026-10-02 after Doug asked whether the C1 class of bug reached
+named screens. It did, silently. See Doc rev 136.**
+
+Until v0.26.3, 18 of the 46 states the 840 offers on named types drew
+**ordinary-user-screen geometry** — a confident wrong shape with nothing
+saying so, because those states are legal and no flag applied.
+
+| | Check | Expect |
+|---|---|---|
+| H1 | 840, open the **Workout** screen in Census4 (6 fields) | Diagram **blank**, with a note: *"Field arrangement at this layout has not been measured on the Edge 840 — not drawn rather than guessed"* |
+| H2 | 840, **eBike Metrics** — change its count to 7 | Same blank + note |
+| H3 | 840, **eBike Metrics** at **5** fields | **Draws a real grid.** 5 is measured; this is the control proving H2 is about data, not about the type |
+| H4 | 840, **STEPS Metrics** at **4** fields | Draws a real grid (measured) |
+| H5 | 840 **Compass** at 0, 1 and 2 fields | All three draw. The 840 offers all three where the 530 locks 2 — the original per-model defect |
+| H6 | 840 **Segment** at 4 fields | Picker reads **"4 fields (C)"** for the third variant, not "(3)" — same as F8 |
+| H7 | **530**, walk every named screen you have | **Every one draws a grid. No blanks, no notes.** All 25 of its named states are measured, so a blank here is a regression |
+| H8 | 840 **Workout** — confirm field editing is offered at all | Allowed on the 840, refused on the 530 (`NO_FIELD_EDIT_BY_MODEL`) |
+
+> **H7 is the regression guard.** The v0.26.3 change only suppresses the
+> guessed-geometry fallback for named types. If a 530 named screen now
+> draws blank, the suppression is too broad.
+
+**H1 is the cheap one and needs no hardware** — Census4 already has a
+6-field Workout screen, and Workout is field-editable on the 840.
+
+To replace those blanks with real geometry, see `NAMED_LAYOUT_CAPTURE.md`.

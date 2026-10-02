@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-01, at Doc rev 135.*
+> *Last updated 2026-10-02, at Doc rev 136.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,94 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 136 — refreshed 2026-10-02.* **Doug asked whether the C1 class of
+bug could also hit NAMED screens, given they behave differently between the
+530 and the 840. It could, it did, and unlike C1 it was SILENT. 18 of the
+46 states the 840 offers on named types had no measured grid, and 17 of
+them were drawing a confident wrong shape with nothing saying so.**
+
+He also noted *"the named screen issues lagged in the 530 only release
+until I realized there was an issue with them"* — the same lag had
+recurred, one model later, in the same subsystem.
+
+### Answering the question he actually asked
+
+**Are the 530-vs-840 named differences documented?** Partly. These are:
+
+| Difference | Where | Status |
+|---|---|---|
+| Compass counts — 530 locked at 2, 840 offers 0/1/2 | Doc rev 123 | documented, and the defect that started the per-model work |
+| Segment stores a different `f8` for the same apparent layout — 530 graph-variant `f8=2`, 840 `f8=0` | `fit_dump` v2.10.0 | documented; the reason letter→`f8` is never assumed |
+| Segment count 4 has THREE variants on the 840, two on the 530 | `MODEL_LAYOUTS` | documented |
+| Workout field editing — refused on the 530, allowed on the 840 | `NO_FIELD_EDIT_BY_MODEL` | documented |
+| 840-only types: Music Control 30, Power Guide 125, Stamina 127, GroupRide 162, Radar 223 | `NAMED_SCREEN_TYPES` | documented |
+| mesg 14 field 14 (`uint16[10]`) on the 840 where the 530 has field 5 (`uint8[10]`) | Doc rev 128 area | documented |
+| **Named-screen GRIDS per model** | — | **was NOT documented and NOT tested. This rev.** |
+
+**Were there test steps?** No. Not for any of the above. That is the real
+answer to his question, and it is now `TEST_PLAN_v1.6.0.md` section H.
+
+### The gap
+
+18 of 46 states, all on four types: **Workout** at 6, **eBike Metrics** at
+1–4 and 6–8, **STEPS Metrics** at 1–3 and 5–8, **Radar** at 0, 5/A and 5/B.
+
+`EditScreenPanel` fell through to `LAYOUT_GRIDS` and drew
+**ordinary-user-screen geometry on a named screen** — the precise defect
+v0.22.0 was created to remove, which "got the 2-field case exactly
+backwards, two stacked full-width rows where the device renders two
+half-width side by side". The fallback quietly reintroduced it for any
+state whose grid is unmeasured.
+
+**Why it stayed hidden, and why that is worse than C1.** C1 was loud: an
+empty preview. This drew a plausible picture. The states are **legal** —
+`layout_state_is_valid()` returns True for all 18 — so the out-of-range
+flag never fired and nothing indicated a guess. Doug would have had to
+compare the drawing against the device to notice.
+
+### Fixed in v0.26.3, and the fix adds no data
+
+The diagram now draws an honest **blank plus a note naming the model** for
+a named type whose grid is unmeasured. Plain user screens keep the generic
+fallback, which for them is the correct source.
+
+**Verified 530-safe before the change, not after:** all 25 of the 530's
+named states have a measured grid, so zero change behaviour. Checked
+rather than assumed, because the entire premise of the per-model work is
+that a 530 measurement is evidence about the 530 only.
+
+Same posture as `layout_grid()` returning None instead of guessing and
+`row_height_note()` staying silent where nothing is known. **An honest
+blank beats a plausible wrong picture.**
+
+### ⚠ Radar may not be representable at all, which is a bigger finding
+
+Doug's own description: *"5 half width data fields stacked on the left side
+of the screen and the full height half width 'radar' field on the Right."*
+
+That is a **column**, not a stack of rows. Both `LAYOUT_GRIDS` and
+`user_grids` model a layout as an ordered list of ROWS each holding one or
+two positions. A left-hand column of five beside one full-height
+right-hand cell **cannot be written in that form**. It is not an
+unmeasured value; it is a shape the structure has no way to hold.
+
+So Radar is a third dimension problem alongside height — and unlike
+height, which merely goes undescribed, this one cannot be entered at all.
+Recorded; nothing built. `NAMED_LAYOUT_CAPTURE.md` says to measure Radar
+last, so that if the other three types go in cleanly that isolates Radar as
+the structural case.
+
+### Not measured, deliberately
+
+eBike and STEPS need hardware Doug does not have. But Radar is the
+precedent for trying anyway: it appeared in the editor with no Varia
+paired, which established that **the editor lists a type from its RECORD,
+not from a paired sensor**. If the editor declines to offer a count, that
+is itself data — those `states` lists came from reading menus, not from
+bytes.
 
 ---
 
