@@ -74,7 +74,36 @@ Open any screen → **Add Field**.
 
 ---
 
-## Known limitation — WIDER than this plan first said
+## F — Layout variant dropdown (v0.26.1, replaces the A/B radios)
+
+**New since you ran section A. Section A does NOT need re-running** — those
+tests are all `FieldPickerDialog`, which this did not touch.
+
+The two A/B radio buttons in **Edit Screen** and **Add New Screen** are now
+a single **Layout:** dropdown, built from what the model actually offers.
+
+| | Check | Expect |
+|---|---|---|
+| F1 | 840, 9-field screen, Edit Screen | Dropdown offers **A, B and C**. This is the bug you found |
+| F2 | 840, 8-field screen | **A, B, C** |
+| F3 | 840, 3-field through 7-field | **A, B, C** |
+| F4 | 840, 1, 2 or 10 fields | **A only**, control disabled — those counts have one variant |
+| F5 | Pick **C** on a 9-field 840 screen | Applies. Diagram redraws to the 9/C row structure, and no "Layout B isn't available" dialog appears — that refusal is deleted, not corrected |
+| F6 | **530**, 3- to 7-field screen | **A and B** only. Unchanged from v1.5.0 |
+| F7 | **530**, 8-, 9- or 10-field screen | **A only**, disabled. Unchanged |
+| F8 | 840 **Segment** screen with 4 fields (named type, separate picker) | Reads **"4 fields (C)"**, not "4 fields (3)". Separate bug, live before today |
+| F9 | 530 **Segment** with 4 fields | Still "4 fields (A)" / "4 fields (B)". Its "A" stores `f8=2`, so if the letters moved, the positional mapping broke |
+| F10 | Change a layout, then re-open the screen | The dropdown shows the variant you chose, i.e. it was written and read back |
+| F11 | Load a **Favorite** saved from an 840 C-variant screen onto a 530 | Falls back to a legal variant rather than writing `f8=2`, which the 530 offers at no count |
+
+> **F9 is the one that catches a whole class of error.** The dropdown's
+> selection index is *not* the `f8` value — Segment's "A" is `f8=2` on the
+> 530. If letters and layouts have come unstuck anywhere, this is where it
+> shows.
+
+---
+
+## Known limitation — FIXED 2026-10-01, see section F
 
 **Corrected 2026-10-01 after Doug found it in testing (A-section run).**
 
@@ -93,9 +122,9 @@ radios cannot express three options.
 
 My error, in both this plan and PROJECT_NOTES Doc rev 132.
 
-**So there is currently NO route** through the GUI to any of the nine
-states measured on 2026-10-01. They are reachable only by building the
-screen in the device's own editor, as `CyclingRoadLayouts.fit` was.
+**~~So there is currently NO route~~ FIXED in v0.26.1** — both panels now
+build the control from `layout_variants_for_count()`. The section below is
+kept as the record of what was wrong and why. Test it via section F.
 
 **What still works, and is worth confirming — this is section C's point:**
 the toolkit now READS and DRAWS those states correctly. The read side and
