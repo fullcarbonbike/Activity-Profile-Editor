@@ -93,6 +93,33 @@ the inert-feature test and it depends on that value arriving.
 See section G. It is optional for signing off B–F and important before
 release.
 
+## C1 FAILED and is FIXED — re-run C and F on v0.26.2
+
+**Doug, 2026-10-02:** the layout preview read **"(No layout to show)"** for
+every C variant and for 8/B, 8/C, 9/B and 9/C. His table matched the nine
+`user_grids` states exactly, which is what identified the cause.
+
+**Cause, and it was mine.** `AddScreenPanel`'s diagram still read the
+global 530 `LAYOUT_GRIDS`, which holds none of those nine, so it returned
+`[]` — and an empty grid is precisely what the diagram draws that message
+for. v0.26.1 made that panel's *dropdown* model-aware and left the diagram
+global, with a comment claiming it was safe because "a new screen starts at
+variant A, which is in the global table at every count". True of the
+default and irrelevant to the feature: the whole point of the new dropdown
+is that B and C became selectable. **The justification was written in the
+same commit that invalidated it.**
+
+A second instance of the same mistake, in the same method, found only
+because the first one was visible: the **height note** was also still
+global-only. It had no symptom of its own — but at count 3 the note is the
+*only* thing distinguishing A, B and C, since all three share the row
+structure `[[0],[1],[2]]` and differ purely in row height.
+
+**Expect this on re-run, and it is correct, not a bug:** at **count 3**,
+A, B and C all draw the **same three stacked full-width rows**. They differ
+only in height, which the grid cannot express. The note below the diagram
+is what tells them apart.
+
 ## F — Layout variant dropdown (v0.26.1, replaces the A/B radios)
 
 **New since you ran section A. Section A does NOT need re-running** — those
