@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-01, at Doc rev 134.*
+> *Last updated 2026-10-01, at Doc rev 135.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,60 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 135 — refreshed 2026-10-01.* **Doug found in testing that the
+variant limitation is WIDER than rev 132 recorded, and that the workaround
+rev 132 offered does not work. My error. There is currently no route
+through the GUI to any of the nine states measured today.**
+
+**What he saw.** Viewing a **9-field** screen in **Edit Screen**: the
+layout radios show A and B, B cannot be selected, and there is no C option
+at all.
+
+**What rev 132 said, and why it was wrong.** It scoped the limitation to
+`AddScreenPanel` and offered: *"EditScreenPanel is model-aware as of
+v0.25.0, so an 840 user can reach those states by creating a screen here
+and changing its layout there."*
+
+`EditScreenPanel` **is** model-aware — for **geometry and advisories**,
+which is what v0.25.0 threaded `product` into. It is **not** model-aware
+in its **variant selector**. For a plain user screen that still asks
+`count in COUNTS_WITH_B_VARIANT`, the 530's `{3,4,5,6,7}`, so a 9-field
+screen gets B disabled and C was never a control at all — two radios
+cannot express three options.
+
+I generalised "model-aware" from the part I had just changed to the whole
+panel, without checking the selector. The same shape as the
+reversed-argument error in rev 129: a plausible belief, never tested,
+written into the notes as fact. **It took a human opening the panel.**
+
+**Consequence, stated plainly.** The nine grids added today are reachable
+only by building the screen in the device's own editor, as
+`CyclingRoadLayouts.fit` was. The toolkit reads and draws them correctly;
+it cannot create or change into them.
+
+**The read side still works and is still worth testing.** Read and write
+are separate paths here, and only write is blocked — so test-plan sections
+B through E stand.
+
+**The fix is small, and the data layer was never the problem.**
+`layout_variants_for_count(0, 9, 4062)` already returns `[0, 1, 2]`. Three
+call sites ignore it in favour of the 530 constant:
+
+1. `EditScreenPanel.refresh_from_file()`'s `else` branch — `supports_b`
+2. `EditScreenPanel.on_layout_choice()`'s refusal test
+3. `_apply_field_list()`'s equivalent check
+
+Plus the UI question of what replaces two radios. The named-type path
+already uses a `layout_picker` driven by `layout_states()`; the obvious
+move is to give plain user screens the same control rather than add a
+third radio, since a radio per variant hardcodes a maximum again.
+
+**Not fixed in this rev, deliberately:** Doug is mid-test on
+`gui_app.py` 0.26.0. Editing the file he is testing would invalidate his
+results, which matters more than closing this quickly.
 
 ---
 

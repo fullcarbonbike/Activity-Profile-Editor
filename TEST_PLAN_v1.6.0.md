@@ -74,11 +74,36 @@ Open any screen → **Add Field**.
 
 ---
 
-## Known limitation to confirm rather than report as a bug
+## Known limitation — WIDER than this plan first said
 
-On an 840, **Add New Screen cannot create a C variant, nor any variant of
-8 or 9 fields.** Its A/B radio pair is built on the 530's shape (counts
-3–7, two variants). That is logged as its own item, not an oversight.
+**Corrected 2026-10-01 after Doug found it in testing (A-section run).**
 
-**Workaround, worth confirming it works:** create the screen in Add New
-Screen, then change its layout in Edit Screen, which *is* model-aware.
+On an 840, **neither panel can select a C variant, nor any variant of 8 or
+9 fields.** Doug viewing a 9-field screen in **Edit Screen**: the radios
+show A and B, B cannot be selected, and there is no C at all.
+
+**The workaround this plan originally gave does not work.** It said to
+create the screen in Add New Screen and change its layout in Edit Screen
+"which *is* model-aware". Edit Screen is model-aware for **geometry and
+advisories** — that is what v0.25.0 added — but **not for the variant
+selector**. For a plain user screen it still asks
+`count in COUNTS_WITH_B_VARIANT`, the 530's set `{3,4,5,6,7}`, so a
+9-field screen gets B disabled and C never existed as a control. Two
+radios cannot express three options.
+
+My error, in both this plan and PROJECT_NOTES Doc rev 132.
+
+**So there is currently NO route** through the GUI to any of the nine
+states measured on 2026-10-01. They are reachable only by building the
+screen in the device's own editor, as `CyclingRoadLayouts.fit` was.
+
+**What still works, and is worth confirming — this is section C's point:**
+the toolkit now READS and DRAWS those states correctly. The read side and
+the write side are separate, and only the write side is blocked, so
+sections B through E are unaffected and worth finishing.
+
+**Why the fix is small:** `layout_variants_for_count(0, 9, 4062)` already
+returns `[0, 1, 2]` — the data layer has been model-aware all along. Only
+the GUI's `else` branch ignores it in favour of the 530 constant. Three
+sites need it: that branch, `on_layout_choice()`'s refusal test, and
+`_apply_field_list()`'s equivalent.
