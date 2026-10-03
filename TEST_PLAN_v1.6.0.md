@@ -273,3 +273,30 @@ See Doc rev 138.**
 > **I4 is a 530 check and the important one.** It confirms the letter is
 > positional rather than arithmetic. If I4 reads **C**, the fix has
 > reintroduced the exact error it was meant to remove.
+
+### Does section I change the earlier sections?
+
+**No step is invalidated and nothing already passed needs redoing.**
+Checked rather than assumed — v0.26.4 touched the Layout COLUMN, the CLI
+output and the deploy summary, none of which A through H depend on.
+
+| Section | Effect |
+|---|---|
+| **A** (picker) | **Unaffected.** Still no re-run — nothing since has touched `FieldPickerDialog` |
+| **B** (tier-2 advisory) | Unaffected. `graph_bars_warnings()` unchanged |
+| **C** (840 geometry) | Unaffected. **But I1–I3 are free while you are here** — the Layout column is on the same screens list you open to reach C |
+| **D** (height notes) | Unaffected |
+| **E** (regressions) | **E1 gains weight.** "Walk a 530 profile" now also exercises the changed Layout column, and I4 is the specific case inside it |
+| **F** (variant dropdown) | Unaffected. F9 and I4 are complementary, not duplicate: **F9 is the named-type picker, I4 is the screens-list column** — two different renderers of the same positional rule |
+| **G** (device round trip) | Unaffected |
+| **H** (named screens) | Unaffected. **H6 and F8 are the same check** — 840 Segment at 4 fields reading "(C)". Do it once, in whichever section you reach first |
+
+**Suggested grouping to save passes:** open the 840 Layouts profile once and
+take **I1, I2, I3** off the screens list before drilling into **C**, then
+**F** on the same screens. **I4 and E1** are the 530 pass. **I5 and I6** are
+CLI only and need no device at all.
+
+**One change to expect in output you send me:** the CLI `screens` LAY column
+now reads `C` where it used to be blank, `-` for types with no layout, and
+`?` for a genuine mismatch. That makes your pasted dumps more diagnostic,
+not less — but it will look different from earlier ones in this thread.
