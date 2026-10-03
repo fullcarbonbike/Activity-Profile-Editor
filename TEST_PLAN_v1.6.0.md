@@ -300,3 +300,27 @@ CLI only and need no device at all.
 now reads `C` where it used to be blank, `-` for types with no layout, and
 `?` for a genuine mismatch. That makes your pasted dumps more diagnostic,
 not less — but it will look different from earlier ones in this thread.
+
+---
+
+## J — Offline restore + cross-model warning (v0.27.0)
+
+**Both from Doug's own test-E attempt. See Doc rev 139.**
+
+| | Check | Expect |
+|---|---|---|
+| J1 | **Offline**, profile list panel | **No** "Deleted, but available to restore" list and **no** Restore button. One line in their place pointing at opening the backup folder as the source and using Export |
+| J2 | Offline, read that line | Wraps inside the window — **no width blowup**. It is a read-only TextCtrl for exactly that reason |
+| J3 | **Connected 530**, profile list | Deleted list and Restore button are **back**, unchanged from v1.5.0 |
+| J4 | Connected **530**, restore an **840** backup | Confirmation leads with **DIFFERENT DEVICE MODEL**, names the layouts the 530 does not offer, states that **data fields are not checked**, and still offers Continue |
+| J5 | Connected 530, restore a **530** backup | **No** model warning at all — just the normal confirmation |
+| J6 | J4, then press **No** | Nothing written. The warning must not be a one-way door |
+| J7 | Connected 840, restore an **840** backup | No warning |
+
+> **J5 and J7 matter as much as J4.** A warning that fires on same-model
+> restores would get ignored within a week, which is the failure mode that
+> makes guards useless.
+
+**J4 needs both devices' backups in one working folder**, so it may be the
+one J-check worth deferring until you have the 530 connected with 840
+backups present. The rest need no 840 at all.

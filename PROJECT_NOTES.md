@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-02, at Doc rev 138.*
+> *Last updated 2026-10-03, at Doc rev 139.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,106 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 139 — refreshed 2026-10-03.* **Doug, starting test E: the Restore
+path in OFFLINE mode ran all the way to "Write to Device (NewFiles)" and
+only then refused, telling him to export instead — with no Export button on
+that path. And he asked whether anything guards restoring an 840 profile to
+a 530. Nothing did. Both fixed; the second only partly, and the limits are
+stated rather than implied.**
+
+### 1. The offline restore dead end
+
+`assert_mode()` is called at `DeployPanel`'s write button and **nowhere in
+the restore flow**. So the guard worked exactly as designed and fired far
+too late to be any use: select a deleted profile → Restore → the whole
+deploy machine → refusal. Export lives in `ProfileListPanel`, so there was
+no way forward from where he was standing.
+
+**Hidden offline, not disabled** — the opposite of the v0.21.2
+"visibly unavailable rather than clickable-then-refused" posture, and
+deliberately. A greyed control invites *why can't I click this*; the honest
+answer is that **restoring is a device operation and offline there is
+nothing to restore to.**
+
+Doug's own framing settled the design and is better than what I would have
+built: offline mode already means *work from a folder*, and a backup folder
+is just another folder. So the offline equivalent of a restore is to open
+the backup folder as the source and Export from it — **no second restore
+pipeline required.** One line says so where the list was.
+
+### 2. No cross-model guard existed anywhere
+
+Grepped before building: the only match in the codebase was a comment I
+wrote the previous day. Task **#78** had logged "cross-device check" months
+ago and it was never built.
+
+`cross_model_concerns()` (fit_dump v2.16.0) now runs on restore, prepended
+to the existing confirmation rather than raised as a second modal — two
+dialogs in a row train people to click through both.
+
+**Advisory, never a block, and that is from evidence not timidity.**
+Garmin's own setup process does cross-model transfers — Doug migrated his
+530 profiles onto the 840 that way — and the device **drops** what it
+cannot use rather than corrupting. His migration lost exactly two things,
+both recoverable: the **Virtual Partner** screen (the 840 has none) and
+**WindField**, which needed re-selecting by hand because the Connect IQ app
+was not installed yet. Refusing outright would deny a transfer the vendor
+itself performs.
+
+### What the warning can and cannot say — stated in the output
+
+**Specific, because measured:** layout states the target does not offer,
+via `layout_state_is_valid()`. Reliable because the 530 is in
+`SURVEYED_MODELS`. An 840 9/C screen on a 530 is a real finding. Census4
+→ 530 correctly surfaces Lap Summary 2/B and eBike Metrics 5/A.
+
+**Hedged, because the data does not exist:** *which named types a model
+has* is recorded **nowhere**, and cannot be derived.
+`NAMED_SCREEN_LAYOUTS` omits 26/38/57 on purpose though they exist on the
+530, and GroupRide (162) sits in the global no-edit set while also
+appearing in the 840's own entry — so a union yields **13** types for a
+device whose survey found **12**. That ambiguity is real, so the warning
+says *"no measured rules for X on <target>"*, never *"the target lacks
+X"*. Different claims; only the first is supported.
+
+**Not checked at all, and the output says so: DATA FIELDS.**
+`FIELD_ID_NAMES` is global with no per-model availability, so the 33 ids
+from the 840 census are indistinguishable here from ids the 530 also
+offers. A warning that looks complete and is not would be worse than one
+that admits its edge.
+
+### Two false positives, caught by reading my own first output
+
+It flagged *"GroupTrack List at 0 fields"* and *"GroupRide at 0 fields"* as
+problems on a 530. Both nonsense — a zero-field GroupTrack List is the only
+state that type has.
+
+**The cause is the interesting part.** My skip test was an empty
+`layout_states()`, which never fires, because **`layout_states()` falls
+back to the ordinary user-screen state list** for a named type with no
+entry — it returned the generic 1..10 set, and a 0-field record duly looked
+illegal. The correct idiom is `named_layout(...) is None`, which
+`_layout_flag_text()` already uses for exactly this question.
+
+That fallback is **the same shape as the bug fixed in v0.26.3**: answering
+a question about a NAMED type with ordinary-user-screen data. Contained
+here because this is the only caller that asks it of a no-entry type, but
+it is **a trap left armed for the next one.**
+
+### Open items this raised
+
+- **No per-model data-field availability.** The single biggest gap in the
+  cross-model story, and the reason the warning cannot be complete.
+- **`layout_states()`'s fallback** for no-entry named types — above.
+- **The Import path has the same cross-model gap.** Noted, not wired —
+  half-doing it is how the v1.5.0 inert feature happened.
+- **Virtual Partner on the 840.** Doug's migration dropped it, implying the
+  840 has no such screen — yet `NO_FIELD_EDIT_BY_MODEL[4062]` includes 26.
+  Harmless but misleading, and possibly the Radar pattern again (a record
+  can exist while the type is not offered). Worth one check.
 
 ---
 
