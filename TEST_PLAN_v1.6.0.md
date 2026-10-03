@@ -309,6 +309,7 @@ not less — but it will look different from earlier ones in this thread.
 
 | | Check | Expect |
 |---|---|---|
+| **J0** | **Offline entry itself:** click "Work Without a Device", pick a folder with profiles | **The profile list appears.** v0.27.0 crashed here on every attempt (`SetLabel()` on a `wx.TextCtrl`), killing the only offline entry path. Do this first — nothing else offline is reachable until it passes |
 | J1 | **Offline**, profile list panel | **No** "Deleted, but available to restore" list and **no** Restore button. One line in their place pointing at opening the backup folder as the source and using Export |
 | J2 | Offline, read that line | Wraps inside the window — **no width blowup**. It is a read-only TextCtrl for exactly that reason |
 | J3 | **Connected 530**, profile list | Deleted list and Restore button are **back**, unchanged from v1.5.0 |
