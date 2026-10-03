@@ -310,6 +310,7 @@ not less — but it will look different from earlier ones in this thread.
 | | Check | Expect |
 |---|---|---|
 | **J0** | **Offline entry itself:** click "Work Without a Device", pick a folder with profiles | **The profile list appears.** v0.27.0 crashed here on every attempt (`SetLabel()` on a `wx.TextCtrl`), killing the only offline entry path. Do this first — nothing else offline is reachable until it passes |
+| **J0b** | Offline, select a profile from the ordinary **"In folder"** list | **"Restore from Backup..." stays absent.** v0.27.0 hid the deleted list but left this button live, so selecting a normal profile reopened the same dead end |
 | J1 | **Offline**, profile list panel | **No** "Deleted, but available to restore" list and **no** Restore button. One line in their place pointing at opening the backup folder as the source and using Export |
 | J2 | Offline, read that line | Wraps inside the window — **no width blowup**. It is a read-only TextCtrl for exactly that reason |
 | J3 | **Connected 530**, profile list | Deleted list and Restore button are **back**, unchanged from v1.5.0 |
@@ -317,6 +318,22 @@ not less — but it will look different from earlier ones in this thread.
 | J5 | Connected 530, restore a **530** backup | **No** model warning at all — just the normal confirmation |
 | J6 | J4, then press **No** | Nothing written. The warning must not be a one-way door |
 | J7 | Connected 840, restore an **840** backup | No warning |
+
+### Audited, so it need not be re-checked
+
+Every button on `ProfileListPanel` was traced to the panel it opens, and
+against every `assert_mode(False, ...)` site in the file:
+
+| Button | Goes to | Offline |
+|---|---|---|
+| Startup Message... | `startup_txt` | **works** — import/export added v0.23.0; the eject control is hidden |
+| Clone... | `clone` | **works** — clones into the folder being viewed |
+| View Screens → | `screens` → Preflight → Deploy | **works** — Deploy becomes Export |
+| Restore from Backup... | `restore` → Deploy | **device-only.** The one unguarded route, fixed in v0.27.2 |
+
+So `restore_btn` was the only hole, and the audit is the thing that should
+have been done when the first fix was written rather than after the second
+report.
 
 > **J5 and J7 matter as much as J4.** A warning that fires on same-model
 > restores would get ignored within a week, which is the failure mode that
