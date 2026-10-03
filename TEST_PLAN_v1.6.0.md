@@ -251,3 +251,25 @@ saying so, because those states are legal and no flag applied.
 6-field Workout screen, and Workout is field-editable on the 840.
 
 To replace those blanks with real geometry, see `NAMED_LAYOUT_CAPTURE.md`.
+
+---
+
+## I — Layout letter, everywhere it appears (v0.26.4 / fit_dump 2.15.1)
+
+**Doug found the screens-list Layout column showing `-` for every
+C-variant. The letter was derived in four places by arithmetic on `f8`.
+See Doc rev 138.**
+
+| | Check | Expect |
+|---|---|---|
+| I1 | 840 Layouts profile, screens-list Layout column | A real letter on every screen — **C** where you set C. No `-` on a C screen |
+| I2 | 840, counts 1, 2 and 10 | **A** |
+| I3 | 840, **GroupTrack List** and **Virtual Partner** rows | `-`, not `?`. Those types have no layout to letter |
+| I4 | **530**, a **Segment** screen at 4 fields in layout **A** | **A**. It stores `f8=2` and showed `-` before today — a pre-existing 530 bug |
+| I5 | CLI `fit_dump.py screens <840 profile>` | LAY column shows **C** on C screens, blank on A (established terse convention), `-` on types with no layout |
+| I6 | Same CLI with `-v` | Reads **`C (f8=2)`**, not `variant=2?` |
+| I7 | Change a layout on an 840 screen, then open **Pre-Flight** | *"layout changed from B to C"* — not *"from A to -"* |
+
+> **I4 is a 530 check and the important one.** It confirms the letter is
+> positional rather than arithmetic. If I4 reads **C**, the fix has
+> reintroduced the exact error it was meant to remove.

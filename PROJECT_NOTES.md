@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-02, at Doc rev 137.*
+> *Last updated 2026-10-02, at Doc rev 138.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,73 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 138 — refreshed 2026-10-02.* **Doug: the screens-list Layout
+column showed `-` instead of a letter, and every screen it did that for was
+a C-variant. The letter was being derived in FOUR separate places, each by
+arithmetic on `f8`, each with the 530's two-variant assumption baked in.
+Three of the four were ALSO wrong on the 530 — an 840 symptom surfaced a
+pre-existing 530 defect.**
+
+### The four sites
+
+| Where | Was | Wrong for |
+|---|---|---|
+| `fit_dump.py`'s `screens` CLI | `"B" if f8==1 else " "` | 840 C **and** 530 Segment 4/A |
+| `ViewScreensPanel` Layout column | `1→"B"`, `0→"A"`, else `"-"` | 840 C **and** 530 Segment 4/A |
+| `describe_screen_changes()` | `{0:"A", 1:"B"}` | 840 C **and** 530 Segment 4/A |
+| `_state_label()` (named picker) | `"AB"[index]`, numeric fallback | 840 C only — fixed in v0.26.1 |
+
+**The 530 half matters more than the 840 half.** Segment's menu "A" stores
+`f8=2`, so a 530 Segment at 4 fields in layout A has been displaying as
+`-` or blank in three places **since long before this project saw an 840**.
+Nobody noticed because each site was internally consistent — the same
+reason `LAYOUT_GRIDS` and `COUNTS_WITH_B_VARIANT` drifted apart unseen
+before v2.8.0 consolidated them.
+
+### Consolidated, not patched four times
+
+`variant_letter()` and `layout_letter()` now live in `fit_dump.py`
+(v2.15.1) with the rest of the layout model, resolving the letter
+**positionally** against what the type offers on that model — never
+arithmetic on `f8`. The local `variant_letter()` added to `gui_app.py` in
+v0.26.1 is gone: **fixing four copies by writing a fifth would have been
+the actual mistake.**
+
+Three outcomes now exist where everything previously collapsed into `-`:
+
+- a **letter** when the stored variant is one the type offers
+- **`?`** when it is NOT among a known set — a real disagreement, and a
+  state Garmin's own editor can produce
+- **`-`** when there is no stored `f8`, or the type offers no variants
+
+### A self-correction inside the same change
+
+v2.15.0 printed `?` for GroupTrack List — caught by reading the function's
+own first CLI output, not by a test. Virtual Partner (26), Workout (38) and
+GroupTrack List (57) are deliberately given no layout entry because the
+device generates their contents and offers no choice, so the answer is
+"nothing to letter", not "something is wrong with this screen". v2.15.1
+returns `-` for an empty variant set and reserves `?` for a real mismatch.
+
+### One design point worth keeping
+
+`describe_screen_changes()` derives the product **per file**, not from the
+frame. It is module-level with no view of the app — and the two sides can
+legitimately be **different models**, since a cross-model deploy rewrites
+`file_id.product`. One product for both would mislabel exactly the
+comparison that matters most there. It had also been reporting an 840
+C-variant change as *"layout changed from A to -"* in the **deploy
+summary**, the one screen where a user decides whether to trust the write.
+
+### Count
+
+Fourth 530-shaped assumption found in two days, and the second found by
+Doug simply using the app rather than following the test plan. Same pattern
+each time: true of the 530, internally self-consistent, nothing failed
+loudly.
 
 ---
 
