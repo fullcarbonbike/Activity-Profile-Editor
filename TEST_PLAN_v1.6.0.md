@@ -314,7 +314,8 @@ not less — but it will look different from earlier ones in this thread.
 | J1 | **Offline**, profile list panel | **No** "Deleted, but available to restore" list and **no** Restore button. One line in their place pointing at opening the backup folder as the source and using Export |
 | J2 | Offline, read that line | Wraps inside the window — **no width blowup**. It is a read-only TextCtrl for exactly that reason |
 | J3 | **Connected 530**, profile list | Deleted list and Restore button are **back**, unchanged from v1.5.0 |
-| J4 | Connected **530**, restore an **840** backup | Confirmation leads with **DIFFERENT DEVICE MODEL**, names the layouts the 530 does not offer, states that **data fields are not checked**, and still offers Continue |
+| J4 | Connected **530**, look for an **840** backup to restore | **None is offered, and that is CORRECT** — see the note below. Not a bug and not a test failure |
+| J4b | Connected 530, `ls ~/GarminBackups/backups/` | Any folder named with a **timestamp** rather than a serial is a LEGACY backup. Those are offered to either device, so a cross-model restore is reachable only through them — the one path where the J4 warning can still fire |
 | J5 | Connected 530, restore a **530** backup | **No** model warning at all — just the normal confirmation |
 | J6 | J4, then press **No** | Nothing written. The warning must not be a one-way door |
 | J7 | Connected 840, restore an **840** backup | No warning |
@@ -334,6 +335,39 @@ against every `assert_mode(False, ...)` site in the file:
 So `restore_btn` was the only hole, and the audit is the thing that should
 have been done when the first fix was written rather than after the second
 report.
+
+### ⚠ J4 was a badly specified test — Doug, 2026-10-04
+
+He found no 840 backups offered while a 530 was connected and correctly
+diagnosed why: **the restore list is scoped by device serial.**
+`list_backed_up_profile_filenames()` restricts the scan to the connected
+device's own serial, and its comment already states the intent — *"offering
+the OTHER Edge's profiles invites restoring a profile onto hardware it was
+never meant for."*
+
+**That is the right behaviour and nothing should change.** His framing:
+
+> a strict restore is same-device. If the user wants to *try* a profile
+> from a different model, that is a **migrate**, and **Import** is the
+> route they should take.
+
+Which is correct, and it means **the cross-model warning built into
+`RestorePanel` on 2026-10-03 is on nearly the wrong path.** Restore can
+almost never see a foreign model, by design.
+
+**Almost, not quite** — and the exception is real rather than a
+rationalisation. Legacy flat backups, from before per-device separation,
+are **deliberately included** for either device because they cannot be
+attributed to one; dropping them would orphan restore points. So a
+cross-model restore remains reachable precisely through the backups whose
+provenance is unknown — which is the case where a warning earns its keep.
+
+So the restore-side check stays, correctly scoped as narrow, and **the
+warning's real home is the Import path**, which v0.27.0 recorded as "not
+wired -- noted rather than half-done". Doug's framing promotes that from a
+loose end to the main requirement.
+
+**Nothing has been changed on his instruction to hold.**
 
 > **J5 and J7 matter as much as J4.** A warning that fires on same-model
 > restores would get ignored within a week, which is the failure mode that

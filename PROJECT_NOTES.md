@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-03, at Doc rev 139.*
+> *Last updated 2026-10-04, at Doc rev 140.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,74 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 140 — refreshed 2026-10-04. NO CODE CHANGED, at Doug's
+instruction.* **He found J4 untestable — no 840 backups offered while a
+530 was connected — and diagnosed it correctly before asking: the restore
+list is scoped by device serial. That is the intended behaviour, and it
+means the cross-model warning added one day earlier sits on nearly the
+wrong path.**
+
+### Why no 840 backups appeared
+
+`list_backed_up_profile_filenames(working_dir, device_serial=...)`
+restricts its scan to the connected device's own serial folder. Its own
+comment already stated the reasoning: *"offering the OTHER Edge's profiles
+invites restoring a profile onto hardware it was never meant for."* Doug's
+backups are serial-keyed — his own log line shows
+`backups/3632253714/20261003_173243`.
+
+So the behaviour is correct and **nothing is being changed.**
+
+### His design position, which settles a question I had left open
+
+> A strict restore is same-device. If the user wants to *try* a profile
+> from a different model, that is a **migrate**, and **Import** is the
+> route they should take.
+
+That is the right split, and it is sharper than anything in the notes
+before it. Restore means *put this device's own file back*. Migrate means
+*bring a foreign file in and accept what the device makes of it*.
+
+### The consequence for yesterday's work
+
+`cross_model_concerns()` was wired into `RestorePanel.on_restore()`. If
+restore can only ever see same-serial backups, the model can almost never
+differ — so that guard is **nearly unreachable on the path it was put on.**
+Close to the inert-feature class this project keeps catching, and worth
+recording as such rather than quietly leaving it.
+
+**It is narrow, not inert, and the distinction is real.** Legacy flat
+backups — from before per-device separation — are **deliberately included
+for either device**, because they cannot be attributed to one and dropping
+them would orphan restore points. So a cross-model restore is still
+reachable, through exactly the backups whose provenance is unknown. That is
+the case where a warning earns its keep, so the restore-side check stays,
+scoped honestly as narrow.
+
+**The warning's proper home is the Import path.** v0.27.0 recorded Import
+as "the same gap, noted rather than half-done". Doug's framing promotes
+that from a loose end to the primary requirement: Import is where a foreign
+profile legitimately arrives, so it is where the model comparison belongs.
+
+### What this does NOT resolve
+
+The data-field gap from Doc rev 139 stands and matters more on the Import
+path than it did on restore: there is still no per-model record of which
+data fields a model offers, so a migrate warning cannot enumerate the
+fields that will not survive. Doug's own 530→840 migration lost WindField
+and the Virtual Partner screen — the second of those this toolkit could
+now name, the first it could not.
+
+### Test plan
+
+J4 was a badly specified test and is replaced: on a 530, **no 840 backup
+being offered is the PASS**, not a failure. New J4b points at
+`~/GarminBackups/backups/` — a folder named with a timestamp rather than a
+serial is legacy, and those are the only route by which the J4 warning can
+still fire.
 
 ---
 
