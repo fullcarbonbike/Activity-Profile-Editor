@@ -221,6 +221,37 @@ G1 and G2 alone are worth the bench time. G3 is cheap once the device is
 already connected, and it is the only step that proves the byte persisted
 rather than merely rendered once.
 
+### G5 — what does a 530 do with an 840-only data field?
+
+**Added 2026-10-04. One screen, and it decides how much work the per-model
+field question is worth.**
+
+Confirmed by inspection: `FieldPickerDialog` excludes only Connect IQ
+markers, so **on a 530 it offers all 33 fields that were confirmed on the
+840 and are absent from the 530's own census** — Force, Stamina, Potential,
+Resistance and the rest. Nothing in `fit_patch.py` validates a field id
+against the model either. So a 530 user can place field 860 "Force" today
+and deploy it.
+
+**What the device then does is unknown.** Precedent points at benign — the
+Connect IQ marker renders as Garmin's "Timer" fallback, and the device
+clamps an over-range field count at render without rewriting the file — but
+that is inference, and this project's rule is that inference about device
+behaviour is a hypothesis until hardware says otherwise.
+
+| | Step | Why |
+|---|---|---|
+| G5a | On a **530** profile, put **Stamina (581)** and **Force (860)** on a user screen. Deploy | Both are 840-confirmed and absent from the 530 census |
+| G5b | Look at that screen **on the 530** | Blank? "Timer"? A dash? The field's real name? Something else? |
+| G5c | Pull the profile back and send it | Did the device keep ids 581/860 in `f7`, replace them, or strip the screen? |
+
+**This is the deciding experiment.** If the device shrugs, per-model field
+data is a nicety — worth an annotation in the picker, not a guard. If it
+blanks the screen or rewrites the record, it becomes a correctness issue
+and jumps the queue.
+
+Cheapest to fold into G, since the 530 is already connected for G1–G4.
+
 ---
 
 ## H — Named screens, 530 vs 840 (v0.26.3)
