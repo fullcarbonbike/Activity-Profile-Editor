@@ -349,7 +349,7 @@ not less — but it will look different from earlier ones in this thread.
 | J4b | Connected 530, `ls ~/GarminBackups/backups/` | Any folder named with a **timestamp** rather than a serial is a LEGACY backup. Those are offered to either device, so a cross-model restore is reachable only through them — the one path where the J4 warning can still fire |
 | J5 | Connected 530, restore a **530** backup | **No** model warning at all — just the normal confirmation |
 | J6 | J4, then press **No** | Nothing written. The warning must not be a one-way door |
-| J7 | Connected 840, restore an **840** backup | No warning |
+| ~~J7~~ | ~~Connected 840, restore an 840 backup~~ | **N/A — the configuration cannot exist.** The 840 is MTP with no mass-storage mode, which is *why* offline mode was built. There is no connected 840, so it never reaches the restore path at all |
 
 ### Audited, so it need not be re-checked
 
@@ -400,7 +400,27 @@ loose end to the main requirement.
 
 **Nothing has been changed on his instruction to hold.**
 
-> **J5 and J7 matter as much as J4.** A warning that fires on same-model
+### J7 is void, and it narrows the guard further — Doug, 2026-10-04
+
+There is **no connected mode for the 840**: MTP, no mass-storage. That is
+the reason offline mode exists at all, and it is stated on line 52 of
+`PROJECT_NOTES.md` — fifty lines into the file's own State of play. The
+test was written against a mental model instead of the recorded facts, the
+same way J4 was.
+
+**The consequence is sharper than J4's.** Restore is connected-mode-only,
+now correctly hidden offline. The 840 is offline-only. Therefore **the 840
+can never reach the restore path.** So the cross-model warning there can
+only fire on a **530** — the only connected device — meeting a **legacy
+flat backup that happens to hold an 840 file**. Since serial-keying
+predates the 840 work, that set is probably empty in practice.
+
+So on the restore path the guard is, for this setup, effectively dead. Doc
+rev 140 called it "narrow, not inert". **Rev 141 corrects that: on this
+path it is nearer inert than narrow**, and Import is not merely the better
+home for it but the only reachable one.
+
+> **J5 matters as much as J4.** A warning that fires on same-model
 > restores would get ignored within a week, which is the failure mode that
 > makes guards useless.
 

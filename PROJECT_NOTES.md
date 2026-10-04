@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-04, at Doc rev 140.*
+> *Last updated 2026-10-04, at Doc rev 141.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,54 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 141 — refreshed 2026-10-04. NO CODE CHANGED.* **J7 specified a
+configuration that cannot exist: there is no connected mode for the 840.
+That is recorded on line 52 of this very file — "840 (firmware 29.22,
+**MTP**, no mass-storage mode)" — and it is the reason offline mode was
+built. Second test in two days written against a mental model instead of
+the project's own State of play.**
+
+### The correction that matters
+
+Rev 140 called the restore-path cross-model guard **"narrow, not inert"**.
+That was too kind, and the reason is structural rather than incidental:
+
+- Restore is **connected-mode only** (correctly hidden offline, v0.27.2)
+- The 840 is **offline only** (MTP)
+- ∴ **the 840 can never reach the restore path at all**
+
+So the guard can only fire on a **530** — the single connected-mode device
+— encountering a **legacy flat backup that happens to hold an 840 file**.
+Serial-keying predates the 840 work, so that set is likely empty.
+
+**On the restore path it is nearer inert than narrow.** Import is not
+merely the better home for the model comparison; it is the **only
+reachable** one. Rev 140's conclusion was right and its severity was
+understated.
+
+### Doug's framing, confirmed again
+
+He noted that offline there is no "restore" distinct from opening a folder:
+*"a restore is just a selected folder with a backup of any Profiles that
+may have been deleted."* Consistent with rev 140 and with what v0.27.0
+built — which is a good sign that the design is settling rather than being
+re-litigated.
+
+### The pattern across J4, J7, and the AddScreenPanel comment
+
+Three times now the error has been the same shape: **a claim that was true
+of my model of the system rather than of the system**, written down with
+enough confidence to become a test or a comment. J4 assumed restore spanned
+devices; J7 assumed the 840 had a connected mode; the AddScreenPanel note
+assumed a default implied a feature. In each case the correcting fact was
+already written down somewhere in the repo.
+
+The practical rule, recorded because it keeps earning its place: **before
+specifying a test or justifying a decision, grep the notes for the device
+or path involved.** All three were one search away.
 
 ---
 
