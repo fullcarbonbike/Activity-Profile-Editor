@@ -252,6 +252,50 @@ and jumps the queue.
 
 Cheapest to fold into G, since the 530 is already connected for G1–G4.
 
+### Using Census4 instead: it works, and answers THREE questions at once
+
+Doug is running G5 by pushing the 840's `Census4` to the 530 rather than
+building a fresh 530 screen. Checked, and it is a **better** test than the
+one specified: the three kinds of incompatibility are **partitioned across
+separate screens** rather than mixed within them, so each group isolates
+one variable.
+
+**Group A — field ids ONLY.** Layout legal on the 530, plain user screen
+type. Anything odd here is attributable to the field ids alone:
+
+| Screen | Layout | Unknown fields |
+|---|---|---|
+| Screen 1 | 10/A | 9 — the whole Force family |
+| Screen 2 | 9/A | 8 — Norm. Force ×3, Vertical Descent ×4, Lap Ascent |
+| Screen 3 | 7/B | 5 — Lap Descent, Dist./Time to Point, 24-Hour temps |
+| Screen 4 | 9/A | 7 — Resistance, Segment Time, Primary/Secondary Target, Step Distance, Lap %HRR, Lap W/kg |
+| Screen 5 | 5/A | 4 — Stamina, Potential, Estimated Distance, Estimated Time |
+
+**Group B — layout ONLY.** Every field known to the 530:
+`Lap Summary 2/B` and `eBike Metrics 5/A`, neither offered on a 530. This
+is where a fallback-to-A shows itself under controlled conditions.
+
+**Group C — screen type ONLY.** `GroupRide`, `Stamina`, `Power Guide`,
+`Music Control` — all 840-only. Doug's own 530→840 migration dropped
+Virtual Partner, so dropping is the expectation to test against.
+
+### Three outcomes for Group A, and the third is the interesting one
+
+1. **Blank, or Garmin's "Timer" fallback** — the Connect IQ precedent.
+   Benign; per-model field data becomes a picker annotation, not a guard.
+2. **Screen blanked or the record rewritten** — a correctness issue, and it
+   jumps the queue ahead of the Import warning.
+3. **The field renders CORRECTLY, with its real name.** That would mean the
+   530 firmware knows the id while Garmin's own 530 picker does not offer
+   it — the field exists and is merely unlisted. It would change the
+   per-model question from *which fields does this model have* to *which
+   does its menu expose*. Worth watching for specifically, because it is
+   the outcome most easily misread as "nothing happened".
+
+**On the pull-back:** the 530 rewrites `file_id.product` on import, so the
+returned file will report **Edge 530**. Expected — see `profile_model()`'s
+own warning — not a bug.
+
 ---
 
 ## H — Named screens, 530 vs 840 (v0.26.3)
