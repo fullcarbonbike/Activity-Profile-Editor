@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-05, at Doc rev 142.*
+> *Last updated 2026-10-05, at Doc rev 143.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,88 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 143 — refreshed 2026-10-05.* **G5 complete, and it answers four
+questions at once. Doug pushed the 840's Census4 to a 530 and pulled it
+back. All 33 of the 840-only field ids SURVIVED IN THE FILE — every
+incompatibility is a render-time substitution, nothing is rewritten. But
+the device RE-INDEXES the screens it keeps, which breaks this toolkit's
+message_index keying for cross-model transfers and makes the deploy change
+summary contradict itself.**
+
+### What the 530 does with an 840 profile — measured, from the bytes
+
+| Incompatibility | What the device does | File rewritten? |
+|---|---|---|
+| **Screen type it lacks** | **dropped entirely** — Stamina, Power Guide, GroupRide, Music Control, Radar all gone; 22 slots → 17 | the slot is gone |
+| **Field id it does not know** | **renders as Speed** | **no** — all 33 ids still in `f7` |
+| **Layout it does not offer** | renders as a legal one | **no** — Lap Summary kept `f8=1` though the 530 offers only `(2,0)` |
+
+**The Speed fallback is new and specific.** A Connect IQ marker falls back
+to Garmin's "Timer"; an unknown ordinary field id falls back to **Speed**.
+Two different failure modes with two different fallbacks — worth knowing
+because "it shows Timer" and "it shows Speed" diagnose different problems.
+
+**Nothing is rewritten, so a migrate is lossy on screen and reversible on
+disk.** Take that same file back to an 840 and the fields should return.
+That is the benign outcome for the per-model-field question: it argues for
+an annotation in the picker, **not** a guard.
+
+**This also settles Doc rev 142's provisional finding.** The C→A fallback
+Doug saw was exactly this, via exactly this route — an 840 profile on a
+530. Purely device behaviour, no toolkit hole, and the toolkit's own
+refusals were verified to hold.
+
+### The consequential finding: message_index is NOT stable cross-model
+
+The 530 dropped the five unsupported types at slots 15–19 and **moved the
+survivors up into the vacated indices**:
+
+```
+source slot 20  "Screen 4"  f3=9  ->  pullback slot 15   field array IDENTICAL
+source slot 21  "Screen 5"  f3=5  ->  pullback slot 16   field array IDENTICAL
+```
+
+`f9` was renumbered too. So the same screen has a **different
+`message_index` on each side of a cross-model import.**
+
+**That breaks a rule this project established deliberately.** Whole-file
+byte compare was ruled invalid because the device returns a different file
+SIZE without semantic change, so comparison moved to record level keyed on
+`message_index`. Correct for a same-model deploy — G3 confirmed slots and
+`f8` survive one intact — and **wrong for a cross-model one.**
+
+Demonstrated rather than reasoned: `describe_screen_changes()` across this
+round trip emits **both** `"Screen 4: added Power, EPOC, ..."` **and**
+`"Screen 4: REMOVED"` in the same 16-line list, because slot 15 now holds
+Screen 4's content while source slot 20 looks deleted.
+
+**Not fixed, deliberately.** Re-keying on content identity instead of index
+is a real redesign, and a cross-model transfer is a *migrate*, which Doc
+rev 140 settled belongs on Import rather than deploy. Instead the
+cross-model warning now says the summary cannot be trusted after such a
+transfer — honest and cheap. Silently emitting contradictory lines was
+neither. The limitation is recorded in the function itself so the next
+reader does not mistake it for a bug in the comparison logic.
+
+### Per-model display names, confirmed from the other side
+
+Doug: *"some fields have the 530 names vs the 840."* Seen on the 530's own
+screens, which independently corroborates the two divergences already on
+record — 478 `EPOC`/`LOAD` and 32 `Next Pt Location`/`WPT NEXT`. Still only
+two known cases, so the Doc rev 132 decision stands: keep the 530 strings,
+note the 840 ones in comments, and let the COUNT decide if per-model
+display names are ever worth the change to every read path.
+
+### Where this leaves the per-model field question
+
+**Annotation, not a guard.** The device's handling is graceful and
+non-destructive, so blocking or filtering would be heavier than the problem
+warrants — and filtering from an incomplete table would hide fields a user
+legitimately has, which is the Compass defect again. The picker should say
+"840 only" beside such a field; nothing should refuse it.
 
 ---
 

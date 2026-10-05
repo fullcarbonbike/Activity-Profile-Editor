@@ -4315,6 +4315,30 @@ def describe_screen_changes(path_a, path_b):
     # exactly the comparison that matters most there.
     product_a = profile_model(msgs_a)[0]
     product_b = profile_model(msgs_b)[0]
+    # ⚠ THIS FUNCTION IS UNRELIABLE ACROSS A CROSS-MODEL TRANSFER, and the
+    # reason is the device, not this code. MEASURED 2026-10-05 (Doug's G5,
+    # Doc rev 143): when the 530 imported an 840 profile it DROPPED the five
+    # screen types it does not support and then RE-INDEXED the survivors
+    # into the vacated message_index slots -- source slot 20 came back as
+    # slot 15 with a byte-identical field array.
+    #
+    # Everything here keys on message_index, which is correct and is the
+    # project's own established rule (a whole-file byte compare is invalid
+    # because the device returns a different SIZE without semantic change).
+    # That rule holds for a same-model deploy and breaks for a cross-model
+    # one, where the same screen has a different index on each side.
+    #
+    # The output then contradicts itself: the G5 round trip produced both
+    # "Screen 4: added Power, EPOC, ..." AND "Screen 4: REMOVED" in one
+    # list, because slot 15 now holds Screen 4's content while source slot
+    # 20 looks deleted.
+    #
+    # NOT FIXED HERE. Re-keying on content identity rather than index would
+    # be a real redesign, and cross-model transfers are a migrate -- which
+    # Doc rev 140 settled belongs on the Import path, not deploy. The
+    # cross-model warning tells the user this summary cannot be trusted
+    # after such a transfer, which is honest and cheap; silently emitting
+    # contradictory lines was not.
 
     def slot_map(data):
         slots = {}

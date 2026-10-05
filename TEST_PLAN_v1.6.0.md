@@ -239,11 +239,36 @@ clamps an over-range field count at render without rewriting the file — but
 that is inference, and this project's rule is that inference about device
 behaviour is a hypothesis until hardware says otherwise.
 
-| | Step | Why |
+| | Step | Result |
 |---|---|---|
-| G5a | On a **530** profile, put **Stamina (581)** and **Force (860)** on a user screen. Deploy | Both are 840-confirmed and absent from the 530 census |
-| G5b | Look at that screen **on the 530** | Blank? "Timer"? A dash? The field's real name? Something else? |
-| G5c | Pull the profile back and send it | Did the device keep ids 581/860 in `f7`, replace them, or strip the screen? |
+| G5a | 840 `Census4` pushed to the 530 | **PASS 2026-10-05** |
+| G5b | Visual check on the 530 | **Unknown field ids render as SPEED.** 840-only screen types do not appear at all |
+| G5c | Pull back and compare | **All 33 840-only ids still in `f7`.** Nothing rewritten. Slots re-indexed — see below |
+
+**ANSWERED: per-model field data is an ANNOTATION, not a guard.** The
+device substitutes at render time and leaves the file alone, so the
+transfer is lossy on screen and reversible on disk. Filtering the picker
+from an incomplete table would hide fields a user legitimately has — the
+Compass defect again — so the picker should say "840 only" and refuse
+nothing.
+
+**New device behaviours recorded (Doc rev 143):**
+
+- an **unknown field id renders as Speed** — a Connect IQ marker falls back
+  to "Timer", so the two failure modes have *different* fallbacks
+- an **unsupported screen type is dropped entirely** — five vanished,
+  22 slots became 17
+- an **unsupported layout is not rewritten** — Lap Summary kept `f8=1`
+  though the 530 offers only `(2,0)`
+- **the device RE-INDEXES the survivors**: source slot 20 came back as slot
+  15 with a byte-identical field array, so `message_index` is not stable
+  across a cross-model import
+
+That last one makes `describe_screen_changes()` self-contradictory after
+such a transfer — the G5 round trip produced both *"Screen 4: added
+Power, EPOC, …"* and *"Screen 4: REMOVED"*. Not fixed; the cross-model
+warning now says the summary cannot be trusted after a migrate, and the
+limitation is documented in the function.
 
 **This is the deciding experiment.** If the device shrugs, per-model field
 data is a nicety — worth an annotation in the picker, not a guard. If it
