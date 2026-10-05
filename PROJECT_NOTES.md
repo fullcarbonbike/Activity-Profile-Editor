@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-04, at Doc rev 141.*
+> *Last updated 2026-10-05, at Doc rev 142.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,73 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 142 — refreshed 2026-10-05.* **G3 PASSES: a toolkit-written
+`f8=2` survives NewFiles and renders as 9/C on the 840. The nine measured
+grids are now confirmed in BOTH directions, read and write. Separately,
+Doug found that the 530 silently FALLS BACK TO A rather than rejecting an
+unsupported variant — provisional, pending one question about how the C
+got onto the 530.**
+
+### G3 — confirmed from the bytes, not from the rendering alone
+
+Doug changed User Screen 4 from 9/A to 9/C in the toolkit, deployed through
+NewFiles, and the 840 **rendered it correctly as 9/C**. The pull-back
+(`CyclingRoadCensus4-58031416.fit`) holds:
+
+```
+slot[20]  f10=3  count=9  f8=2   -> letter C
+          grid  [0,1] [2,3] [4] [5,6] [7,8]
+```
+
+**`f8` came back as 2, unchanged.** That matters as much as the rendering:
+it rules out the device accepting the byte for one render and rewriting it
+afterwards, which is exactly what it does do to field counts (clamps at
+render, leaves the file alone). Here the byte persisted.
+
+**This closes the gap Doc rev 132 opened.** All nine 840 layout states were
+MEASURED from device-authored profiles; v0.26.1 then let the toolkit
+*author* them, and nothing had confirmed a toolkit-written `f8=2` would be
+accepted. It is. The write side is as sound as the read side.
+
+Also clean in the pull-back: **zero unknown field ids**, so the 2026-09-30
+census survived a further round trip intact.
+
+### The 530 clamps an unsupported variant to A — PROVISIONAL
+
+Doug, improvising a cross-model layout check before noticing G5a–c: *"using
+a #/C layout on the 530 defaulted to a #/A layout, instead of rejecting."*
+
+**The toolkit is not the route.** Verified both paths:
+
+- `fit_patch.py --layout 2` on a 530 user screen **refuses**, naming the
+  valid values: *"--layout 2 is not a layout the device offers for a
+  6-field Screen 2. Valid here: --layout 0 (A), --layout 1 (B)."* The same
+  request against an 840 file succeeds.
+- The GUI dropdown is built from `layout_variants_for_count()`, which
+  returns `[0,1]` for a 530 at counts 3–7 and `[0]` at 8–10, so C is not
+  offerable there either.
+
+So the C reached the 530 by some other route and **the DEVICE fell back to
+A**. If that holds, it is the variant analogue of a behaviour already
+recorded — the device clamps an over-range field count at render without
+rewriting the file — and it is the specific answer to a question the
+cross-model warning currently fudges. That warning says an unsupported
+layout "will render as something else"; it could say **"will render as
+layout A"**.
+
+**Not recorded as fact and the warning is unchanged**, because the route
+matters: a toolkit path that permitted it would be a defect, while a manual
+copy or `--force` makes it purely a device observation. One question
+outstanding.
+
+### Test plan
+
+G1–G4 complete. G5a–c still to do, and they remain the deciding experiment
+for per-model DATA FIELDS, which is a separate question from this layout
+finding.
 
 ---
 
