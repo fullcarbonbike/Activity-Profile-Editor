@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-06, at Doc rev 144.*
+> *Last updated 2026-10-06, at Doc rev 145.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,80 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 145 — refreshed 2026-10-06.* **CORRECTION to rev 144, same
+subject. The anchor experiment gave the exact permutation — and in checking
+how to store it I found rev 144's central claim was wrong about my own
+code. The grid CAN express this, it is now entered, and the "third
+structural limit" rev 144 announced does not exist.**
+
+### The permutation, measured
+
+Doug set the six Workout slots to six unmistakable fields and read the
+device:
+
+```
+stored   [0]Speed  [1]Cadence  [2]HR  [3]Power  [4]Odometer  [5]Temp
+renders  Heart Rate                                  full width
+         Power                                       full width
+         Odometer                                    full width
+         Temperature                                 full width
+         Speed | Cadence                             half width, bottom
+```
+
+So the grid is **`[[2],[3],[4],[5],[0,1]]`**: the half-width pair is stored
+*first* and rendered *last*.
+
+**Independently corroborated.** The previous configuration of the same
+screen — a completely different field set — had stored `[0] Timer` and
+`[1] Distance` rendering as that same bottom pair. Two field sets, one
+mapping. And it explains why Doug's first-pass guess ("the 2 Targets are in
+the top 2") was off: with no workout active, Duration and both Targets all
+render blank, so the labels could not distinguish them. **The anchor
+experiment was worth running precisely because the unaided observation was
+unreliable, and he said as much at the time.**
+
+### Rev 144 was wrong, and wrong about this codebase
+
+It claimed *"the grid model asserts that `f7` index equals reading-order
+position"* and declined to add the entry on that basis. **False.** A grid
+row is a list of **f7 indices**, and the row ORDER is the visual order — so
+an arbitrary permutation has always been representable. Both consumers
+confirm it:
+
+- `is_position_full_width()` asks `position in row`, not `row[position]`
+- `LayoutDiagramPanel.on_paint()` draws `field_labels[pos]` for each index
+  **in** the row
+
+The ordinary user grids are written `[[0],[1],[2]...]` only because for a
+plain user screen index and position coincide. I read identity-ordered data
+and inferred an identity-ordered *requirement*.
+
+So of the three limits rev 144 listed, **two are real** — row HEIGHT (rev
+133) and Radar's left-hand COLUMN (rev 137) — and the third was a
+misreading. Entered now: `MODEL_LAYOUTS[4062]['named'][38]` holds
+`(6,0) -> [[2],[3],[4],[5],[0,1]]`. **First of the 18 unmeasured named
+states filled; 17 remain.**
+
+### A silent failure in my own first attempt, caught by exercising it
+
+The first fix added a **second `38:` key to the same dict literal**. Python
+keeps the last duplicate **with no warning**, so the entry was dead code:
+`layout_states(38, 4062)` returned `[(6,0)]` from the surviving entry while
+`layout_grid(38, 6, 0, 4062)` returned `None`. Reading the diff would have
+looked correct. It was found by running it — same lesson as the v1.5.0
+inert feature, and the reason the verification step is not optional.
+
+### One thing deliberately NOT changed
+
+Doug's H1 note that **`"No Workout Active"` appears in a field slot**
+suggests `'content': 'top'` may be wrong for this type — the six positions
+he described account for all six fields, leaving no separate region. Left
+as recorded, because one observation under one condition (no workout
+running) is thin evidence about a content area, and the state that would
+settle it is a live workout. Flagged, not acted on.
 
 ---
 

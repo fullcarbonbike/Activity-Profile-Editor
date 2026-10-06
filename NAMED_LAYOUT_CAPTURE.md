@@ -5,8 +5,8 @@ which closed the same gap for plain user screens. See PROJECT_NOTES.md Doc rev 1
 
 ## What is missing
 
-**18 of the 46 layout states the 840 offers on named screen types have no
-measured grid.** Until v0.26.3 seventeen of them silently drew
+**~~18~~ 17 of the 46 layout states the 840 offers on named screen types
+have no measured grid.** Workout 6/A was measured 2026-10-06 — see Doc rev 145. Until v0.26.3 seventeen of them silently drew
 ordinary-user-screen geometry — the exact defect v0.22.0 existed to remove.
 They now draw blank with a note. Filling this table replaces the blank with
 the real arrangement.
