@@ -15,7 +15,7 @@ The 530 is complete: all 25 of its named states are measured.
 
 | Type | `f10` | Unmeasured states | Hardware needed? |
 |---|---|---|---|
-| Workout | 38 | 6/A | no — Workout is field-editable on the 840 and Census4 already has a 6-field one | 
+| ~~Workout~~ | 38 | ~~6/A~~ **geometry MEASURED 2026-10-06** — 4 full-width stacked + 1 row of 2 half-width. **NOT entered in the table**: stored `f7` index is not screen reading order for this type, so the grid would encode a false claim. See Doc rev 144 | no — Workout is field-editable on the 840 and Census4 already has a 6-field one | 
 | eBike Metrics | 58 | 1/A, 2/A, 3/A, 4/A, 6/A, 7/A, 8/A | **eBike** — you have none. The screen record exists though; the editor may still list layouts | 
 | STEPS Metrics (Shimano) | 95 | 1/A, 2/A, 3/A, 5/A, 6/A, 7/A, 8/A | **Shimano STEPS** — you have none. Same caveat as eBike | 
 | Radar | 223 | 0/A, 5/A, 5/B | no Varia needed — Radar appeared with none paired, which is how it was identified | 

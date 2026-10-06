@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-05, at Doc rev 143.*
+> *Last updated 2026-10-06, at Doc rev 144.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,93 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 144 — refreshed 2026-10-06.* **H1 measured Workout (6,0) on the
+840 — one of the 18 unmeasured named states — and turned up a THIRD
+structural limit in the layout model: for this type the stored `f7` index
+is NOT the screen reading position. The grid is deliberately NOT added,
+because adding it would encode a false claim.**
+
+Doug's profile is `CyclingRoadROAD`, **product 4062**, Workout record
+`f1=1 f3=6 f8=0 f9=13 f12=0` — exactly the state H1 targets.
+
+### The geometry, measured
+
+Four full-width rows stacked, then one row of two half-width fields:
+`[[0],[1],[2],[3],[4,5]]`. He also confirms the count is **locked at 6** —
+the on-device editor offers no count selector, and neither does the
+Connect+ app, which does not even draw a grid for this type.
+
+**That shape is identical to the ordinary 6/A user-screen grid.** Which is
+worth stating plainly because it is tempting to conclude the fallback
+removed in v0.26.3 was fine after all. It was not — see below.
+
+### The structural finding: stored order ≠ screen order
+
+Stored `f7`, from the bytes:
+
+```
+[0] Timer   [1] Distance   [2] Duration
+[3] Primary Target   [4] Workout Comparison   [5] Secondary Target
+```
+
+On-device, Doug sees **Timer at the bottom LEFT and Distance at the bottom
+RIGHT** — i.e. stored indices 0 and 1 render in the *last* row, as the
+half-width pair. The two Target fields are in the top two full-width rows.
+
+**The grid model asserts that `f7` index equals reading-order position.**
+Every consumer depends on it: `is_position_full_width(count, variant,
+position)` takes a position and means an `f7` index; the diagram draws
+labels in array order. For Workout that mapping is wrong.
+
+**So the v0.26.3 blank was right for a reason I had not anticipated.** The
+old fallback would have drawn the correct *shape* — four stacked, two
+side-by-side — with the *wrong labels in the boxes*. A picture that is
+right about geometry and wrong about content is worse than no picture,
+because nothing about it looks suspect.
+
+**This is the third thing the grid cannot express**, alongside row HEIGHT
+(Doc rev 133) and Radar's left-hand COLUMN (Doc rev 137). All three argue
+the same way: the model is a list of rows of positions, and the device
+needs rows, heights, orientation, *and* an index mapping.
+
+### Why the grid is NOT being added
+
+`MODEL_LAYOUTS[4062]['named'][38]` could take `(6,0) -> [[0],[1],[2],[3],
+[4,5]]` today. It will not, because that entry would assert "`f7` index 0
+is the top full-width row", which this measurement shows is false. Adding
+a correct shape under a false index assumption is how a wrong answer gets
+laundered into a table. The blank-plus-note stands.
+
+### The disambiguating experiment, cheap and decisive
+
+The exact permutation is NOT determinable from this report, and Doug says
+so himself — the on-device labels are poorly identified, and his
+identifications of the `"--"` and `"No Workout Active"` rows were explicit
+guesses. What is solid is only that stored 0 and 1 render last.
+
+**Workout field editing is ALLOWED on the 840** (`NO_FIELD_EDIT_BY_MODEL`
+excludes 38 for 4062), so the field census's own anchor technique applies:
+set the six slots to six unmistakable, visually distinct fields in a known
+stored order — Speed, Cadence, Heart Rate, Power, Odometer, Temperature —
+deploy, and read off which lands where. That yields the permutation
+outright, with no reliance on ambiguous labels.
+
+### Two smaller observations worth keeping
+
+**`"No Workout Active"` occupies a field slot.** It is not a separate
+content area — the six positions Doug describes account for all six fields.
+So a device-generated status string can render *in* a field slot, which is
+the same family as 520/578 showing a bare `"--"` with no label until a
+workout step defines them.
+
+**The Connect+ app's list order is not the stored order either.** He
+reports the app listing Secondary Target at position 2 and Duration at
+position 4; the file has Duration at 2 and Secondary Target at 5. Could be
+a transcription slip, could be a third ordering. Not pursued — the
+experiment above makes it moot.
 
 ---
 
