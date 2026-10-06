@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-06, at Doc rev 145.*
+> *Last updated 2026-10-06, at Doc rev 146.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,64 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 146 — refreshed 2026-10-06.* **H2 measured eBike Metrics counts 5
+and 7 on the 840, confirmed an existing grid nobody had re-checked, and
+found that `content: 'top'` is right about WHERE the device-generated
+region is and badly wrong about WHAT it is.**
+
+### Measured
+
+| Count | Grid | Notes |
+|---|---|---|
+| **5** | `[[0],[1],[2,3],[4]]` | the **default**; already stored, and Doug's measurement matched it **exactly** |
+| **7** | `[[0],[1,2],[3,4],[5,6]]` | new — one full-width row over three rows of two half-width |
+
+The selector offers **counts 1–8 with no letter choice**, which matches the
+`states` already recorded. Count 5 matching a stored grid is worth noting
+on its own: that entry had been carried for some time with nobody
+re-deriving it, and an independent measurement agreeing is the cheapest
+kind of confirmation available.
+
+### The content area is in the right place and the wrong size
+
+`'content': 'top'` is **confirmed** — there is a device-generated region
+above the fields. But it is **not** the large e-bike metric panel the label
+implies. Doug: *"a shorter than normal full width field above the layout
+data fields, that only contains a small battery icon"*, and it **persists
+at every count** (verified at 5 and 7).
+
+`LayoutDiagramPanel` draws every content area at `content_weight = 2.0` —
+twice a field row — with the justification *"on the real device it
+dominates the screen."* True for Map. **False for eBike**, where the strip
+is shorter than one row, so the diagram draws it roughly **four times too
+tall** and labels it "eBike Metrics".
+
+**Not fixed, and the reason is the standing one.** Content height is the
+same unmodelled dimension as row height (Doc rev 133). Patching it for one
+type with a hardcoded exception is precisely how the scattered-geometry
+problem started — `LAYOUT_GRIDS` and `COUNTS_WITH_B_VARIANT` drifted apart
+because each special case lived where it was convenient. Recorded as a
+known inaccuracy against the eventual geometry rework.
+
+### Where the named-screen gap now stands
+
+**16 of the original 18 unmeasured states remain**, and they have narrowed
+to three types:
+
+| Type | States left | Reachable? |
+|---|---|---|
+| eBike Metrics | 6 | yes — Doug just did two without owning an eBike |
+| STEPS Metrics | 7 | likely, same way |
+| Radar | 3 | the structural case — a left-hand COLUMN the grid cannot express (Doc rev 137) |
+
+**H2 settles the hardware question that `NAMED_LAYOUT_CAPTURE.md` flagged
+as doubtful.** It asked whether eBike and STEPS layouts could be read
+without the hardware, noting Radar as the precedent for trying anyway.
+They can: Doug has no eBike and read two of its layouts off the editor. So
+the remaining 13 non-Radar states are ordinary bench work, not blocked.
 
 ---
 
