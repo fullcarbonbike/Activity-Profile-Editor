@@ -5,7 +5,7 @@ which closed the same gap for plain user screens. See PROJECT_NOTES.md Doc rev 1
 
 ## What is missing
 
-**~~18~~ ~~17~~ 16 of the 46 layout states the 840 offers on named screen types
+**~~18~~ ~~17~~ ~~16~~ 10 of the 46 layout states the 840 offers on named screen types
 have no measured grid.** Workout 6/A was measured 2026-10-06 — see Doc rev 145. Until v0.26.3 seventeen of them silently drew
 ordinary-user-screen geometry — the exact defect v0.22.0 existed to remove.
 They now draw blank with a note. Filling this table replaces the blank with
@@ -16,7 +16,7 @@ The 530 is complete: all 25 of its named states are measured.
 | Type | `f10` | Unmeasured states | Hardware needed? |
 |---|---|---|---|
 | ~~Workout~~ | 38 | ~~6/A~~ **geometry MEASURED 2026-10-06** — 4 full-width stacked + 1 row of 2 half-width. **NOT entered in the table**: stored `f7` index is not screen reading order for this type, so the grid would encode a false claim. See Doc rev 144 | no — Workout is field-editable on the 840 and Census4 already has a 6-field one | 
-| eBike Metrics | 58 | ~~7/A~~ measured 2026-10-06. Left: 1/A, 2/A, 3/A, 4/A, 6/A, 8/A | **no** — ANSWERED 2026-10-06: Doug read counts 5 and 7 off the editor without owning an eBike, so the rest is ordinary bench work | 
+| ~~eBike Metrics~~ | 58 | **COMPLETE 2026-10-06 — all 8 counts, no eBike hardware needed** | **no** — ANSWERED 2026-10-06: Doug read counts 5 and 7 off the editor without owning an eBike, so the rest is ordinary bench work | 
 | STEPS Metrics (Shimano) | 95 | 1/A, 2/A, 3/A, 5/A, 6/A, 7/A, 8/A | **probably not** — eBike proved the editor lists layouts without the hardware; expect the same here | 
 | Radar | 223 | 0/A, 5/A, 5/B | no Varia needed — Radar appeared with none paired, which is how it was identified | 
 

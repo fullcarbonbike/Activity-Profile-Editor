@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-06, at Doc rev 146.*
+> *Last updated 2026-10-06, at Doc rev 147.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,70 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 147 — refreshed 2026-10-06.* **eBike Metrics is the first named
+type fully closed on the 840 — all eight counts measured, with no eBike
+hardware. And it gives a measurable verdict on the fallback v0.26.3
+removed: it would have been right 4 times out of 8.**
+
+### The complete set
+
+| Count | Grid |
+|---|---|
+| 1 | `[[0]]` |
+| 2 | `[[0],[1]]` |
+| 3 | `[[0],[1],[2]]` |
+| 4 | `[[0],[1],[2],[3]]` |
+| 5 | `[[0],[1],[2,3],[4]]` ← default, matched the stored grid |
+| 6 | `[[0],[1],[2,3],[4,5]]` |
+| 7 | `[[0],[1,2],[3,4],[5,6]]` |
+| 8 | `[[0,1],[2,3],[4,5],[6,7]]` |
+
+All eight check out arithmetically — positions contiguous `0..n-1`, no
+duplicates, counts matching.
+
+### The fallback was right half the time, and that is worse than useless
+
+Counts **1–4 are plain full-width stacks and coincide EXACTLY** with the
+ordinary user grid. Counts **5–8 all diverge**, because this type
+surrenders a row to its top strip and packs the remainder differently —
+compare count 8: eBike `[[0,1],[2,3],[4,5],[6,7]]` against generic
+`[[0],[1],[2,3],[4,5],[6,7]]`.
+
+So the ordinary-geometry fallback would have drawn **4 of these 8
+correctly and 4 wrongly.** Stated precisely because the tempting version
+("the fallback was wrong") is false, and the true version is worse: **it
+was unpredictably wrong, with nothing on screen distinguishing the halves.**
+Consistent wrongness is learnable; a picture that is right about half the
+layouts of one screen type is not.
+
+That is the clearest argument yet for the posture v0.26.3 took, and it is
+now a number rather than a principle.
+
+### The hardware doubt is resolved
+
+`NAMED_LAYOUT_CAPTURE.md` recorded genuine uncertainty about whether the
+sensor-gated types could be surveyed without the sensors, citing Radar as
+the only precedent. **eBike settles it: eight of eight, no eBike.** The
+editor lists layouts from the screen record, not from a paired device —
+the same conclusion as Doc rev 128, reached from a third direction.
+
+So **STEPS Metrics (7 states) is ordinary bench work**, not blocked.
+
+### Where the gap stands
+
+**10 of the original 18 remain**, in two types:
+
+| Type | Left | Nature |
+|---|---|---|
+| STEPS Metrics | 7 | routine — expect the eBike experience to repeat |
+| Radar | 3 | **structural** — a left-hand column the grid cannot express (Doc rev 137) |
+
+Once STEPS is done, every remaining gap on this model is Radar, and Radar
+is a model problem rather than a measurement problem. That is a clean place
+for the named-screen work to end.
 
 ---
 
