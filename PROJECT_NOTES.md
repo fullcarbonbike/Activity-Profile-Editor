@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-06, at Doc rev 147.*
+> *Last updated 2026-10-07, at Doc rev 148.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,74 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 148 — refreshed 2026-10-07.* **STEPS Metrics is complete too, so
+RADAR IS THE ONLY NAMED TYPE LEFT UNMEASURED ON THE 840 — 3 states of the
+original 18. And Doug found a real editor annoyance: cycling layouts
+replaces the original data fields with Timer and nothing remembers them.**
+
+### STEPS Metrics — complete, by assertion of identity
+
+Doug: *"identical to the eBike Metrics. Same number of layouts 1-8, no
+alternatives."* Measured with no Shimano hardware, same as eBike.
+
+**The one grid already stored — count 4 — matched eBike's count 4 before
+any of this was entered.** So the pre-existing data point corroborates the
+claim rather than conflicting with it. Cheap confirmation, and it is the
+kind worth noticing: an independent prior measurement agreeing with a new
+assertion is stronger than either alone.
+
+**The eight grids are DUPLICATED from eBike's, not shared.** Deliberate,
+and in deliberate contrast to the layout letter (Doc rev 138) and the
+height note (rev 133), both of which were *consolidated*. The difference is
+provenance:
+
+- those were **one fact** stored in four places → consolidate
+- this is **two independent measurements** that currently coincide →
+  duplicate
+
+A shared reference would let a future correction to either silently rewrite
+the other, and a STEPS divergence on some firmware could not be fixed
+without splitting them first. Verified the two dicts are equal and are not
+the same object.
+
+### Where the named-screen gap ends
+
+**3 of the original 18 remain, all Radar** — `(0,0)`, `(5,0)`, `(5,1)`.
+
+Which is the clean landing place Doc rev 147 predicted: everything that was
+a *measurement* problem is now measured, and what is left is the one that is
+a *model* problem. A left-hand column of five beside a full-height cell
+cannot be written as a list of rows, so Radar waits on the geometry rework
+rather than on bench time.
+
+### The Timer substitution — a real annoyance, logged not built
+
+Doug: open a named screen with four distinct fields, cycle the layout
+options, return to the original count — the originals are gone, replaced by
+Timer.
+
+**Working as designed, and the design is unkind.** Every layout choice
+writes to `editing_path` immediately (v0.22.0): shrinking drops the surplus
+fields, growing stamps `DEFAULT_FILLER_FIELD_ID`. Nothing retains what was
+dropped, so returning cannot restore it. His workaround — Back out without
+applying — is correct and should not be necessary.
+
+**Scoped as #150 and NOT built**, because he is mid-test and this changes
+the panel he is testing. Two design points worth fixing in advance of the
+work:
+
+- Cache keyed on **count**, updated on every field edit — not just "the
+  original". Otherwise someone who deliberately edits fields at count 4,
+  navigates away and returns would have their old fields resurrected over
+  their new ones, which is a worse bug than the one being fixed.
+- A cached list may hold a **CIQ marker**. Restoring it is a *restore*, not
+  an introduction, so the v0.20.1 refusals should not fire — but the write
+  must still go through `patch_screen_maintaining_ciq()` so the mesg 170
+  placement follows. **Verify rather than assume**; that guard has been
+  mis-scoped before.
 
 ---
 
