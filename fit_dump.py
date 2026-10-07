@@ -2316,6 +2316,21 @@ SMALL_SLOT_UNUSABLE_FIELD_IDS = {
 #       exact order.
 #
 #   (b) WITHIN a layout -- MEASURED, and that is what this table holds.
+#       ⚠ WHAT THE VARIANT IS FOR, Doug 2026-10-07: "in most cases the
+#       layout A/B/C shifts the taller slot around in the layout, if it
+#       offers one, to allow the placement for customization." That one
+#       sentence unifies every note below, which until now read as a set
+#       of unrelated observations:
+#           3/A  rows equal
+#           3/B  top SMALLER      -> tallness sits lower
+#           3/C  first two taller -> tall at the TOP
+#           5/C  second taller    -> tall in the MIDDLE
+#           6/C  second taller    -> tall at position 1
+#       The variant RELOCATES the tall row. So it is not a cosmetic
+#       choice: it is the control for WHERE a field that needs vertical
+#       room can go, which is why the letters exist at all. Nothing in
+#       this table said that before, and it is the kind of why that stops
+#       a reader treating the entries as arbitrary.
 #       (3,1)'s top field being smaller, or (5,2)'s second row being
 #       taller, cannot come from (a), which would make every row in one
 #       layout equal. These are deliberate per-variant choices and only

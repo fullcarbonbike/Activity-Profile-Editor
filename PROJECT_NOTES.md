@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-07, at Doc rev 151.*
+> *Last updated 2026-10-07, at Doc rev 152.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,49 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 152 — refreshed 2026-10-07.* **One sentence from Doug unifies
+every height note in the table, and supplies the WHY that none of them
+had: the variant letter relocates the tall row.**
+
+> "In most cases the layout A/B/C shifts the taller slot around in the
+> layout, if it offers one, to allow the placement for customization."
+
+Checked against every recorded note, and it fits all of them:
+
+| State | Note | Read as "where is the tall row" |
+|---|---|---|
+| 3/A | none — rows equal | nowhere in particular |
+| 3/B | top field renders *smaller* | tallness sits **lower** |
+| 3/C | first two rows taller | tall at the **top** |
+| 5/C | second row taller | tall in the **middle** |
+| 6/C | second row taller than the first | tall at **position 1** |
+
+Until now those read as five unrelated observations. They are one
+mechanism seen five times.
+
+**And it makes the variant purposeful rather than cosmetic.** The letter is
+the control for *where a field that needs vertical room can go* — which is
+exactly what Doug has been using it for, moving WindField between slots to
+find one tall enough for its Forecast icon. That is why the letters exist,
+and no note in the table said so.
+
+Recorded in the table's own header rather than as a new entry, because it
+is not a fact about one state; it is the rule the states are instances of.
+
+### Practical consequence, left as advice rather than code
+
+If a field needs vertical room, **the variant letter is the control** — not
+the field count, and not the position within the layout. A reader of this
+table can now work out where the tall slot is for the states it covers, and
+the derivable component from rev 151 handles the rest: fewer rows, taller
+rows.
+
+Still no warning built, for rev 151's reason. "This field needs a tall
+slot" is per-app and per-version knowledge — WindField **15.x** — and not
+something this project can hold.
 
 ---
 
