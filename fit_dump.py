@@ -2302,7 +2302,28 @@ SMALL_SLOT_UNUSABLE_FIELD_IDS = {
 #
 # Coverage is PARTIAL and that is on purpose. Only states actually observed
 # appear; a state with no entry gets no note, which is correct, because the
-# alternative is inventing height data. Designing a full height dimension
+# alternative is inventing height data.
+#
+# ⚠ HEIGHT HAS TWO COMPONENTS, and only one of them belongs in this table
+# (Doc rev 151, 2026-10-07):
+#
+#   (a) ACROSS layouts -- DERIVABLE, not recorded here. A row's height is
+#       roughly the usable screen height over len(grid), so a 3-row layout
+#       has taller rows than a 5-row one. This falls out of the grids
+#       already stored and needs no measurement. It is also the component
+#       with real consequences: Doug's WindField Forecast icon worked in
+#       7/B (4 rows) and 3/A (3 rows) and failed in 8/A (5 rows), in that
+#       exact order.
+#
+#   (b) WITHIN a layout -- MEASURED, and that is what this table holds.
+#       (3,1)'s top field being smaller, or (5,2)'s second row being
+#       taller, cannot come from (a), which would make every row in one
+#       layout equal. These are deliberate per-variant choices and only
+#       observation finds them.
+#
+# So the geometry rework this table is waiting on is SMALLER than Doc rev
+# 133 implied: most of the height information is already implicit in the
+# grids, and only the per-variant exceptions need bench time. Designing a full height dimension
 # on the handful of fragments known today is how the Compass defect
 # happened (Doc rev 123).
 _ROW_HEIGHT_NOTES_GLOBAL = {

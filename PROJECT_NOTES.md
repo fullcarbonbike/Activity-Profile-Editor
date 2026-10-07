@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-07, at Doc rev 150.*
+> *Last updated 2026-10-07, at Doc rev 151.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,76 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 151 — refreshed 2026-10-07.* **Doug's account of the WindField
+slots splits the height dimension into two components, one of which looks
+DERIVABLE. And it confirms Doc rev 134's narrowing in the strongest
+possible terms: the behaviour is version-specific — WindField **15.x**.**
+
+### The three data points
+
+| Slot | Verdict | Rows sharing the screen |
+|---|---|---|
+| 8/A position 0 | the original; Forecast **stopped** working | **5** |
+| 7/B position 2 | works — Screen 1 today | **4** |
+| 3/A position 0 | works — Screen 6 today | **3** |
+
+All three are full-width. Doug: both working slots are "larger ones, with
+just slightly different heights from each other", and both larger than the
+8/A top slot that failed.
+
+**That is exactly the order the row counts predict.** Five rows share the
+screen in 8/A, four in 7/B, three in 3/A — so each row is progressively
+taller, and the two that work differ slightly because 4 rows ≠ 3 rows.
+
+### So height has two components, not one
+
+**(a) Across layouts — looks derivable.** A row's height is roughly the
+screen's usable height divided by the number of rows. Nothing needs
+measuring; it falls out of the grid we already store. This is the component
+that decided the WindField case.
+
+**(b) Within a layout — must be measured.** The recorded notes describe
+differences that (a) cannot produce, because (a) would make every row in
+one layout equal:
+
+- `(3,1)` the **top** field renders smaller than the other two
+- `(3,2)` the first **two** rows are taller than the third
+- `(5,2)` the **second** row is taller than those around it
+- `(6,2)` the **second** row is taller than the first
+
+Those are deliberate per-variant decisions by Garmin and only observation
+will get them.
+
+**This reframes the "height is unmodelled" gap** (rev 133) from one problem
+into a derivable part and a measured part. The derivable part is the one
+with practical consequences — it is what makes a field work or not — and it
+needs no new data at all, only arithmetic over `len(grid)`.
+
+### What this does NOT justify building
+
+A tempting next step is a warning: *"this layout has N rows, so each is
+short — a Connect IQ field may lose features."* **Not built, and rev 134
+says why.** Doug has now put a version number on it: **WindField 15.x**
+changed the requirement, in an app this toolkit does not ship, cannot
+inspect, and has no business modelling. Encoding "5 rows is too short"
+would bake one app's one version into the geometry model, and the next
+update could invert it.
+
+Rev 134 concluded that Connect IQ room requirements are per-app and
+per-version and therefore not facts this project can hold. **"15.x" is that
+conclusion with a version number attached.** It is the strongest
+confirmation it has had, and it argues against the warning rather than for
+it.
+
+### What it does justify
+
+Recording the row-count insight where the height gap is described, so that
+whoever eventually does the geometry rework knows that **most of what they
+need is already in the grids**, and only the per-variant exceptions require
+bench time. That is a materially smaller job than rev 133 implied.
 
 ---
 
