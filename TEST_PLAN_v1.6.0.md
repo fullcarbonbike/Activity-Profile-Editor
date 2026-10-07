@@ -323,7 +323,7 @@ own warning — not a bug.
 
 ---
 
-## H — Named screens, 530 vs 840 (v0.26.3)
+## H — Named screens, 530 vs 840 (v0.26.3) — **COMPLETE, H1–H8 all pass**
 
 **Added 2026-10-02 after Doug asked whether the C1 class of bug reached
 named screens. It did, silently. See Doc rev 136.**
@@ -340,7 +340,7 @@ saying so, because those states are legal and no flag applied.
 | H4 | 840, **STEPS Metrics** at **4** fields | Draws a real grid (measured) |
 | H5 | 840 **Compass** at 0, 1 and 2 fields | All three draw. The 840 offers all three where the 530 locks 2 — the original per-model defect |
 | H6 | 840 **Segment** at 4 fields | Picker reads **"4 fields (C)"** for the third variant, not "(3)" — same as F8 |
-| H7 | **530**, walk every named screen you have | **Every one draws a grid. No blanks, no notes.** All 25 of its named states are measured, so a blank here is a regression |
+| H7 | **530**, walk every named screen you have | **PASS 2026-10-07** — every one drew the correct grid, with its available layouts or fixed field count. **Every one draws a grid. No blanks, no notes.** All 25 of its named states are measured, so a blank here is a regression |
 | H8 | 840 **Workout** — confirm field editing is offered at all | Allowed on the 840, refused on the 530 (`NO_FIELD_EDIT_BY_MODEL`) |
 
 > **H7 is the regression guard.** The v0.26.3 change only suppresses the
