@@ -540,6 +540,64 @@ Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
 
+*Doc rev 81 — refreshed 2026-10-07.* **v1.6.0: the Edge 840 stops being
+a guess.** See `RELEASE_NOTES_v1.6.0.md` for the user-facing summary.
+
+**Every 840 layout state is now measured or explicitly marked undrawable.**
+v1.5.0 stopped the toolkit applying one device's measurements to another;
+it did not yet KNOW the 840. This closes that. 50 named states have grids,
+nine user-screen layouts the 530 does not offer were measured and wired,
+and `fit_dump.py knowledge` prints the whole picture derived from the
+tables rather than written beside them — a hand-maintained status table
+would have been a fifth copy of facts that live in the dicts, which is this
+project's most repeated failure mode.
+
+**206 data fields, up from 173**, from one profile built for the purpose:
+five screens each anchored with a known field so a transposition would be
+visible, pulled once. 520 and 578 — the only two entries left in
+`KNOWN_UNRESOLVED_IDS` — are Primary and Secondary Target, and the
+strongest evidence was not the census at all: both already sat on the
+device's own Workout screen template beside Duration and Workout
+Comparison, in a record nobody had edited.
+
+**The layout control is a dropdown built from what the model offers.** Two
+radio buttons could not express three variants, so on an 840 a 9-field
+screen showed A and B with B unselectable and no C. The post-hoc legality
+refusals are deleted rather than corrected: the control is built from the
+legal set, so an illegal variant is unreachable by construction. The
+selection INDEXES the offered list and is not the f8 value — Segment's menu
+"A" stores f8=2 on the 530, so treating the index as an f8 would silently
+write the wrong byte.
+
+**Where the toolkit does not know a layout it now draws nothing and says
+so**, instead of falling back to ordinary user-screen geometry. That
+fallback was not harmless: for eBike Metrics it would have drawn four of
+eight layouts correctly and four wrongly, with nothing on screen
+distinguishing the halves. Unpredictably wrong is worse than consistently
+wrong. Today the blank appears only for Radar, whose layout is a left-hand
+column the row model cannot express.
+
+**Cross-model transfers are measured rather than guessed.** An 840 profile
+pushed to a 530 and pulled back: a screen type the target lacks is dropped
+entirely, an unknown field id renders as Speed (not the "Timer" fallback a
+Connect IQ field gets, so the two diagnose differently), an unsupported
+layout renders as a legal one, and nothing is rewritten — all 33 foreign
+ids survived in the file. So a migrate is lossy on screen and reversible on
+disk. The device also RE-INDEXES the screens it keeps, which makes the
+deploy change summary unreliable after such a transfer; the warning says
+so.
+
+**A pre-existing 530 defect, surfaced by an 840 symptom.** A 530 Segment at
+4 fields in layout A displayed as "-" in the screens list, the CLI and the
+deploy summary, because all three derived the letter by arithmetic on f8
+and that layout stores 2. Fixed once, in one shared place.
+
+Also: the offline restore dead end closed (restoring is a device operation,
+so the controls are gone offline with a line pointing at the backup folder
+instead), a crash on the only offline entry path, the named picker reading
+"(3)" where it meant "(C)", and confirmation from the bytes that a
+toolkit-written f8=2 survives NewFiles and renders correctly.
+
 *Doc rev 80 — refreshed 2026-09-29.* **v1.5.0: offline mode, Export,
 and per-model layout rules.** See `RELEASE_NOTES_v1.5.0.md` for the
 user-facing summary.
