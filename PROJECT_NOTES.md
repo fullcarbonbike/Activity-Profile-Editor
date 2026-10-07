@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-07, at Doc rev 148.*
+> *Last updated 2026-10-07, at Doc rev 150.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,129 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 150 — refreshed 2026-10-07.* **H5, H6 and H8 pass. All seven 840
+Segment grids independently confirmed. And H6's real content is a
+structural finding: for Segment the VARIANT does not select field geometry
+at all — it selects what the content panel contains.**
+
+### H5 / H8 — confirmations
+
+- **Compass** at 0, 1 and 2 fields: correct on device and in the GUI. This
+  is the type whose 530-derived hard lock at 2 started the whole per-model
+  effort (Doc rev 123), so all three being offered and drawn closes that
+  loop.
+- **Workout** fixed at 6: confirmed both places, consistent with rev 145.
+
+### H6 — the entry was already right, and the variant means something else
+
+All seven states matched the stored grids **exactly**: `0 → []`,
+`2 → [[0,1]]`, `4/A|B|C → [[0,1],[2,3]]`, `6/A|B → [[0,1],[2,3],[4,5]]`.
+Counts and letters match too, including **no 6/C**. The entry was already
+complete; this is independent corroboration.
+
+**The field grid is IDENTICAL across variants at a given count** — checked
+programmatically, not by eye. So the variant letter carries *no* geometry
+information for this type. What it selects is which of the two Segment
+graphics occupy the content panel:
+
+| State | Content panel |
+|---|---|
+| 0, 2 | graph **and** completion time |
+| 4/A, 6/A | graph only |
+| 4/B, 6/B | completion-time graphic only |
+| 4/C | **both** |
+
+### Content COMPOSITION is a third unmodelled dimension
+
+`content` is `'top'`, `'bottom'` or `None` — a position, nothing more. It
+cannot say what is in there, how much, or how tall. Honest list of what the
+geometry model cannot express:
+
+1. **row height** (rev 133), and content height — rev 146's eBike battery
+   strip is drawn four times too tall
+2. **orientation** — Radar's left-hand column (rev 137)
+3. **content composition** — this
+
+The "index mapping" rev 144 announced as a fourth is **not** on the list:
+rev 145 established the grid always could express it, and Workout's
+`[[2],[3],[4],[5],[0,1]]` proves it.
+
+### The familiar pre-consolidation smell
+
+Content composition is **already** encoded, as two hardcoded strings in
+`gui_app.py` — `f10=25` count 0 and `f10=56` count 4. The second is now
+known to be **incomplete rather than wrong**: B does drop the graph, but
+the note says nothing about the completion-time graphic replacing it, nor
+about C showing both, and there is no note at all for count 6 where the
+same distinction applies.
+
+Two scattered hardcoded strings describing one unmodelled dimension is
+exactly where the layout letter sat before rev 138 and the height note
+before rev 133. **Logged as #151, not built** — H7 is still to run and this
+changes note text on 530 Segment and Elevation screens. The precedent is
+`row_height_note()`: one keyed table in `fit_dump.py`, read by both panels.
+
+**H7 outstanding**, and still the check that matters most of the H set: a
+blank diagram on any 530 named screen means v0.26.3's suppression is too
+broad.
+
+---
+
+*Doc rev 149 — refreshed 2026-10-07. WRITTEN LATE; see the note at the
+end.* **Radar is MEASURED, DOCUMENTED and UNREPRESENTABLE — three
+different things that revs 147 and 148 collapsed into "unmeasured". Doug
+caught it by asking why we were calling it unmeasured when its options had
+been documented.**
+
+### What was already recorded
+
+The comment beside the Radar entry, since 2026-09-30: the editor offers
+**0, 5/A and 5/B**, and 5/A versus 5/B is **which side the radar strip sits
+on** (fields left / radar right, or the mirror). It also states that
+`grids` is empty **on purpose**, because a column cannot be written as a
+list of rows.
+
+So nothing about Radar needs measuring. **Corrected count: zero of the 46
+states on this model are unmeasured; three are undrawn.** The remedies
+differ — unmeasured needs bench time, undrawable needs the geometry model
+changed — and only the second applies.
+
+### The reading error, three times in one week
+
+Each time: treating an empty or absent value as ignorance **without reading
+the adjacent comment that says why it is empty.**
+
+1. `layout_states()` — used the wrong emptiness test, producing false
+   positives on GroupTrack List and GroupRide
+2. grid row order — read identity-ordered data and inferred an
+   identity-ordered *requirement*, then declined to add Workout's grid
+3. `grids: {}` for Radar — called it unmeasured
+
+This project's standing rule is that **omission is meaningful**. These
+omissions are all documented in place, and I kept re-deriving them as gaps.
+The response was mechanical rather than another rule: `layout_knowledge()`
+and `fit_dump.py knowledge` (v2.21.0), which make the distinction *data*
+instead of prose.
+
+### Provenance found while checking
+
+All **30** Radar records this project has seen carry `f3=5, f8=0`. So
+`(5,1)` — the mirror — is attested by the **editor menu** and has never
+appeared in a stored byte; `(0,0)` likewise. Weaker standing than the eBike
+and STEPS states, which were menu-read *and then exercised*. Doug's own
+on-device description matches `(5,0)`, the one state attested both ways.
+
+### Why this rev is out of order
+
+**It was cited before it was written.** `fit_dump.py` v2.20.1 and
+`NAMED_LAYOUT_CAPTURE.md` both reference "Doc rev 149"; the rev itself
+never reached this file, because the commit that was supposed to add it had
+its `PROJECT_NOTES.md` edit in a block that failed an assertion, and I did
+not verify the write. A dangling citation is the same disease as the three
+errors above — asserting a record exists without looking.
 
 ---
 
