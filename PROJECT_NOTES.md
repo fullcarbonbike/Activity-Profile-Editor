@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-08, at Doc rev 154.*
+> *Last updated 2026-10-08, at Doc rev 155.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,81 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 155 — refreshed 2026-10-08.* **The 530 transfers. Doug ran its
+layouts the same way: the 1/5 half-width-row rule holds there too, and all
+of its A and B layouts match the 840's. So the 530's heights are DERIVED
+from the 840 measurement, not measured again and not copied. The more
+instructive part of this entry is that the check I used to confirm it was
+broken, and agreed with itself.**
+
+> "I'll also ran through the 530 layouts, it has the same 2 half width data
+> fields in a row height rule. On the 530 all of the A and B layouts match
+> the 840 layouts. The 530 just doesn't have the C variants and in some
+> case, (already documented) some layouts didn't have the B variant."
+
+### Two findings, both needed
+
+1. **the 1/5 rule holds on the 530** — measured; this is the only thing
+   that lets anything transfer at all
+2. **its A and B layouts match the 840's**
+
+(2) turns out to be corroborated by data that was already in the file.
+`LAYOUT_GRIDS` gives the 530 fifteen states — A only at counts 1, 2, 8, 9
+and 10, A+B at 3 through 7, exactly as Doug describes. All fifteen resolve
+to the **identical grid** on both models, and not one of the nine per-model
+overrides in `MODEL_LAYOUTS[4062]['user_grids']` touches a state the 530
+has. The two models are reading the same global grid for A and B, so "they
+match" is structural rather than a coincidence.
+
+Result: `_ROW_HEIGHT_UNITS_BY_MODEL[3121]` is a **comprehension**, not a
+second literal — the 840 vectors restricted to the states the 530 offers.
+13 of 15 land (the same two, 2/A and 4/A, unmeasured on both). Computed for
+the reason given in the 2.21.0 note: a copy drifts because each copy stays
+self-consistent, and this one follows its inputs.
+
+A third corroboration, and this one is **530-native**: the single entry in
+`_ROW_HEIGHT_NOTES_GLOBAL` was measured on the 530 and says 3/B's top field
+renders smaller. The vector transferred for `(3, 1)` is `(1, 2, 2)` — top
+row one unit, the other two doubled.
+
+### The check that agreed with itself
+
+Worth recording as method, not as apology.
+
+Strengthening `check_row_height_tables()` to resolve grids through
+`layout_grid()` — the way a real caller does — immediately produced **19
+failures**, all of the form "grid has 1 rows, heights have 4". They could
+not be real, and that is what made them useful.
+
+The cause: `layout_grid()` takes **`f10` first**, then count. I had written
+`layout_grid(count, variant, product=...)`, so `f10` received the count and
+`count` received the variant. It returns a wrong-but-plausible `[[0]]`
+rather than failing.
+
+The part that matters: **the verification I had already run and reported to
+Doug used the same reversed call on both sides.** It compared `[[0]]` to
+`[[0]]` and reported "15 of 15 identical, no differences" — and I wrote
+that conclusion into a source comment as *provably* identical. Two equally
+wrong calls agree every time. Re-run correctly it is still 15 of 15, so the
+conclusion survived, but by luck, and the comment now says so.
+
+Second time this exact reversal has cost something (Doc rev 130 was
+`model_rule_known(4062, 0)`). The lesson that generalises is not "check
+argument order" — it is that **a comparison is not a verification unless it
+can come out unequal**, and the way to know is to make it fail on purpose.
+A mutation test now confirms the height invariants do fail when fed a
+vector summing to 4 or a row count the grid contradicts.
+
+### The 530's tall slots
+
+Same shape as the 840's, with fewer places to put them: tall full-width
+rows at 1/A, 3/A, 3/B, 4/B, 5/B, 6/B and 7/B; nothing tall at 5/A, 6/A,
+7/A, 8/A, 9/A or 10/A. The 530 has no C variants, so it has **one** way to
+position a tall row rather than two — the B variant — and at counts 8, 9
+and 10 it has none at all, the same dead end as the 840.
 
 ---
 
