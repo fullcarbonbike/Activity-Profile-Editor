@@ -21,8 +21,8 @@ matters far more than the blanks**, because it would falsify the rule.
 
 #### 2 fields, layout A    <<< NEEDS YOUR DATA
 
-    row 0   [   0   ]      height: _____
-    row 1   [   1   ]      height: _____
+    row 0   [   0   ]      height: 5/2
+    row 1   [   1   ]      height: 5/2
 
     2 full-width rows share 5 of the 5 units. Equal division would be
     5/2 of the screen each. Or the units may split unevenly — if so,
@@ -30,10 +30,10 @@ matters far more than the blanks**, because it would falsify the rule.
 
 #### 4 fields, layout A    <<< NEEDS YOUR DATA
 
-    row 0   [   0   ]      height: _____
-    row 1   [   1   ]      height: _____
-    row 2   [   2   ]      height: _____
-    row 3   [   3   ]      height: _____
+    row 0   [   0   ]      height: 5/4
+    row 1   [   1   ]      height: 5/4
+    row 2   [   2   ]      height: 5/4
+    row 3   [   3   ]      height: 5/4
 
     4 full-width rows share 5 of the 5 units. Equal division would be
     5/4 of the screen each. Or the units may split unevenly — if so,
@@ -41,10 +41,10 @@ matters far more than the blanks**, because it would falsify the rule.
 
 #### 5 fields, layout B    <<< NEEDS YOUR DATA
 
-    row 0   [   0   ]      height: _____
-    row 1   [   1   ]      height: _____
+    row 0   [   0   ]      height: 1/5
+    row 1   [   1   ]      height: 2/5
     row 2   [ 2 | 3 ]      height: 1/5    (rule)
-    row 3   [   4   ]      height: _____
+    row 3   [   4   ]      height: 1/5
 
     3 full-width rows share 4 of the 5 units. Equal division would be
     4/3 of the screen each. Or the units may split unevenly — if so,
@@ -53,8 +53,8 @@ matters far more than the blanks**, because it would falsify the rule.
 #### 6 fields, layout B    <<< NEEDS YOUR DATA
 
     row 0   [ 0 | 1 ]      height: 1/5    (rule)
-    row 1   [   2   ]      height: _____
-    row 2   [   3   ]      height: _____
+    row 1   [   2   ]      height: 2/5
+    row 2   [   3   ]      height: 1/5
     row 3   [ 4 | 5 ]      height: 1/5    (rule)
 
     2 full-width rows share 3 of the 5 units. Equal division would be

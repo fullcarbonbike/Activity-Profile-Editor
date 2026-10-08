@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-08, at Doc rev 153.*
+> *Last updated 2026-10-08, at Doc rev 154.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,93 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 154 — refreshed 2026-10-08.* **The heights are now DATA, not
+prose. Doug returned the fill-in sheet; 22 of the 24 states are recorded in
+`_ROW_HEIGHT_UNITS_BY_MODEL` and pass four mechanical invariants. The
+finding that matters is negative: no 8-, 9- or 10-field layout has a tall
+slot in ANY variant, which is why WindField's forecast icon cannot be
+rescued by rearranging an 8-field screen.**
+
+### What was returned, and what was checked
+
+Doug filled only the blanks — **no pre-filled `(rule)` value was altered**,
+which is the thing that would have falsified the 5-unit rule. Against the
+committed template, four states gained numbers and nothing else moved.
+
+`check_row_height_tables()` enforces four invariants over every entry:
+
+1. the vector sums to exactly 5 units
+2. no row is under 1 unit (a half-width row is the measured floor)
+3. the state is one `user_states` actually offers
+4. where a measured grid exists, row count and per-row widths agree, and
+   every half-width row is exactly 1 unit
+
+All clean. It is a **function returning a list**, not a module-level
+assert, because an assert inside a block that something else swallows
+passes silently — which has already cost this project two phantom doc
+revisions (revs 149, 152).
+
+### Independent corroboration, for once
+
+The four prose notes in `_ROW_HEIGHT_NOTES_BY_MODEL` came from the layout
+file's own descriptions (Doc rev 132). Doug's numbers came from looking at
+the device. **All four agree exactly** — 3/C "first two taller", 4/C "the
+two full-width rows taller", 5/C and 6/C "the SECOND row taller" are each
+reproduced by the measured vector. Two independent sources, so neither is
+now resting on the other. That is rare here and worth naming.
+
+### The useful finding is a negative one
+
+A tall full-width row exists **only at counts 1, 3, 4, 5, 6 and 7**:
+
+| state | tall full-width row(s) | height |
+|---|---|---|
+| 1/A | row 0 | 5 units (whole screen) |
+| 3/A | all three | 5/3 units each |
+| 3/B, 4/B | rows 1, 2 | 2 units |
+| 3/C, 4/C | rows 0, 1 | 2 units |
+| 5/B, 5/C, 6/B, 6/C, 7/B | row 1 | 2 units |
+| 7/C | row 2 | 2 units |
+
+**Every 8-, 9- and 10-field layout is five regular rows, in all three
+variants.** So there is no variant of an 8-field screen that gives any slot
+extra vertical room. That turns Doug's 2026-10-07 observation — the
+WindField forecast icon stopped drawing in the top full-width slot of an
+8/A once v15.x wanted more height — from an anecdote into a prediction: it
+will fail in 8/B and 8/C too, and the fix is to drop to **7 or fewer fields
+and pick B or C**, where a 2-unit row exists and the variant chooses where
+it sits.
+
+Note also that **"uniform" is not "regular"**: 3/A's three rows are equal
+at 5/3 units each, which is *taller* than a 1-unit row. The predicate for
+annotation is "greater than 1 unit", not "differs from its neighbours" — a
+distinction this entry nearly collapsed.
+
+### (2,0) and (4,0) are deliberately absent
+
+The sheet asked for them with a generated hint that printed an impossible
+number — *"equal division would be 5/2 of the screen each"*, a screen
+fraction above 1. That was **my arithmetic error in the generator** (the
+third bug in that script), and the returned values echo the hint rather
+than contradict it, so they are my own numbers coming back, not a
+measurement. Doug *did* override the hint on 5/B and 6/B, which is what
+makes those two genuine.
+
+Left unmeasured rather than closed with a guess. The cost is nil: the rule
+predicts equal division for both, and an equal division is already what the
+diagram draws for a uniform state, so the omission changes no pixel. As
+everywhere else in this module, **omission means unmeasured**.
+
+### The 530 question is still open
+
+The sheet's one 530 question — is a half-width row 1/5 there too? — came
+back unanswered, so `_ROW_HEIGHT_UNITS_BY_MODEL` has no 3121 entry and
+`knowledge` now says so **explicitly** rather than printing nothing. Silence
+that reads as completeness is the same shape as the bug where 17 unmeasured
+840 named states drew plausible guessed geometry (v0.26.3).
 
 ---
 
