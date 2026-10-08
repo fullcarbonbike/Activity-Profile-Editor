@@ -2307,13 +2307,32 @@ SMALL_SLOT_UNUSABLE_FIELD_IDS = {
 # ⚠ HEIGHT HAS TWO COMPONENTS, and only one of them belongs in this table
 # (Doc rev 151, 2026-10-07):
 #
-#   (a) ACROSS layouts -- DERIVABLE, not recorded here. A row's height is
-#       roughly the usable screen height over len(grid), so a 3-row layout
-#       has taller rows than a 5-row one. This falls out of the grids
-#       already stored and needs no measurement. It is also the component
-#       with real consequences: Doug's WindField Forecast icon worked in
-#       7/B (4 rows) and 3/A (3 rows) and failed in 8/A (5 rows), in that
-#       exact order.
+#   (a) ACROSS layouts -- DERIVABLE, not recorded here, and the rule is
+#       ARITHMETIC rather than a rough proportion (Doc rev 153, Doug
+#       2026-10-08). A row of two half-width fields is ALWAYS 1/5 of the
+#       screen, so:
+#
+#           the screen is 5 UNITS tall
+#           a half-width row costs 1 unit
+#           the full-width rows share 5 - (number of HW rows)
+#
+#       Verified against all 24 user-screen states on the 840: every one
+#       sums to exactly 5. It also explains Doug's WindField data exactly
+#       -- 8/A position 0 is 1 unit (1/5) and Forecast failed; 7/B
+#       position 2 is 2 units (2/5) and works; 3/A position 0 is 5/3
+#       (1/3) and works, which is why he described the two working slots
+#       as "slightly different heights from each other".
+#
+#       CONSEQUENCE FOR THIS TABLE: when units_left == number of FW rows,
+#       every full-width row is regular and NOTHING needs measuring. Only
+#       the slack case is open, and then only two bits: equal division or
+#       integer units, and which row takes the extra.
+#
+#       APPLIES TO ORDINARY USER SCREENS ONLY. Named types spend screen
+#       space on a content area the grid does not describe, so 5 - HW is
+#       not their budget. eBike's strip being shorter than a normal row
+#       (v2.19.0) hints the content area has its own unit cost, but one
+#       hint is not a rule.
 #
 #   (b) WITHIN a layout -- MEASURED, and that is what this table holds.
 #       ⚠ WHAT THE VARIANT IS FOR, Doug 2026-10-07: "in most cases the

@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-07, at Doc rev 152.*
+> *Last updated 2026-10-08, at Doc rev 153.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,81 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 153 — refreshed 2026-10-08.* **Doug found the RULE behind the
+heights, and it is arithmetic rather than a list of exceptions. A row of
+two half-width fields is always 1/5 of the screen — so the screen is FIVE
+UNITS tall, a half-width row costs one, and the full-width rows share
+whatever is left. Verified against all 24 user-screen states: every one
+sums to exactly 5.**
+
+> "When a screen has a row of 2 half width data fields those appear to
+> always be 1/5 of the screen total height."
+
+### The model
+
+- the screen is **5 units** tall
+- a **half-width row** is always **1 unit**
+- the **full-width rows share the remainder**, `5 − (number of HW rows)`
+
+Doug's worked examples, which is what made this visible:
+
+| State | Rows | Heights |
+|---|---|---|
+| 3/A | 3 FW | **1/3 each** — the 5 units divided equally |
+| 3/B | 3 FW | **1/5, 2/5, 2/5** — integer units, short row on top |
+| 3/C | 3 FW | **2/5, 2/5, 1/5** — same, short row moved to the bottom |
+
+Both 3/B and 3/C sum to 5 as integers; 3/A divides equally. **So the
+variant letter chooses between equal division and integer units, and where
+the odd row goes** — which is Doc rev 152's "the variant relocates the tall
+row", now with the arithmetic underneath it.
+
+### It explains all three WindField slots quantitatively
+
+| Slot | Under the rule | Height | Forecast |
+|---|---|---|---|
+| 8/A pos 0 | 3 HW + 2 FW, 2 units for 2 rows | **1 unit = 1/5** | **failed** |
+| 7/B pos 2 | 3 HW + 1 FW, 2 units for 1 row | **2 units = 2/5** | works |
+| 3/A pos 0 | 0 HW + 3 FW, 5 units equally | **5/3 = 1/3** | works |
+
+`2/5 = 0.400` and `1/3 = 0.333` — both well clear of `1/5 = 0.200`, **and
+slightly different from each other**, which is precisely how Doug described
+the two working slots before any of this was understood. The rule was
+reconstructed from his earlier report and then confirmed by his
+measurements, in that order.
+
+### What this does to the measurement surface
+
+Doc rev 151 split height into derivable and measured. **The derivable part
+is much larger than that rev assumed.** Given a grid, the rule yields:
+
+- the total (5 units)
+- every half-width row's height (1 unit)
+- the **sum** available to the full-width rows
+- therefore, when `units_left == count_of_FW_rows`, that **every full-width
+  row is regular** — no measurement needed at all
+
+What remains unmeasurable from the grid alone is only: when there is
+slack, is it divided **equally** or in **integer units**, and if integer,
+**which row** gets the extra. Nothing else.
+
+So #152's estimate of "~38 states need their heights measured" was too
+pessimistic. Many resolve by arithmetic, and the rest need one bit of
+information each — which **Doug says he has already documented for every
+layout.**
+
+### Named types are NOT covered, and that is expected
+
+Running the same arithmetic over named types shows no contradiction but no
+confirmation either: their content area consumes screen space the grid does
+not describe, so `5 − HW` is not the budget for their full-width rows.
+eBike's content strip being *shorter than a normal row* (rev 146) is a
+clue that the content area has its own unit cost, but one clue is not a
+rule. **The 5-unit model is recorded as applying to ordinary user screens
+only**, until something measures the named case.
 
 ---
 
