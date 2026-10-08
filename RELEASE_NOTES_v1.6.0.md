@@ -1,6 +1,43 @@
 # v1.6.0 — The Edge 840 stops being a guess
 
-*Released 2026-10-07.*
+*Released 2026-10-07. Corrected 2026-10-08 — see the correction directly
+below. The body of these notes is left as written and is not rewritten.*
+
+> ## Correction, 2026-10-08
+>
+> **The `v1.6.0` tag contains two commits these notes do not describe.**
+> Work on row heights landed between the notes being written and the tag
+> being pushed, so the tag carries `fit_dump.py` **2.23.0**, not the
+> 2.21.0 printed under *Upgrading* below. `gui_app.py`, `fit_patch.py`,
+> `garmin_device.py` and `fit_census.py` are exactly as stated.
+>
+> **Nothing in the release behaves differently because of it.** The two
+> commits add a data table and three functions to `fit_dump.py` and
+> nothing outside that file calls them — no read path, no write path, no
+> GUI path. v1.6.0 behaves as tested.
+>
+> **One Known gap below is now half wrong.** *"Row and content height are
+> unmodelled"* was true when written. Row height is now modelled: 22 of
+> the 24 Edge 840 user-screen states and 13 of the 15 the 530 offers are
+> recorded as per-row unit vectors, from the rule that a row of two
+> half-width fields is always 1/5 of screen height. So:
+>
+> - **row height — superseded.** Measured and recorded, though not yet
+>   drawn to scale or annotated in the GUI; that is the remaining work.
+> - **content height — still true.** eBike's content strip is still drawn
+>   about four times too tall.
+> - the sentence about counts 3–6 variant C differing from A and B *only*
+>   in row height is still correct, but it is no longer unmodelled.
+>
+> `fit_dump.py knowledge` prints the height coverage for both models and
+> self-checks the table, so the accurate statement is always available
+> from the code rather than from this file.
+>
+> **Cause, recorded because the process is the fix:** the version line
+> under *Upgrading* is a frozen claim about the tree, and commits
+> continued to land on `main` after it was written. Bump versions and
+> write the notes **last**, or do not commit between the notes and the
+> tag.
 
 v1.5.0 made the toolkit usable on an 840 and stopped it applying one
 device's measurements to another. It did not yet **know** the 840. Where

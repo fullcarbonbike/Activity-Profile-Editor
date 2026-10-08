@@ -540,6 +540,37 @@ Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
 
+*Doc rev 82 — refreshed 2026-10-08.* **Row heights are measured, and the
+v1.6.0 notes are corrected rather than rewritten.**
+
+Data-field **row heights** are now recorded for both models. The rule came
+from measuring the device: a row of two half-width fields is always 1/5 of
+the screen, so the screen is five units tall, a half-width row costs one
+unit, and the full-width rows share what is left. 22 of the Edge 840's 24
+user-screen states are recorded, and 13 of the 15 the 530 offers — derived
+rather than re-measured, because the 530's A and B layouts resolve to the
+same grids as the 840's.
+
+The practical consequence, for anyone placing a data field that wants
+vertical room: **a taller full-width row exists only at 1, 3, 4, 5, 6 and
+7 fields.** Every 8-, 9- and 10-field layout is five regular rows in every
+variant, so no rearranging of an 8-field screen will ever give a field more
+height. Drop to 7 or fewer and pick the B or C variant, which is what the
+variant letter is for — it chooses where the tall row sits.
+
+`fit_dump.py knowledge` prints the coverage for both models and
+self-checks the table. Nothing is drawn to scale or annotated in the GUI
+yet; that is the next piece of work.
+
+**Correction to v1.6.0.** The `v1.6.0` tag includes the first two of these
+commits, which its release notes do not describe: the tag carries
+`fit_dump.py` 2.23.0, not the 2.21.0 printed in those notes, and the Known
+gap reading *"row and content height are unmodelled"* is now half
+superseded — content height still is, row height is not. No behaviour
+differs; nothing outside `fit_dump.py` calls the new table.
+`RELEASE_NOTES_v1.6.0.md` carries the correction at its top and its body
+is left as written.
+
 *Doc rev 81 — refreshed 2026-10-07.* **v1.6.0: the Edge 840 stops being
 a guess.** See `RELEASE_NOTES_v1.6.0.md` for the user-facing summary.
 

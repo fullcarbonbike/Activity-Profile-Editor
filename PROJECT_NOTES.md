@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-08, at Doc rev 155.*
+> *Last updated 2026-10-08, at Doc rev 156.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,54 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 156 — refreshed 2026-10-08.* **v1.6.0 is pushed, and the tag
+contains two commits its release notes do not describe. Corrected forward,
+not rewritten.**
+
+The `v1.6.0` tag sits on `05add1b`, the second row-height commit. So the
+tagged tree holds `fit_dump.py` **2.23.0** while the notes' *Upgrading*
+line says 2.21.0, and the Known gap *"row and content height are
+unmodelled"* is half superseded by a change inside the same tag.
+
+Scope of the problem, stated precisely so it is neither minimised nor
+inflated: **no behaviour differs.** The two commits add one table and
+three functions to `fit_dump.py`, and `grep` confirms zero callers in
+`gui_app.py` or `fit_patch.py`. v1.6.0 runs as tested in sections A–J. It
+is a documentation accuracy fault on a public tag, nothing more.
+
+### The cause is worth more than the fix
+
+I verified "inert" carefully — no existing function changed, no caller
+outside the module — and then let *inert* stand in for *harmless*. It was
+inert with respect to behaviour and not at all inert with respect to the
+release notes, because **the version line in a release note is a frozen
+claim about the tree**, and I kept committing to `main` after it was
+frozen. Telling Doug twice that the work was "inert, v1.6.0 testing
+unaffected" was true and still left him with notes that misdescribe his
+own tag.
+
+Process change, which is the actual remedy:
+
+- **write the release notes and bump versions LAST**, immediately before
+  the tag, or
+- **do not commit to `main` between the notes commit and the tag** — park
+  the work on a branch, which this project already does for exactly this
+  reason (see the READ FIRST block)
+
+### Corrected forward, per the standing discipline
+
+Committed revs are superseded, never rewritten, and that applies to a
+pushed tag with more force than to a doc rev. The tag stays where it is;
+no public history is rewritten. `RELEASE_NOTES_v1.6.0.md` gains a
+correction block at the top with its body untouched, and README's own
+counter advances to Doc rev 82.
+
+Rejected: re-pointing the tag at `562cb6a`, which would mean deleting and
+re-pushing a public tag to make the notes retroactively true. Changing
+history to match a document is the wrong direction.
 
 ---
 
