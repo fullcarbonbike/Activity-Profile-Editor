@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-08, at Doc rev 156.*
+> *Last updated 2026-10-09, at Doc rev 157.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,105 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 157 — refreshed 2026-10-09.* **Two devices, two rendering
+philosophies — confirmed by two independent field families. A new family of
+four field ids. And a census method fault that hid them, which has no record
+anywhere because the method could not produce one.**
+
+### The divergence, which is the headline
+
+| family | Edge 530 | Edge 840 |
+|---|---|---|
+| Graph / Bars | degrades to plain text | scales down, still draws |
+| composite (351–354) | degrades to primary value | scales down, all three |
+
+The 530 **degrades** content that will not fit; the 840 **scales** it. One
+family was suggestive, two make it a rule worth building on.
+
+Consequence for the shipped release: `graph_bars_warnings()` takes `product`
+but uses it only for `is_position_full_width()` geometry. Tier membership and
+the message text are global, so on an 840 v1.6.0 says a field *"needs full
+width to render as a graph/bar, not plain text"* — false on that device.
+Wrong advice about the very model v1.6.0 was about, and the same shape as the
+Compass-locked-at-2 defect: a 530-measured rule applied as universal. Logged
+as #153.
+
+**The fix needs no new vocabulary**, which is the pleasing part. The two
+existing tiers already *are* the two behaviours — `GRAPH_OR_BARS_FIELD_IDS`
+is the 530's, `SMALL_SLOT_UNUSABLE_FIELD_IDS` is the 840's. Tier is a
+per-model property **of the same field**, not a property of the field.
+
+### A new family: 351–354
+
+`Heart Rate`, `Speed`, `Cadence`, `Power` under the on-device **Graphical**
+menu — a live numeric readout plus **AVG** and **MAX** sub-fields. Present on
+both models. Not graph widgets despite the category: the content is three
+numbers, so they must never enter `GRAPH_OR_BARS_FIELD_IDS`.
+
+Behaviour is a single clean threshold — half-width degrades (on the 530),
+every full-width size shows all three with only the font changing.
+
+The numbering prediction (351 HR, 353 Cadence, 354 Power, from 352 Speed and
+the 343–346 / 347–350 metric order) held exactly. **That does not make the
+arithmetic evidence.** A different ordering would have produced four
+confident wrong entries, and 355–367 remain unknown with no pattern to
+extend. The ids are writable because Doug pulled them.
+
+### The method fault, which is the part that generalises
+
+Doug: *"I probably assumed, that since it had the same name in the editor,
+that it was just the regular Speed data field."*
+
+Every census build sheet was assembled by reading menu labels and listing the
+unfamiliar ones. **A field whose label duplicates a known field's label is
+invisible to that method** — skipped as already known, and the skip leaves no
+trace: not in `KNOWN_UNRESOLVED_IDS` (empty), not on the checklist (41/41
+"resolved"), not counted. So those completeness claims are true *relative to
+a list built from labels*.
+
+The rule, for every future pass: **never skip a menu entry because its label
+is already known.** Only a placed-and-pulled id can say it is the same field.
+Logged as #154, belongs in `FIELD_ID_BUILD_SHEET.md`'s preamble.
+
+352–354 will be the **first name collisions** in `FIELD_ID_NAMES` — 206
+entries, 206 distinct strings, zero collisions today. So the uniqueness check
+(no two entries sharing a display string unless one is in
+`AMBIGUOUS_DEVICE_LABELS`) can go in while the invariant still holds, and it
+ships with the ids rather than speculatively ahead of them.
+
+### One question closed as MOOT rather than answered
+
+Does the 840's editor use the `*` degradation marker? The 840 composite check
+could not tell, and recording *why* matters more than the answer: both
+hypotheses predict the absence that was seen.
+
+- the 840 has no marker → no `*`
+- the 840 has a marker that stays silent when nothing is lost → no `*`,
+  **because nothing was lost**
+
+The 840 field did not degrade, so there was nothing to mark. An observation
+identical under both hypotheses is evidence for neither — the same fault as
+the comparison that agreed with itself in rev 155, in a new costume.
+
+Separating them needs an 840 field that genuinely loses content somewhere,
+and none is known: graph/bars scale, composite scales, Compass and Map draw
+fully but tiny. If the 840 never degrades anything, the two readings are
+**behaviourally equivalent** — a marker that cannot fire and an absent marker
+are the same thing to a user and to this toolkit. "Undecidable and harmless"
+is a real answer and better than an open item implying work outstanding. The
+systematic matrix pass will settle it as a byproduct if any 840 field turns
+out to degrade.
+
+### Working doc
+
+`GRAPHICAL_FIELD_MATRIX.md`. Five slot geometries cover every state on both
+models — a payoff from rev 154's height work, which turned "try layouts and
+see" into a finite grid — and three screens (1/A, 3/A, 5/B) reach all five on
+either device. Every cell starts blank: the slot-heights sheet taught that a
+form which suggests an answer gets the answer it suggests.
 
 ---
 

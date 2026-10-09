@@ -1,0 +1,468 @@
+# Graphical data-field rendering matrix — 840 vs 530
+
+*Generated 2026-10-09 from the measured grids and the row-height model.*
+
+Doug's initial pass (2026-10-09) found three things that this sheet exists
+to pin down properly:
+
+- on the **840** a graph-style field scales all the way down to a half-width
+  slot and still draws a tiny graph
+- on the **530** the same field type minimises to just the numeric value, and
+  the 530's own editor prefixed its label with `*` to say so
+- the **Bar** types do not merely shrink, they **change form**: a circular
+  format in the larger slots, a straight-line bar in the smaller full-width
+  ones. None of the 840 fields checked so far showed a `*`.
+
+So the cell to fill in is **what it draws**, not whether it works.
+
+## Why this is only five columns
+
+Across all 24 of the 840's user states and all 15 of the 530's there are
+exactly **five distinct slot geometries**, and both models have the same
+five. Height is in units where the screen is 5 units tall (the half-width
+row rule), so this is the full set — not a sample.
+
+| # | slot | width | height | share of screen |
+|---|---|---|---|---|
+| S1 | half-width | half | 1 unit | 1/5 |
+| S2 | full-width, regular | FULL | 1 unit | 1/5 |
+| S3 | full-width, 3/A | FULL | 5/3 unit | 1/3 |
+| S4 | full-width, tall | FULL | 2 unit | 2/5 |
+| S5 | full-width, whole screen | FULL | 5 unit | 5/5 |
+
+Size order is S1 < S2 < S3 < S4 < S5. Doug's impression is that bigger is
+better throughout; if that holds, each field has a single **threshold** and
+the cells below it all read the same.
+
+## The three screens that cover all five
+
+### 1 field(s), layout A
+
+    row 0  [ 0 ]   FULL 5 unit   -> **S5**
+
+### 3 field(s), layout A
+
+    row 0  [ 0 ]   FULL 5/3 unit   -> **S3**
+    row 1  [ 1 ]   FULL 5/3 unit   -> **S3**
+    row 2  [ 2 ]   FULL 5/3 unit   -> **S3**
+
+### 5 field(s), layout B
+
+    row 0  [ 0 ]   FULL 1 unit   -> **S2**
+    row 1  [ 1 ]   FULL 2 unit   -> **S4**
+    row 2  [ 2 | 3 ]   half 1 unit   -> **S1**
+    row 3  [ 4 ]   FULL 1 unit   -> **S2**
+
+That is the whole grid: S5 from the 1-field screen, S3 from 3/A, and S1,
+S2 and S4 together from one 5/B screen. The 530 offers all three of these
+states, so the same three screens work on both devices.
+
+## The matrix
+
+Write what it DRAWS. A suggested vocabulary, so cells are comparable —
+but if none fits, write what you actually see rather than forcing it:
+
+`circle` circular/gauge form · `bar` straight-line bar · `plot` line or
+area graph over time · `zones` banded zone display · `number` numeric only,
+widget gone · `blank` nothing drawn · `n/a` not offered in the picker
+
+Add `*` after the value if the editor marked the label that way.
+
+### Graph family — Edge 840
+
+| id | field | S1 half | S2 full reg | S3 full 3/A | S4 full tall | S5 full screen |
+|---|---|---|---|---|---|---|
+| 23 | HR Zone Graph |  |  |  |  |  |
+| 343 | Heart Rate Graph |  |  |  |  |  |
+| 344 | Speed Graph |  |  |  |  |  |
+| 345 | Cadence Graph |  |  |  |  |  |
+| 346 | Power Graph |  |  |  |  |  |
+| 368 | Elevation Graph |  |  |  |  |  |
+
+### Graph family — Edge 530
+
+| id | field | S1 half | S2 full reg | S3 full 3/A | S4 full tall | S5 full screen |
+|---|---|---|---|---|---|---|
+| 23 | HR Zone Graph |  |  |  |  |  |
+| 343 | Heart Rate Graph |  |  |  |  |  |
+| 344 | Speed Graph |  |  |  |  |  |
+| 345 | Cadence Graph |  |  |  |  |  |
+| 346 | Power Graph |  |  |  |  |  |
+| 368 | Elevation Graph |  |  |  |  |  |
+
+### Bars family — Edge 840
+
+| id | field | S1 half | S2 full reg | S3 full 3/A | S4 full tall | S5 full screen |
+|---|---|---|---|---|---|---|
+| 347 | HR Bars |  |  |  |  |  |
+| 348 | Speed Bars |  |  |  |  |  |
+| 349 | Cadence Bars |  |  |  |  |  |
+| 350 | Power Bars |  |  |  |  |  |
+
+### Bars family — Edge 530
+
+| id | field | S1 half | S2 full reg | S3 full 3/A | S4 full tall | S5 full screen |
+|---|---|---|---|---|---|---|
+| 347 | HR Bars |  |  |  |  |  |
+| 348 | Speed Bars |  |  |  |  |  |
+| 349 | Cadence Bars |  |  |  |  |  |
+| 350 | Power Bars |  |  |  |  |  |
+
+## Hypothesis worth trying to break
+
+**Form depends on the family and the slot size, not on which metric it is** —
+a Power Graph and a Speed Graph should draw the same shape in the same slot,
+since the widget is the same and only the data source differs.
+
+If that holds, the cheap route is: fill **346 Power Graph** and **350 Power
+Bars** across all five columns, then fill only the **S1** and **S2** cells
+for the rest. Six fewer screens to build.
+
+It is written here as a hypothesis and not assumed, because the way to use it
+is to **try to falsify it**: the S1/S2 spot-checks are that test. If any
+sibling disagrees with its family representative, the shortcut is void and the
+full grid is needed.
+
+Two candidates for behaving unlike their families, which is why they are
+listed in the Graph block rather than folded into one representative:
+
+- **23 HR Zone Graph** — a banded zone display, not a time plot
+- **368 Elevation Graph** — plots distance rather than time
+
+## What the toolkit actually needs from this
+
+Less than the full grid. `graph_bars_warnings()` has to answer one question:
+*given this field in this slot on this model, is anything lost, and what do we
+say?* That needs, per field per model, only the **smallest slot at which it
+still draws its widget** — the threshold. Everything above it is confirmation
+and everything below it is the warning case.
+
+So a half-finished sheet is still useful, as long as what is filled in is
+filled in for both models. A column complete on the 840 and blank on the 530
+tells us nothing we can act on, because the whole point is that they differ.
+
+## New fields found along the way
+
+Kept in its own section on purpose. The matrix above records **rendering
+behaviour of known fields**; this records **the existence of unknown ones**.
+They are different kinds of claim and folding them together would blur both —
+but splitting them across two files while standing at the device is friction,
+so they share a file and not a table.
+
+Anything here gets promoted into `FIELD_ID_NAMES` afterwards, as its own
+change, with the id confirmed by placement rather than by the menu.
+
+### Found 2026-10-09
+
+| id | menu category | label on device | what distinguishes it | confirmed by |
+|---|---|---|---|---|
+| 351 | Graphical | `Heart Rate` | live numeric readout + **AVG** and **MAX** sub-fields | Doug, 2026-10-09 |
+| 352 | Graphical | `Speed` | live numeric readout + **AVG** and **MAX** sub-fields | Doug, 2026-10-09 |
+| 353 | Graphical | `Cadence` | live numeric readout + **AVG** and **MAX** sub-fields | Doug, 2026-10-09 |
+| 354 | Graphical | `Power` | live numeric readout + **AVG** and **MAX** sub-fields | Doug, 2026-10-09 |
+
+**Correction, same day:** an earlier note in this file said 352's sub-fields
+were **Min** and **Max**. They are **AVG and MAX**. Doug's own correction;
+the wrong pair was recorded here first and is fixed rather than left to be
+read later as measured.
+
+**Present on the 530 as well** (Doug, 2026-10-09), so `(Graphical)` is not an
+840-ism and the name needs no per-model split.
+
+**The numbering prediction held exactly** — 351 HR, 352 Speed, 353 Cadence,
+354 Power, the same metric order as 343–346 (Graph) and 347–350 (Bars). Three
+families of four, in register:
+
+| | HR | Speed | Cadence | Power |
+|---|---|---|---|---|
+| Graph | 343 | 344 | 345 | 346 |
+| Bars | 347 | 348 | 349 | 350 |
+| live + AVG/MAX | **351** | **352** | **353** | **354** |
+
+Being right does not retroactively make the arithmetic evidence: the ids came
+from the device, which is the only reason they can be written down. Had the
+family been ordered differently, the pattern would have produced four
+confident wrong entries — and 355–367 are still unknown, so the next guess
+starts from zero again.
+
+### These four are NOT graph or bar widgets
+
+Important for #153 and for the tables above. The device files them under the
+**Graphical** menu category, but their content is **three numbers** — a live
+readout plus AVG and MAX. Nothing is plotted.
+
+So they do **not** belong in `GRAPH_OR_BARS_FIELD_IDS`: the message that
+field needs "full width to render as a graph/bar, not plain text" would be
+meaningless for a field that is plain text by design.
+
+What they plausibly have instead is a **third size behaviour**, and it is
+the sharpest open question in this whole sheet:
+
+> **In a half-width slot, does a composite field still show AVG and MAX, or
+> does it drop the sub-fields and show only the live number?**
+
+If it drops them, then at half width id 352 is visually **indistinguishable
+from id 48 "Speed"** — the user has given up the whole reason for choosing
+it and has no way to tell. That is a genuine warning case, and a different
+one from both existing tiers:
+
+| tier | behaviour |
+|---|---|
+| `GRAPH_OR_BARS_FIELD_IDS` | widget deprecates to text |
+| `SMALL_SLOT_UNUSABLE_FIELD_IDS` | draws fully, too small to use |
+| **this, if confirmed** | **draws legibly, silently loses its extra data** |
+
+No constant for it yet, and none should be invented before the measurement —
+that is what the table below is for.
+
+### ANSWERED 2026-10-09 — and it is a single threshold
+
+Doug: *"When these are in a Half width data field, they revert to just the
+primary data type single numerical field and the label gets the `*`, in the
+editor view. In all other data field sizes, they show the main and 2
+sub-fields, it's just the size of the fonts within the data field that
+changes getting larger as the space allows."*
+
+So the question above is settled, and the answer is the simplest possible
+shape:
+
+| slot | behaviour |
+|---|---|
+| **S1** half-width | **reverts to the primary number alone**; editor marks the label `*` |
+| S2 full regular | main + AVG + MAX |
+| S3 full 3/A | main + AVG + MAX, larger fonts |
+| S4 full tall | main + AVG + MAX, larger fonts |
+| S5 full screen | main + AVG + MAX, largest fonts |
+
+**One threshold, between S1 and S2.** Above it nothing changes but font
+size — no reflow, no dropped sub-field, no change of form. That is exactly
+the "smallest slot at which it still works" the toolkit needs, and it means
+the composite table below collapses to one row per model rather than five
+columns of distinct behaviour.
+
+It also confirms the consequence that made this worth asking: **at half
+width, 352 shows one number with no sub-fields — visually identical to id 48
+"Speed".** A user who chose the composite field for its AVG and MAX gets
+neither, and the only thing that says so is the editor's `*`.
+
+> ### RESULT 2026-10-09: the models diverge, and the `*` question is now
+> ### probably MOOT rather than answered
+>
+> Doug checked the 840: *"for those 4 new data field IDs, on the 840, they
+> scale all the way down even in a half width data field, it's just that the
+> font is very small, but they don't revert to the primary data type single
+> numeral only nor do they display a `*` with the label."*
+>
+> **What this settles — and it is the firmest result in this file:**
+>
+> | | half-width behaviour | editor `*` |
+> |---|---|---|
+> | **Edge 530** | reverts to the primary number alone | yes |
+> | **Edge 840** | keeps all three values, very small font | no |
+>
+> That is the **second independent family** showing the same divergence in
+> the same direction. Taken with the graph/bars finding:
+>
+> | family | Edge 530 | Edge 840 |
+> |---|---|---|
+> | Graph / Bars | degrades to plain text | scales down, still draws |
+> | composite (351–354) | degrades to primary value | scales down, all three |
+>
+> So this is not a quirk of one widget. The two devices appear to follow
+> **different rendering philosophies**: the 530 *degrades* content that will
+> not fit, the 840 *scales* it. Two families agreeing is a far stronger
+> basis for #153's per-model split than one was.
+>
+> **What this does NOT settle: whether the 840's editor has a `*` at all.**
+> The test was designed to separate the two readings below and cannot,
+> because both predict precisely what was seen:
+>
+> - **(a)** the 840 has no marker → no `*`
+> - **(b)** the 840 has the marker but stays silent when nothing is lost →
+>   no `*`, *because nothing was lost*
+>
+> Identical predictions. The 840 field did not degrade, so there was nothing
+> for a marker to mark. An observation that comes out the same under both
+> hypotheses is evidence for neither — the same fault as a comparison that
+> agrees with itself (Doc rev 155).
+>
+> **Separating them needs an 840 field that genuinely loses something in
+> some slot, and no such field is known.** The graph/bar family scales; the
+> composite family scales; `SMALL_SLOT_UNUSABLE_FIELD_IDS` (Compass, Map)
+> draws fully and is merely tiny. If the 840 never degrades anything, then
+> (a) and (b) are not just empirically indistinguishable, they are
+> **behaviourally equivalent** — a marker that can never fire and an absent
+> marker are the same thing to any user and to this toolkit.
+>
+> Which makes this a question worth **closing as moot** rather than chasing,
+> unless an 840 field that drops content turns up on its own. Recording it
+> that way deliberately: "undecidable and harmless" is a real answer, and
+> better than leaving an open item that implies work outstanding.
+>
+> ### Superseded — the framing before the 840 check
+>
+> Doug, 2026-10-09, asked which device: *"I was looking at the 530 for that
+> part, let me double check for those particular data field types on the 840
+> before I say it only occurs on the 530."*
+>
+> So the observation above — the `*` on a half-width composite field — is a
+> **530** observation. Whether the 840's editor does the same for *these*
+> fields is **not yet known**, and declining to assert it either way is the
+> right call: the 2026-10-09 pass found no `*` on any 840 **graph or bar**
+> field, which says nothing about the **composite** family. Different
+> fields, different question.
+>
+> Two readings remain, and they are not close:
+>
+> **(a) the 840 shows no `*` here either.** Then `*` is a 530-only editor
+> feature, the 840 has no editor warning at all, and this is consistent with
+> everything so far while adding nothing new.
+>
+> **(b) the 840 does show `*` on these.** Then the 840's editor *does* use
+> the marker, and the whole story unifies into one rule:
+>
+> > **`*` means "this field loses something in this slot" — on both
+> > devices.**
+>
+> Under (b), the absence of `*` on 840 graph fields is not a missing
+> feature, it is the marker correctly staying silent **because those fields
+> do not degrade on the 840**. The device's own editor would then be
+> reporting exactly the fact `graph_bars_warnings()` is trying to compute,
+> on both models, and the 530-vs-840 difference in #153 would be a
+> difference in *field behaviour* rather than in *editor behaviour*.
+>
+> (b) is much the more attractive model — one rule covering both devices,
+> with the device's own editor reporting the very fact
+> `graph_bars_warnings()` tries to compute. **That attractiveness is the
+> reason to be careful with it.** A hypothesis one wants to be true is the
+> kind that gets read into a thin observation, and the cheapest version of
+> that mistake here is concluding "840 shows no `*`" from having looked at
+> 840 graph fields rather than 840 composite fields.
+>
+> **The check:** place a composite field (352 will do) in a half-width slot
+> on the **840** and read the editor label. Either answer is a finding.
+>
+> Record `*` presence per device in its own column below — it is an
+> observation in its own right, not a detail of the rendering.
+
+### Composite family — what survives at each slot size
+
+Cell vocabulary: `3up` all three values shown · `live+1` live plus one
+sub-field (say which) · `live` live number only, sub-fields gone ·
+`number` same as `live` but also no label · `n/a` not offered.
+
+#### Edge 840 — MEASURED 2026-10-09, all four
+
+| id | field | S1 half | `*` at S1? | S2-S5 full width | family matches? |
+|---|---|---|---|---|---|
+| 351 | Heart Rate (Graphical) | `3up` tiny font | no | `3up` | yes |
+| 352 | Speed (Graphical) | `3up` tiny font | no | `3up` | yes |
+| 353 | Cadence (Graphical) | `3up` tiny font | no | `3up` | yes |
+| 354 | Power (Graphical) | `3up` tiny font | no | `3up` | yes |
+
+Doug checked all four, not one and an assumption — so family uniformity is
+measured here rather than inferred. Nothing degrades at any size on this
+model; only the font changes.
+
+#### Edge 530 — S1 established, per-field confirmation outstanding
+
+| id | field | S1 half | `*` at S1? | S2-S5 full width | family matches? |
+|---|---|---|---|---|---|
+| 351 | Heart Rate (Graphical) |  |  |  |  |
+| 352 | Speed (Graphical) | `live` | yes | `3up` | — |
+| 353 | Cadence (Graphical) |  |  |  |  |
+| 354 | Power (Graphical) |  |  |  |  |
+
+The 530 row for 352 is from the observation that opened this section. The
+other three are blank on purpose: the 840 pass showed the family behaving
+uniformly *on the 840*, which is not evidence about the 530. Uniformity has
+to be checked per model, since the models are exactly what differ here.
+
+The rendering question is already answered for whichever device Doug was
+looking at, so what is left here is narrow:
+
+1. **the `*` column, on the 840 specifically** — the unresolved item above,
+   and the highest-value cell in this file
+2. **family uniformity** — do all four behave like 352, or does one differ
+3. `n/a` for any the device does not offer
+
+`S2-S5` is one column rather than four because the only difference across
+those sizes is font size. If any field turns out to break that — a
+sub-field dropping at S2 but not S4, say — split the column rather than
+forcing the observation into it.
+
+**352 will be the FIRST name collision in `FIELD_ID_NAMES`** — 206 entries,
+206 distinct display strings, zero collisions today. That is why no
+convention exists for this cause yet, and it is also the moment to add a
+uniqueness check: no two entries may share a display string unless at least
+one is in `AMBIGUOUS_DEVICE_LABELS`. Worth bundling with the 352 commit
+rather than added speculatively now.
+
+**352 is a name collision, not a new name.** The device calls it `Speed` and
+id 48 is also `Speed`. Proposed handling, using machinery that already
+exists rather than a new convention:
+
+- `FIELD_ID_NAMES[352] = "Speed (Graphical)"` — the device's own menu
+  category as the disambiguator, since that is how a user will look for it
+- `AMBIGUOUS_DEVICE_LABELS[352] = "Speed"` — so the picker row reads
+  `Speed (Graphical)  (id=352, shows as "Speed")`
+
+That constant's comment gives two reasons a field belongs there (an icon
+carries part of the name; there is no label at all). This is a **third
+cause with the same effect**: the text is ambiguous because it collides with
+another field's text, and a list box cannot disambiguate two rows both
+reading "Speed". Worth adding to that comment when 352 lands.
+
+Deliberately NOT named for its widget form — no `Gauge`, no `Dial`. The form
+is what the matrix above is measuring, and a name that encodes an unverified
+guess is how `Speed *` briefly became a field name in August.
+
+### ⚠ The blind spot that hid 352, which is bigger than 352
+
+Doug, 2026-10-09: *"not sure how I missed it, I probably assumed, that since
+it had the same name in the editor, that it was just the regular Speed data
+field."*
+
+That is a **method fault in every census pass so far**, not an oversight.
+The build sheets were assembled by reading menu labels and listing the
+unfamiliar ones. A field whose menu label duplicates a known field's label
+is invisible to that method — it gets skipped as "already known", and the
+skip **leaves no trace**: it is not in `KNOWN_UNRESOLVED_IDS` (which is
+empty), not on `EDGE840_NEW_FIELDS_CHECKLIST.md`, not counted anywhere.
+
+So "41/41 resolved" and "zero unresolved ids" are true *relative to a list
+built from labels*, and label de-duplication is the step where fields fell
+out silently. The familiar failure here in a new place: an absent record
+read as an absent thing.
+
+**The rule, for this pass and every future one: never skip a menu entry
+because its label is already known.** Only a placed-and-pulled id can tell
+you it is the same field. Placing a duplicate you already have costs one
+slot; assuming costs a gap nothing can detect.
+
+Unknown ids still sit in three contiguous blocks near this family — 330–342
+(13), 351–367 (17) and 369–399 (31). Those are not all graphical fields, but
+they are where a same-named sibling would hide.
+
+### If you find more
+
+Add a row to the table above. Useful to capture, in order of value:
+
+1. **the id** — from a pull after placing it, not from the menu
+2. **the menu category** it lives under
+3. **the exact label** rendered on the screen, not the menu text (294 says
+   `Trainer Controls` in the menu and renders `Resistance`)
+4. **what makes it distinct** from the similarly-named field, which for this
+   whole category seems to be an extra data area
+5. whether it collides with an existing name — if so it wants the same
+   `AMBIGUOUS_DEVICE_LABELS` treatment as 352
+
+A field you cannot get an id for is still worth a row with the id left blank.
+"Exists, unidentified" is more useful than nothing, and it bounds what the
+Graphical category contains.
+
+## Blank means unchecked
+
+As everywhere else in this project: an empty cell is **not** "same as the one
+above it". If a permutation is not worth the time, leave it blank and it stays
+honestly unknown rather than becoming a guess that later reads as measured.
