@@ -114,12 +114,60 @@ So 23 is confirmed present on the 840, and was named from what looks like a
 Rate** instead. That would reconcile all three records at once and make the
 cell "not in Graphical on the 530" rather than "not on the 530".
 
-Please check the Heart Rate category on the 530 before this is recorded as an
-availability difference. The distinction matters well beyond this cell: a
-field genuinely absent from one model would be the **first** such case, and
-would justify building the per-model field availability that v1.6.0 lists as
-a known gap. A field merely filed under a different category justifies
-nothing except a better note.
+**No restore needed — the bytes are already on disk.** A scan of all 80
+`.fit` files available found **22 screens containing id 23**:
+
+| written by | count | earliest | latest |
+|---|---|---|---|
+| Edge 530 (product 3121) | 21 | **2026-07-31** | 2026-09-29 |
+| Edge 840 (product 4062) | 1 | 2026-10-06 | — |
+
+Every one is the **same screen**: `message_index=6`, `f10=2` (a plain user
+screen, not a named type), **6 fields, layout A**, with id 23 at **position
+3**. Its neighbours are 59 Time of Day, 317 Light Battery, 56 Timer, then 23,
+then 48 Speed and 49 Avg Speed.
+
+Two things follow immediately:
+
+1. **It is in Doug's live ROAD profile on BOTH devices** — the 2026-10-06
+   file is 840-written. So nothing needs restoring to look at it.
+2. **Position 3 of 6/A is a full-width 1-unit row — that is S2.** The
+   `23 / S2` cell can be read straight off a screen that already exists, on
+   either device, with nothing to build.
+
+Files in the working folder carrying it, if a specific one is wanted:
+`CyclingRoadFLDTEST.fit` (2026-09-24), `CyclingRoadCNTTEST2.fit`,
+`CyclingRoadCNTTEST.fit`, `CyclingRoadCIQTEST.fit`,
+`CyclingRoadValueSwapTest.fit` — all 530-written.
+
+#### But the bytes do NOT settle whether the 530's EDITOR offers it
+
+Worth separating carefully, because it is easy to over-read a file:
+
+- **proven** — the 530 stores id 23, and has since at least 2026-07-31
+- **proven** — the 840 stores it too (2026-10-06)
+- **strongly implied** — the 530 *renders* it, since the 2026-08-11 entry
+  records Doug reading its on-device name directly
+- **NOT proven** — that the 530's editor ever *offered* it in a category
+
+The gap matters: this toolkit can write any field id into `f7` regardless of
+whether the device's own picker lists it, and some of those 22 files are
+toolkit staging artifacts (`edit_staged.fit`, `field_change.fit`). So a third
+possibility joins the two above:
+
+> **(c) placeable but not offered.** The 530 renders id 23 perfectly well,
+> but its editor does not list it anywhere — making Doug's observation
+> exactly right and not in conflict with anything.
+
+That would be the mirror image of the "hardware-gated in the picker" case
+`FIELD_ID_BUILD_SHEET.md` already describes, and it would be a genuinely new
+category of fact for this project: a field the toolkit can place that the
+device cannot.
+
+**The question only Doug can answer:** was id 23 originally put on that
+screen *by hand on the 530*, or *by the toolkit*? If by hand, the 530 offered
+it once and the puzzle is which category. If by the toolkit, (c) is live and
+the 530 may never have offered it at all.
 
 Recorded as a conflict rather than a finding precisely because resolving it
 by picking whichever record is more recent is how the 2026-08-17 batch went
