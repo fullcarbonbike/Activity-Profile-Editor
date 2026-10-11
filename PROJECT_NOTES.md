@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-09, at Doc rev 157.*
+> *Last updated 2026-10-11, at Doc rev 158.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,98 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 158 — refreshed 2026-10-11.* **The 530 Graph family has TWO size
+thresholds, not one, and the second is a HEIGHT threshold. This supersedes
+rev 157's "the fix needs no new vocabulary" — there is a third behaviour that
+neither existing tier describes, and v1.6.0 is silent about it on the 530.**
+
+### What the measurement shows
+
+Doug's Graph-family pass on the 530 (ids 343, 344, 345, 346, 368):
+
+| slot | plot? | sub-fields? |
+|---|---|---|
+| **S1** half, 1 unit | **no** — label + number only, `*` | no |
+| **S2** full, 1 unit | yes, small, left | **no** |
+| **S3** full, 5/3 units | yes | **yes** |
+| **S4** full, 2 units | yes, larger | yes |
+| **S5** full, 5 units | yes, largest | yes |
+
+Two different things are lost at two different sizes:
+
+1. **S1 → S2, width buys the plot.** This is what
+   `GRAPH_OR_BARS_FIELD_IDS` and the "needs full width" advisory already
+   cover, and they are right about it.
+2. **S2 → S3, height buys the sub-fields.** At full width but regular
+   height the field still loses its AVG/MAX, and **nothing in the toolkit
+   says so.**
+
+### What this supersedes in rev 157
+
+Two claims, and the more satisfying one is the one that broke:
+
+- *"The fix needs no new vocabulary — the two existing tiers already ARE the
+  two behaviours."* **False.** There is a third: **draws the widget,
+  withholds the sub-fields.** `GRAPH_OR_BARS_FIELD_IDS` means the widget
+  deprecates entirely; `SMALL_SLOT_UNUSABLE_FIELD_IDS` means it draws fully
+  but small. Neither covers partial content at full size. I wrote "the
+  pleasing part" about that tidiness two days ago on one family's data, and
+  tidiness was the tell.
+- *"Graph/Bars → 530 degrades to plain text."* **Incomplete** rather than
+  wrong: true at S1 only. Stated without a slot size it reads as the whole
+  model, which is how a partial observation becomes a confident one.
+
+Rev 157's "single clean threshold" line is NOT superseded — that is about
+the composite family (351–354), where one threshold is still the correct
+account.
+
+### So #153 grows: v1.6.0 both over- and under-warns
+
+- **over-warns on the 840** — tells the user a field needs full width to
+  render as a graph when on that model it scales and still draws
+- **under-warns on the 530** — says nothing when a graph field sits in a
+  full-width *regular-height* row and silently loses AVG/MAX
+
+The second is on the model the advisory was measured from, which is worth
+sitting with: the original rule was not merely mis-generalised to the 840, it
+was incomplete about the 530 from the start, because every observation behind
+it came from the half-width case.
+
+### It also answers #152(c), affirmatively and from Garmin's own fields
+
+The open question was whether a Graph/Bars field genuinely *needs* a taller
+full-width row or merely looks better in one. For the 530 Graph family it
+**needs** one, and the difference is **content, not cosmetics**. The
+threshold is between 1 and 5/3 units — in practice, any full-width row in a
+layout other than a plain 1-unit one.
+
+Garmin's own fields, so the per-app/per-version objection that complicates
+WindField does not apply. This is the strongest case yet for the taller-slot
+annotation.
+
+### Two items for the bench, both recorded as open
+
+- **id 23 vs the 530.** Doug reports HR Zone Graph is not offered on the
+  530, but `fit_dump.py` names it from a 2026-08-11 verification that
+  predates any 840 work, and the 840 checklist confirms the 840 offers it.
+  Likely benign: this pass walked the **Graphical** category and 23 may be
+  filed under **Heart Rate** on the 530. Left as a conflict rather than
+  settled by preferring the newest record — that is how the 2026-08-17 batch
+  went wrong. If it IS genuinely absent, it would be the first confirmed
+  per-model field availability difference and would justify building what
+  v1.6.0 lists as a known gap.
+- **368 breaks family uniformity, mildly.** Same plot, same thresholds, but
+  **ASC/DESC** where the others show AVG/MAX. The hypothesis holds for shape
+  and not for which sub-fields — so a warning naming the lost pair cannot
+  hardcode "AVG and MAX".
+
+Unmeasured and deliberately not inferred: the **Bars** family on either
+model, the **Graph** family on the 840, and whether the 840 withholds
+sub-fields in a 1-unit row. The 840 composite family did not withhold
+anything at any size, so the 840 may have two thresholds, one, or none.
 
 ---
 

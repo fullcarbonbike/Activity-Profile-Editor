@@ -79,16 +79,109 @@ Add `*` after the value if the editor marked the label that way.
 | 346 | Power Graph |  |  |  |  |  |
 | 368 | Elevation Graph |  |  |  |  |  |
 
-### Graph family — Edge 530
+### Graph family — Edge 530 — MEASURED 2026-10-11
 
 | id | field | S1 half | S2 full reg | S3 full 3/A | S4 full tall | S5 full screen |
 |---|---|---|---|---|---|---|
-| 23 | HR Zone Graph |  |  |  |  |  |
-| 343 | Heart Rate Graph |  |  |  |  |  |
-| 344 | Speed Graph |  |  |  |  |  |
-| 345 | Cadence Graph |  |  |  |  |  |
-| 346 | Power Graph |  |  |  |  |  |
-| 368 | Elevation Graph |  |  |  |  |  |
+| 23 | HR Zone Graph | *not offered on the 530 — see conflict below* | | | | |
+| 343 | Heart Rate Graph | `*` label + number, no plot | small plot (left) + single number | plot + number + AVG/MAX | larger plot + number + AVG/MAX | largest plot + number + AVG/MAX |
+| 344 | Speed Graph | `*` label + number, no plot | small plot (left) + single number | plot + number + AVG/MAX | larger plot + number + AVG/MAX | largest plot + number + AVG/MAX |
+| 345 | Cadence Graph | `*` label + number, no plot | small plot (left) + single number | plot + number + AVG/MAX | larger plot + number + AVG/MAX | largest plot + number + AVG/MAX |
+| 346 | Power Graph | `*` label + number, no plot | small plot (left) + single number | plot + number + AVG/MAX | larger plot + number + AVG/MAX | largest plot + number + AVG/MAX |
+| 368 | Elevation Graph | `*` label + number, no plot | small plot (left) + single number | plot + number + **ASC/DESC** | larger plot + number + **ASC/DESC** | largest plot + number + **ASC/DESC** |
+
+*(Doug's returned table listed 344 twice with identical values; recorded once.
+Not a discrepancy — the two rows agreed.)*
+
+#### ⚠ CONFLICT: id 23 and the 530
+
+Doug, 2026-10-11: HR Zone Graph is **not offered on the 530**. That sits
+awkwardly against two existing records:
+
+- `fit_dump.py` line 136: *"CORRECTED 2026-08-11 — was 'Heart Rate (Alt)';
+  Doug verified the real on-device name directly"*. The comment does not say
+  which device, but 2026-08-11 predates this project's 840 work — the 840
+  census was Phase C in late September — so that verification was almost
+  certainly on a **530**.
+- `EDGE840_NEW_FIELDS_CHECKLIST.md` line 262: confirmed 2026-09-30 that the
+  **840** offers HR Zone Graph and no "HR Zone Bar".
+
+So 23 is confirmed present on the 840, and was named from what looks like a
+530 observation, yet now reads as absent from the 530.
+
+**The likely benign explanation, and the cheap check:** this pass walked the
+**Graphical** category. 23 may well be on the 530 but filed under **Heart
+Rate** instead. That would reconcile all three records at once and make the
+cell "not in Graphical on the 530" rather than "not on the 530".
+
+Please check the Heart Rate category on the 530 before this is recorded as an
+availability difference. The distinction matters well beyond this cell: a
+field genuinely absent from one model would be the **first** such case, and
+would justify building the per-model field availability that v1.6.0 lists as
+a known gap. A field merely filed under a different category justifies
+nothing except a better note.
+
+Recorded as a conflict rather than a finding precisely because resolving it
+by picking whichever record is more recent is how the 2026-08-17 batch went
+wrong.
+
+#### ⚠ THE BINARY MODEL IS WRONG. There are TWO thresholds, not one.
+
+This is the most consequential thing in the sheet so far, and it contradicts
+what was written in Doc rev 157 two days ago.
+
+| slot | plot? | sub-fields? |
+|---|---|---|
+| **S1** half, 1 unit | **no** — label + number only, `*` | no |
+| **S2** full, 1 unit | yes, small, left | **no** |
+| **S3** full, 5/3 units | yes | **yes** |
+| **S4** full, 2 units | yes, larger | yes |
+| **S5** full, 5 units | yes, largest | yes |
+
+Two separate things are lost at two separate sizes:
+
+1. **S1 → S2: the plot appears.** Width is what buys the graph. This is the
+   case `GRAPH_OR_BARS_FIELD_IDS` and the existing "needs full width"
+   advisory already cover, and they are correct about it.
+2. **S2 → S3: AVG/MAX appear.** *Height* is what buys the sub-fields. At
+   full width but regular height, the field still loses content — and
+   **nothing in the toolkit warns about this today.**
+
+So v1.6.0 does not merely over-warn on the 840 (#153). It also
+**under-warns on the 530**, on the very model its advisory was measured
+from. A user who puts a Power Graph in a full-width regular row is told
+nothing, and silently gets no AVG or MAX.
+
+#### This answers #152(c)
+
+The open question was whether a Graph/Bars field genuinely *needs* a taller
+full-width row or merely looks better in one. For the 530 Graph family the
+answer is **it needs one, and the difference is content rather than
+cosmetics**: below 5/3 units the sub-fields are gone.
+
+That is the strongest possible case for the taller-slot annotation, and it
+comes from Garmin's own fields, so the per-app/per-version objection that
+complicates WindField does not apply. The threshold sits between 1 and 5/3
+units, which in practice means **any full-width row in a layout other than a
+plain 1-unit one**.
+
+Still to check: whether the same two thresholds hold for the **Bars** family,
+and whether the 840 — which scales rather than degrades — nonetheless also
+withholds sub-fields in a 1-unit row. The 840 composite family did *not*
+(all three values survived even at half width), so the 840 may have one
+threshold, none, or two.
+
+#### 368 breaks family uniformity, mildly
+
+Form is uniform across the family — same plot, same two thresholds — but 368
+shows **ASC/DESC** where the others show AVG/MAX. Sensible for elevation, and
+it means the hypothesis holds for *shape* but not for *which sub-fields*. 368
+was flagged in advance as a likely oddity; it is, in the smallest way it
+could have been.
+
+Worth noting what this costs: a warning that names the lost sub-fields cannot
+hardcode "AVG and MAX". It needs the pair per field, or wording that avoids
+naming them.
 
 ### Bars family — Edge 840
 
