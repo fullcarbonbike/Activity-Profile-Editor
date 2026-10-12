@@ -165,14 +165,56 @@ The 840 relabels exactly as the 530 does — `HEART RATE` when degraded,
 described this as a 530 behaviour; it is not, and that is the part of rev
 159 to supersede.
 
-#### ⚠ Do not record the partial zone counts as geometry
+#### ⚠ The zone counts: partly structural, partly not, and confounded
 
-At S3, 23 shows `Z1–2` on the 840 and `Z5` on the 530. A zone graph plots
-zones actually *reached*, so this is very likely **live data**, not a layout
-property — two sessions with different heart-rate histories would produce
-exactly this. Recorded as observed, flagged as probably not geometry. Worth
-one re-look at S3 on either device after a different ride; if the zone set
-changes, it is data and the cell should read "plot, zone set varies".
+Doug, 2026-10-12: *"I only see what the editor shows, but on a Live Active
+profile, the displayed zone of zones would most likely be the one(s) that
+I'm exerting in at the time, this may need an actual ride interactive to
+document."*
+
+Right to raise, and it splits in two:
+
+**Within one device, the band count IS structural.** On the 840, in one
+editor session with one set of data, S3 showed `Z1–2` and S4/S5 showed
+`Z1–5`. Same data, different heights, different band counts — so **height
+determines how many bands are drawn**. That is a layout property and belongs
+in this sheet.
+
+**Across devices, WHICH bands differ, and that is unexplained.** At S3 the
+840 shows `Z1–2` and the 530 shows `Z5`. A pure "as many bands as fit" rule
+would predict the same *end* of the range on both. Low zones on one and the
+top zone on the other is not that. Candidates, none tested:
+
+- the editor preview is a static mock that differs per model
+- one device shows the lowest bands and the other the current/last zone
+- the two previews reflect different stored histories
+
+**What a ride would settle:** whether the drawn bands track live exertion at
+all. If they do, the cell means "as many bands as the height allows, filled
+from live data" and the specific zone names in this sheet are session
+artifacts. If they do not — if the editor and the activity screen show the
+same bands — then the zone set is fixed per height and the cross-device
+difference is a real rendering difference worth its own entry.
+
+Recorded as observed; the **band count** is treated as geometry, the
+**zone identities** are not.
+
+#### The editor-vs-live question, for the sheet as a whole
+
+Everything in these tables was read from the **editor**, not from a running
+activity. That is fine for what the matrix is for, provided the distinction
+is kept:
+
+- **structural cells** — plot present or absent, label text, whether AVG/MAX
+  or ASC/DESC appear at all — are what `graph_bars_warnings()` needs, and
+  the editor renders the real widget at the real size
+- **content cells** — which zones, what values — are placeholder outside a
+  ride and mean nothing here
+
+Only id 23's zone identities fall in the second group. No other cell in this
+sheet records a value, so no other cell is affected. Worth stating plainly
+rather than leaving implicit, because "measured on the device" and "measured
+while riding" are different claims and this sheet only supports the first.
 
 ### Graph family — Edge 530 — MEASURED 2026-10-11
 
