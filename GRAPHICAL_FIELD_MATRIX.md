@@ -17,10 +17,44 @@ So the cell to fill in is **what it draws**, not whether it works.
 
 ## Why this is only five columns
 
-Across all 24 of the 840's user states and all 15 of the 530's there are
-exactly **five distinct slot geometries**, and both models have the same
-five. Height is in units where the screen is 5 units tall (the half-width
-row rule), so this is the full set — not a sample.
+Across the 840's and the 530's **measured** user states there are five
+distinct slot geometries, the same five on both models. Height is in units
+where the screen is 5 units tall (the half-width row rule).
+
+> ### ⚠ CORRECTION 2026-10-12 — five is the MEASURED set, not the full set
+>
+> This section previously read *"this is the full set — not a sample"*. That
+> was wrong, and Doug found it from the device: *"I think I mixed in a 1/4
+> screen, when I toggled thru the layouts... the 5 tests don't include that
+> variation."*
+>
+> Two states were deliberately left unmeasured — `2/A` and `4/A`, because
+> the slot-heights sheet asked for them with a generated hint that printed
+> an impossible number. Under the 5-unit rule each contributes a geometry
+> that is **not** among the five:
+>
+> | state | each full-width row | sits |
+> |---|---|---|
+> | **4/A** | 5/4 unit = **1/4 of screen** | between S2 and S3 |
+> | **2/A** | 5/2 unit = **1/2 of screen** | between S4 and S5 |
+>
+> So the real count is **seven**, of which this sheet measures five.
+>
+> **How the error happened, which matters more than the error.**
+> `row_height_units()` correctly returns `None` for both states. The
+> generator that produced this list iterated over the entries *present* in
+> that table, so an honest omission became a confident "full set" one step
+> downstream. The data never lied; the derivation dropped the distinction —
+> the same shape as `layout_grid()` returning `None` for
+> measured-but-undrawable and genuinely-unknown alike, which is what
+> `fit_dump.py knowledge` exists to prevent. A gap marked in one place does
+> not protect a claim derived from it somewhere else.
+>
+> **Cheap way to close it while passing through:** a 4-field layout A screen
+> shows four quarter-screen rows. Noting (a) whether those four rows really
+> are equal, and (b) what a graph field draws in one, closes both the 4/A
+> height gap and a sixth matrix column at the same time. 2/A likewise with
+> a 2-field screen.
 
 | # | slot | width | height | share of screen |
 |---|---|---|---|---|
@@ -68,22 +102,83 @@ widget gone · `blank` nothing drawn · `n/a` not offered in the picker
 
 Add `*` after the value if the editor marked the label that way.
 
-### Graph family — Edge 840
+### Graph family — Edge 840 — PARTIAL 2026-10-12
 
 | id | field | S1 half | S2 full reg | S3 full 3/A | S4 full tall | S5 full screen |
 |---|---|---|---|---|---|---|
-| 23 | HR Zone Graph |  |  |  |  |  |
-| 343 | Heart Rate Graph |  |  |  |  |  |
-| 344 | Speed Graph |  |  |  |  |  |
-| 345 | Cadence Graph |  |  |  |  |  |
-| 346 | Power Graph |  |  |  |  |  |
-| 368 | Elevation Graph |  |  |  |  |  |
+| 23 | HR Zone Graph | label `HEART RATE` + number, **no plot**, no `*` | label `HEART RATE` + number, **no plot**, no `*` | label → `HR Zone Graph`, plot Z1–2 only, **no number** | label → `HR Zone Graph`, plot Z1–5, no number | label → `HR Zone Graph`, plot Z1–5, no number |
+| 343 | Heart Rate Graph | *held — see below* | | | | |
+| 344 | Speed Graph | *held — see below* | | | | |
+| 345 | Cadence Graph | *held — see below* | | | | |
+| 346 | Power Graph | *held — see below* | | | | |
+| 368 | Elevation Graph | tiny plot + single number | small plot + single number | plot + number + **ASC/DESC** | larger plot + number + **ASC/DESC** | largest plot + number + **ASC/DESC** |
+
+**343–346 are held as unmeasured, not transcribed.** The returned rows
+carried six values for five columns. Doug, on being asked which was the
+stray: *"I think I mixed in a 1/4 screen, when I toggled thru the layouts,
+but let me make sure, the 5 tests don't include that variation."* A 1/4
+screen is `4/A`, which is genuinely outside these five columns — see the
+correction at the top of this file. Left blank rather than guessed; the
+pattern suggested an answer, and a suggested answer is what the
+slot-heights sheet taught not to record.
+
+#### The `*` question is ANSWERED, not moot
+
+Doc rev 159 and an earlier section of this file closed it as *undecidable
+and harmless*, on the grounds that separating "the 840 has no marker" from
+"the 840 has a marker that stays silent when nothing is lost" would need an
+840 field that genuinely loses content — and that none was known.
+
+**Id 23 is that field.** On the 840 at S1 and S2 it shows a label and a
+number and **no plot** — real degradation, the same loss the 530 marks with
+`*` — and there is no `*`. Doug's own 530 row writes the marker explicitly
+at the same sizes, so the contrast is within one observer's notation.
+
+So: **the 840 has no `*` marker.** Reading (a), settled by evidence rather
+than closed as unanswerable. Worth noting the earlier reasoning was sound —
+the test available *then* could not distinguish the two — and that "moot"
+was still the wrong label, because a decisive case existed and had simply
+not been measured yet. *Undecidable with current data* and *undecidable* are
+different claims.
+
+#### "The 840 scales, never degrades" is FALSIFIED
+
+Rev 157's headline, from the graph/bars and composite families, was that the
+530 degrades and the 840 scales. Id 23 degrades on the 840 — no plot at
+either S1 or S2. The real picture is narrower and more interesting:
+
+| | 530 | 840 |
+|---|---|---|
+| 343–346, 368 at S1 | loses the plot, marked `*` | keeps a tiny plot *(pending recheck)* |
+| 23 at S1 and S2 | loses the plot, marked `*` | **loses the plot, unmarked** |
+| everything S3 and up | identical | identical |
+
+So the models differ in **where the threshold sits and whether it is
+signposted**, not in whether degradation happens at all. And **23 has a
+higher threshold than the rest of its family on both models** — making it
+the family's true outlier, not 368.
+
+#### Label-by-size is a BOTH-models behaviour
+
+The 840 relabels exactly as the 530 does — `HEART RATE` when degraded,
+`HR Zone Graph` when plotting. Only the `*` is 530-only. Doc rev 159
+described this as a 530 behaviour; it is not, and that is the part of rev
+159 to supersede.
+
+#### ⚠ Do not record the partial zone counts as geometry
+
+At S3, 23 shows `Z1–2` on the 840 and `Z5` on the 530. A zone graph plots
+zones actually *reached*, so this is very likely **live data**, not a layout
+property — two sessions with different heart-rate histories would produce
+exactly this. Recorded as observed, flagged as probably not geometry. Worth
+one re-look at S3 on either device after a different ride; if the zone set
+changes, it is data and the cell should read "plot, zone set varies".
 
 ### Graph family — Edge 530 — MEASURED 2026-10-11
 
 | id | field | S1 half | S2 full reg | S3 full 3/A | S4 full tall | S5 full screen |
 |---|---|---|---|---|---|---|
-| 23 | HR Zone Graph | `* Heart Rate`, plain number, no plot | `* Heart Rate`, plain number, no plot | `HR Zone Graph` + plot | | |
+| 23 | HR Zone Graph | `*` marked | `* Heart Rate` + number, no plot | label → `HR Zone Graph`, plot Z5 only, **no number** | label → `HR Zone Graph`, plot Z1–5, no number | label → `HR Zone Graph`, plot Z1–5, no number |
 | 343 | Heart Rate Graph | `*` label + number, no plot | small plot (left) + single number | plot + number + AVG/MAX | larger plot + number + AVG/MAX | largest plot + number + AVG/MAX |
 | 344 | Speed Graph | `*` label + number, no plot | small plot (left) + single number | plot + number + AVG/MAX | larger plot + number + AVG/MAX | largest plot + number + AVG/MAX |
 | 345 | Cadence Graph | `*` label + number, no plot | small plot (left) + single number | plot + number + AVG/MAX | larger plot + number + AVG/MAX | largest plot + number + AVG/MAX |
