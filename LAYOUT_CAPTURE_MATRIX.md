@@ -33,15 +33,15 @@ truncate slots. Glance at slot 0 before moving on.
 
 | # | Count | Letter | Anchor at slot 0 | Expected `f8` | Geometry you observe |
 |---|---|---|---|---|---|
-| 1 | 3 | **C** | Speed *(48)* | 2 | |
-| 2 | 4 | **C** | Cadence *(3)* | 2 | |
-| 3 | 5 | **C** | Heart Rate *(13)* | 2 | |
-| 4 | 6 | **C** | Power *(36)* | 2 | |
+| 1 | 3 | **C** | Speed *(48)* | 2 | 2 FW DFs (larger Height) stacked, then 1 Normal FW DF|
+| 2 | 4 | **C** | Cadence *(3)* | 2 | 2 FW DFs (larger Height) stacked, then 1 ROW of 2 HW DFs |
+| 3 | 5 | **C** | Heart Rate *(13)* | 2 | 1 FW DF Normal Height, 1 FW DF (Larger Height), 1 FW DF Norman Height, then 1 ROW of 2 HW DFs |
+| 4 | 6 | **C** | Power *(36)* | 2 | 1 FW DF Normal Height, 1 FW DF (Larger Height), 2 ROWs of 2 HW DFs |
 | 5 | 7 | **C** | Odometer *(95)* | 2 | *(already described — see below)* |
-| 6 | 8 | **B** | Total Ascent *(60)* | 1 | |
-| 7 | 8 | **C** | Total Descent *(61)* | 2 | |
-| 8 | 9 | **B** | Avg Speed *(49)* | 1 | |
-| 9 | 9 | **C** | Max Speed *(91)* | 2 | |
+| 6 | 8 | **B** | Total Ascent *(60)* | 1 | 1 Row of HW DFs, 2 FW DFs (Normal Height), 2 ROWs of 2 HW DFs |
+| 7 | 8 | **C** | Total Descent *(61)* | 2 | 2 ROWs of 2 HW DFs, 2 FW DFs (Normal Height), then 1 ROW of 2 HW DFs |
+| 8 | 9 | **B** | Avg Speed *(49)* | 1 | 1 ROWs of 2 HW DFs, 1 FW DF (Normal Height), then 3 ROWs of 2 HW DFs |
+| 9 | 9 | **C** | Max Speed *(91)* | 2 | 2 ROWs of 2 HW DFs, 1 FW DF (Normal Height), then 2 ROW of 2 HW DFs |
 | 10 | 5 | **B** | Laps *(24)* | 1 | *control — see below* |
 
 For "geometry you observe", the format you used for count 7 is exactly

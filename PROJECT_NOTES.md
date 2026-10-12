@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-11, at Doc rev 159.*
+> *Last updated 2026-10-11, at Doc rev 160.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,56 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 160 — refreshed 2026-10-11.* **A cloned profile reads a zero
+odometer, and the structure says why: `Totals.fit` keys each record by the
+profile's NAME. Logged as #155 to investigate rather than treated as a bug.**
+
+Doug cloned ROAD on the 840 for the graph tests and found the clone's
+Odometer at zero while switching back to ROAD still read correctly.
+
+A raw walk of the live file — `fit_raw_walk.parse_fit()`, **not** the SDK,
+per the standing rule from Doc rev 116 — shows mesg 33 holding **11 fixed
+records**, each carrying the profile name as a 32-byte string in **field
+10**. Four are named and correspond to real profiles; the remainder are blank
+with field 3 (sport) = `0xFF`, i.e. unused slots.
+
+So a clone is a new name with no record of its own, and reads zero. The
+original's record is untouched, which is exactly why switching back works.
+**Expected behaviour rather than data loss** — but "expected" is a hypothesis
+about the keying, not a measurement of it.
+
+### Three things to settle before relying on that
+
+1. **Toolkit clone or device-side copy?** `gui_app.py` line 5579 says Clone
+   Profile patches `sport_mesgs[0].name`, so a toolkit clone certainly
+   produces a new name with no totals record. A copy made by the 840 itself
+   may not behave the same way.
+2. **Does the device create a record for a new profile?** Pull `Totals.fit`
+   again now the clone exists and diff the record count and names. It may
+   fill a blank slot on first ride, on sync, or never.
+3. **Is the name actually the key?** Field 254 and field 5 are also
+   per-record. The name may merely correlate with whatever the device
+   matches on.
+
+### Two consequences if the name IS the key
+
+- **Renaming a profile would orphan its odometer.** This toolkit can rename,
+  so that is a user-visible footgun the GUI ought to warn about.
+- **Record index 0 is anomalous**: a valid record — sport set, counters
+  non-zero — with a *blank* name. Could be a device aggregate; could be
+  precisely such an orphan. It fits the rename theory a little too neatly,
+  which is a reason for suspicion rather than confidence.
+
+### Why this matters to #106
+
+#106 (odometer set/reset) was substantially de-risked at Doc rev 118 by
+writing the ROAD record and having the device accept it. Writing a record is
+demonstrated; **matching a record to a profile is not**, and a feature that
+sets an odometer has to get that right — including what happens when the name
+changes underneath it.
 
 ---
 

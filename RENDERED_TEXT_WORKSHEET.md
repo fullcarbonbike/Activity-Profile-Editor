@@ -57,19 +57,19 @@ dressing up a 530 number as an 840 one.
 ---
 
 ## Screen A — on-device position 0, slot [0] — 10 fields, layout variant 0
-
+NOTE: all of the Force related data field labels are proceeded with a icon to represent force
 | Pos | ID | Name we recorded | Width *(530 est.)* | Rendered text on device | Same? |
 |---|---|---|---|---|---|
-| 0 | 48 | Speed ← anchor, already known | **half** | | |
-| 1 | 860 | Force | **half** | | |
-| 2 | 847 | Avg Force | **half** | | |
-| 3 | 851 | 3s Force | **half** | | |
-| 4 | 852 | 10s Force | **half** | | |
-| 5 | 853 | 30s Force | **half** | | |
-| 6 | 848 | Lap Force | **half** | | |
-| 7 | 854 | Last Lap Force | **half** | | |
-| 8 | 849 | Max. Force | **half** | | |
-| 9 | 850 | Max. Lap Force | **half** | | |
+| 0 | 48 | Speed ← anchor, already known | **half** | SPEED | Y |
+| 1 | 860 | Force | **half** | FORCE | Y |
+| 2 | 847 | Avg Force | **half** | Average | |
+| 3 | 851 | 3s Force | **half** | 3S FRC | |
+| 4 | 852 | 10s Force | **half** | 10S FRC | |
+| 5 | 853 | 30s Force | **half** | 30S FRC | |
+| 6 | 848 | Lap Force | **half** | LAP FRC | |
+| 7 | 854 | Last Lap Force | **half** | LAST LAP | |
+| 8 | 849 | Max. Force | **half** | MAX | |
+| 9 | 850 | Max. Lap Force | **half** | MAX LAP | |
 
 ---
 
@@ -77,15 +77,15 @@ dressing up a 530 number as an 840 one.
 
 | Pos | ID | Name we recorded | Width *(530 est.)* | Rendered text on device | Same? |
 |---|---|---|---|---|---|
-| 0 | 3 | Cadence ← anchor, already known | full | | |
-| 1 | 856 | Normalized Force | **half** | | |
-| 2 | 857 | Lap Norm. Force | **half** | | |
-| 3 | 858 | Last Lap Norm. Force | **half** | | |
-| 4 | 786 | Vertical Descent Speed | **half** | | |
-| 5 | 220 | Avg. Vertical Descent Speed | **half** | | |
-| 6 | 787 | 30s Vertical Descent Speed | **half** | | |
-| 7 | 788 | Lap Vertical Descent Speed | **half** | | |
-| 8 | 223 | Lap Ascent | **half** | | |
+| 0 | 3 | Cadence ← anchor, already known | full | CADENCE | Y |
+| 1 | 856 | Normalized Force | **half** | NORM FRC | |
+| 2 | 857 | Lap Norm. Force | **half** | LAP N FRC | |
+| 3 | 858 | Last Lap Norm. Force | **half** | LL N FRC| |
+| 4 | 786 | Vertical Descent Speed | **half** | DESC SPD | |
+| 5 | 220 | Avg. Vertical Descent Speed | **half** | AVG DESCENT | |
+| 6 | 787 | 30s Vertical Descent Speed | **half** | 30S DES SPD | |
+| 7 | 788 | Lap Vertical Descent Speed | **half** | LAP DESCENT | |
+| 8 | 223 | Lap Ascent | **half** | LAP ASCENT | Y |
 
 ---
 
@@ -93,13 +93,13 @@ dressing up a 530 number as an 840 one.
 
 | Pos | ID | Name we recorded | Width *(530 est.)* | Rendered text on device | Same? |
 |---|---|---|---|---|---|
-| 0 | 13 | Heart Rate ← anchor, already known | **half** | | |
-| 1 | 224 | Lap Descent | **half** | | |
-| 2 | 595 | Dist. to Point | full | | |
-| 3 | 32 | Next Pt Location ← already known, rename case | **half** | | |
-| 4 | 596 | Time to Point | **half** | | |
-| 5 | 215 | 24-Hour Minimum Temperature | **half** | | |
-| 6 | 214 | 24-Hour Maximum Temperature | **half** | | |
+| 0 | 13 | Heart Rate ← anchor, already known | **half** | | Y |
+| 1 | 224 | Lap Descent | **half** | LAP DESCENT | Y |
+| 2 | 595 | Dist. to Point | full | DIST TO PT | |
+| 3 | 32 | Next Pt Location ← already known, rename case | **half** | WPT NEXT | |
+| 4 | 596 | Time to Point | **half** | TIME TO PT | |
+| 5 | 215 | 24-Hour Minimum Temperature | **half** | 24-HOUR MIN | |
+| 6 | 214 | 24-Hour Maximum Temperature | **half** | 24-HOUR MAX | |
 
 ---
 
@@ -107,15 +107,15 @@ dressing up a 530 number as an 840 one.
 
 | Pos | ID | Name we recorded | Width *(530 est.)* | Rendered text on device | Same? |
 |---|---|---|---|---|---|
-| 0 | 36 | Power ← anchor, already known | full | | |
-| 1 | 478 | EPOC ← already known, rename case | **half** | | |
-| 2 | 294 | Resistance | **half** | | |
-| 3 | 654 | Segment Time | **half** | | |
-| 4 | 520 | Primary Target | **half** | | |
-| 5 | 578 | Secondary Target | **half** | | |
-| 6 | 302 | Step Distance | **half** | | |
-| 7 | 21 | Lap %HRR | **half** | | |
-| 8 | 438 | Lap Watts/kg | **half** | | |
+| 0 | 36 | Power ← anchor, already known | full | | Y |
+| 1 | 478 | EPOC ← already known, rename case | **half** | LOAD | |
+| 2 | 294 | Resistance | **half** | RESISTANCE | Y |
+| 3 | 654 | Segment Time | **half** | SEGMENT TIME | Y |
+| 4 | 520 | Primary Target | **half** | No Label just 2 "--" in the DF | |
+| 5 | 578 | Secondary Target | **half** | No Label just 2 "--" in the DF | |
+| 6 | 302 | Step Distance | **half** | STEP DIST | |
+| 7 | 21 | Lap %HRR | **half** |  LAP %HRR | Y |
+| 8 | 438 | Lap Watts/kg | **half** | LAP W/KG | |
 
 ---
 
@@ -123,11 +123,11 @@ dressing up a 530 number as an 840 one.
 
 | Pos | ID | Name we recorded | Width *(530 est.)* | Rendered text on device | Same? |
 |---|---|---|---|---|---|
-| 0 | 95 | Odometer ← anchor, already known | full | | |
-| 1 | 581 | Stamina | full | | |
-| 2 | 580 | Potential | full | | |
-| 3 | 582 | Estimated Distance | full | | |
-| 4 | 583 | Estimated Time | full | | |
+| 0 | 95 | Odometer ← anchor, already known | full | | Y |
+| 1 | 581 | Stamina | full | | Y |
+| 2 | 580 | Potential | full | | Y |
+| 3 | 582 | Estimated Distance | full | | Y |
+| 4 | 583 | Estimated Time | full | | Y |
 
 ---
 

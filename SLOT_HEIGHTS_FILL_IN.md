@@ -232,3 +232,21 @@ So just one check, and the rest follows or it doesn't:
 A 10-field layout is the easy test: if it is five equal rows of two, the answer
 is yes and the whole model transfers. If those rows are not fifths, the 530 has
 its own geometry and needs its own sheet.
+
+
+
+The 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
