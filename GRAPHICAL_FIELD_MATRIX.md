@@ -83,7 +83,7 @@ Add `*` after the value if the editor marked the label that way.
 
 | id | field | S1 half | S2 full reg | S3 full 3/A | S4 full tall | S5 full screen |
 |---|---|---|---|---|---|---|
-| 23 | HR Zone Graph | *not offered on the 530 — see conflict below* | | | | |
+| 23 | HR Zone Graph | `* Heart Rate`, plain number, no plot | `* Heart Rate`, plain number, no plot | `HR Zone Graph` + plot | | |
 | 343 | Heart Rate Graph | `*` label + number, no plot | small plot (left) + single number | plot + number + AVG/MAX | larger plot + number + AVG/MAX | largest plot + number + AVG/MAX |
 | 344 | Speed Graph | `*` label + number, no plot | small plot (left) + single number | plot + number + AVG/MAX | larger plot + number + AVG/MAX | largest plot + number + AVG/MAX |
 | 345 | Cadence Graph | `*` label + number, no plot | small plot (left) + single number | plot + number + AVG/MAX | larger plot + number + AVG/MAX | largest plot + number + AVG/MAX |
@@ -140,7 +140,78 @@ Files in the working folder carrying it, if a specific one is wanted:
 `CyclingRoadCNTTEST.fit`, `CyclingRoadCIQTEST.fit`,
 `CyclingRoadValueSwapTest.fit` — all 530-written.
 
-#### But the bytes do NOT settle whether the 530's EDITOR offers it
+#### ✅ RESOLVED 2026-10-11 — and the answer was none of the three readings
+
+Doug found it in the ROAD profile: *"in the full width 1/5 height data field
+it is labeled `* Heart Rate` but if I give it a larger data field the Label
+changes to `HR Zone Graph` with a plot. It was just confusing in the 530
+editor (I've been getting used to the 840)."*
+
+**Id 23 is on the 530. It was never missing. Its LABEL CHANGES WITH SLOT
+SIZE.**
+
+| slot | 530 label | content |
+|---|---|---|
+| S1 / S2 (degraded) | `* Heart Rate` | plain HR number |
+| S3 and up | `HR Zone Graph` | plot |
+
+So one id has **two different device strings depending on geometry**, and at
+the degraded size the string is the *base metric's* name with a `*` in front
+— one asterisk away from id 13, whose label is literally `Heart Rate`.
+
+That is why it could not be found: at that slot size the editor was calling
+it Heart Rate. **The same blind spot as field 352**, arrived at from the
+opposite direction — there a field hid behind another field's name
+permanently, here it hides behind one only at certain sizes.
+
+#### This un-does an old "correction" that was not one
+
+`fit_dump.py` line 136 records 23 as *CORRECTED 2026-08-11 — was "Heart Rate
+(Alt)"*, and the README's v2.4.7 note pairs it with 348/349, transcribed then
+as `Speed *` and `Cadence *`, renamed to Speed Bars and Cadence Bars —
+*"confirming the `*`/`(Alt)` marker denotes a Graph/Bars-style field needing
+a full-width slot"*.
+
+August got the **mechanism** right. What it got wrong was treating the two
+strings as a mistake and a fix. They are **both real device labels for the
+same id at different slot sizes**, and replacing one with the other threw
+away a fact rather than correcting an error. The degraded strings were
+evidence, and they were discarded as typos.
+
+#### The rule this suggests, now worth testing deliberately
+
+> **On the 530, a graphical field in a slot too small for its widget
+> relabels to its base metric with a `*` prefix.**
+
+One rule covering id 23 (`* Heart Rate`), 348/349 (`Speed *`, `Cadence *`)
+and — if it holds — 343–346, 368 and the composite family 351–354.
+
+**It predicts specific strings.** While filling the S1 column, record the
+*label text*, not just "`*` label/number only":
+
+- 343 → `* Heart Rate`? 344 → `* Speed`? 345 → `* Cadence`? 346 → `* Power`?
+- 368 → `* Elevation`?
+- 352 at half width → `* Speed`? and 351 → `* Heart Rate`?
+
+If those come back as predicted, the rule is established and the `*` is
+explained. If the prefix sits on the *other* side for some fields — August
+transcribed 348 as `Speed *`, trailing, while 23 is `* Heart Rate`, leading
+— then position varies and that is worth knowing too, since it affects
+nothing functionally but tells us whether these are one mechanism or two.
+
+#### Consequence: `FIELD_ID_NAMES` assumes one string per id
+
+It holds one display name per field, and `AMBIGUOUS_DEVICE_LABELS` holds one
+alternate. Neither can express *"this id displays A at small sizes and B at
+large ones"*. Not necessarily a thing to fix — the full-size name is the
+right one for a picker — but it needs documenting, because the degraded
+string is what a confused user is actually looking at, and that is precisely
+the confusion that cost two days here.
+
+#### What the bytes could and could not settle
+
+Kept for the record, because the reasoning stands even though the answer
+arrived another way.
 
 Worth separating carefully, because it is easy to over-read a file:
 

@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-11, at Doc rev 158.*
+> *Last updated 2026-10-11, at Doc rev 159.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -361,6 +361,72 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 159 — refreshed 2026-10-11.* **A graphical field's LABEL changes
+with slot size on the 530. Id 23 was never missing — at a 1-unit full-width
+slot the editor calls it `* Heart Rate`, and only at larger sizes does it say
+`HR Zone Graph`. This un-does the 2026-08-11 "correction", which replaced one
+true device string with another and discarded evidence as a typo.**
+
+> Doug: *"in the full width 1/5 height data field it is labeled `* Heart
+> Rate` but if I give it a larger data field the Label changes to `HR Zone
+> Graph` with a plot... it was just confusing in the 530 editor."*
+
+| slot | 530 label | content |
+|---|---|---|
+| S1 / S2 | `* Heart Rate` | plain HR number |
+| S3 and up | `HR Zone Graph` | plot |
+
+One id, **two device strings, selected by geometry**. At the degraded size
+the string is the base metric's own name with a `*` prefix — one asterisk
+from id 13, which is literally `Heart Rate`. That is why it could not be
+found in the Graphical category: at that size the editor was calling it
+Heart Rate.
+
+### The August record got the mechanism right and the bookkeeping wrong
+
+`fit_dump.py` line 136 reads *CORRECTED 2026-08-11 — was "Heart Rate
+(Alt)"*, and README v2.4.7 pairs it with 348/349, transcribed then as
+`Speed *` and `Cadence *`, renamed Speed Bars and Cadence Bars, *"confirming
+the `*`/`(Alt)` marker denotes a Graph/Bars-style field needing a full-width
+slot"*.
+
+The inference was correct. The error was treating the two strings as a
+mistake and a fix: they are **both real labels for the same id at different
+slot sizes**. The degraded strings were data, and three of them were
+discarded as transcription noise. Worth naming as its own failure mode —
+distinct from the ones already catalogued here — **a correction that
+overwrites an observation instead of adding to it.**
+
+### The rule it suggests, to be tested rather than assumed
+
+> On the 530, a graphical field in a slot too small for its widget relabels
+> to its base metric with a `*` prefix.
+
+That would cover 23, 348/349, 343–346, 368 and perhaps 351–354 with one
+sentence. It makes **specific string predictions** — `* Speed`, `* Cadence`,
+`* Power`, `* Elevation` — which the S1 column of the matrix will confirm or
+break, so the matrix now asks for label *text* rather than a tick. Note
+August transcribed 348 as `Speed *` with the marker trailing while 23 leads;
+if position genuinely varies, these may be two mechanisms rather than one.
+
+### And it is the 352 blind spot again, from the other direction
+
+352 hid behind another field's name permanently; 23 hides behind one only at
+certain sizes. Same root cause — **identifying a field by its label** — and
+#154's rule covers both: never conclude anything from a label alone, because
+the label is not a stable property of the field.
+
+### Consequence for the data model
+
+`FIELD_ID_NAMES` holds one display string per id and
+`AMBIGUOUS_DEVICE_LABELS` holds one alternate. Neither can express "A at
+small sizes, B at large". Probably not worth restructuring — the full-size
+name is the right one for a picker — but it must be **documented**, because
+the degraded string is what a confused user is looking at, and that
+confusion cost two days.
 
 ---
 
