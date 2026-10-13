@@ -20,28 +20,32 @@ working notes; this is the whole of the outstanding work.*
 | family | Edge 840 | Edge 530 |
 |---|---|---|
 | **Graph** 23, 343–346, 368 | **343–346 to redo** (23 ✓, 368 ✓) | ✅ complete |
-| **Bars** 347–350 | ❌ all four | ❌ all four |
+| **Bars** 347–350 | ✅ complete | ✅ complete |
 | **Composite** 351–354 | ✅ complete | **351, 353, 354** (352 ✓) |
+
+**Two blocks left: four Graph rows on the 840, and three composite rows on
+the 530.**
 
 ### The work, in the order that costs least
 
 1. **Redo 343–346 on the 840.** The returned rows had six values for five
    columns, probably including a 1/4-screen row from toggling layouts. One
    5/B screen plus one 3/A plus one 1/A covers all five columns.
-2. **Bars family, both models — the only wholly untouched block.** Eight
-   rows. 350 Power Bars across all five sizes first; if its siblings match
-   at S1 and S2, the family-uniformity shortcut applies and the rest is four
-   quick cells. Watch for the circular-vs-linear form change you noted on
-   2026-10-09, which is the thing no other family does.
+2. ~~**Bars family, both models.**~~ ✅ **Done 2026-10-13**, all eight rows,
+   family-uniform on both models. Produced the sheet's most interesting
+   result — form follows **aspect ratio**, gauge → bar → gauge — and showed
+   that sub-field thresholds differ **by family** on the same device.
 3. **Composite 351, 353, 354 on the 530.** 352 is done and the 840 showed
    the family behaving uniformly — but uniformity on the 840 is not evidence
    about the 530, and the models are exactly what differ here.
-4. **The `*` label TEXT on the 530 at S1.** Recorded so far as "`*` label +
-   number" without the string. The rule under test predicts `* Heart Rate`,
-   `* Speed`, `* Cadence`, `* Power`, `* Elevation` — 23 already came back as
-   `* Heart Rate`. Also note **where** the marker sits: August transcribed
-   348 as `Speed *`, trailing, while 23 leads. If position varies these may
-   be two mechanisms.
+4. **The `*` label TEXT on the 530 at S1 — Graph family only now.** The
+   Bars pass answered it for 347–350: three matched the predicted base-metric
+   name, **348 gave `MPH`** (the unit) instead of `Speed`, and the marker
+   **leads** on all four. Still unrecorded as text for the Graph family —
+   343, 344, 345, 346, 368, where the same question applies and 344 is the
+   one to watch, since it is Speed and may also show its unit. Marker
+   position settled as leading; August's trailing `Speed *` is now the only
+   contrary record and is probably a loose transcription.
 5. **The two missing geometries, if you want them.** `4/A` gives
    quarter-screen rows and `2/A` half-screen — neither is among the five
    columns, because both states were left unmeasured. A 4-field layout A
@@ -492,23 +496,110 @@ Worth noting what this costs: a warning that names the lost sub-fields cannot
 hardcode "AVG and MAX". It needs the pair per field, or wording that avoids
 naming them.
 
-### Bars family — Edge 840
+### Bars family — Edge 840 — MEASURED 2026-10-13
 
 | id | field | S1 half | S2 full reg | S3 full 3/A | S4 full tall | S5 full screen |
 |---|---|---|---|---|---|---|
-| 347 | HR Bars |  |  |  |  |  |
-| 348 | Speed Bars |  |  |  |  |  |
-| 349 | Cadence Bars |  |  |  |  |  |
-| 350 | Power Bars |  |  |  |  |  |
+| 347 | HR Bars | tiny **gauge** + bpm | **linear bars** + bpm/avg/max | **gauge** + bpm/avg/max | gauge + bpm/avg/max | gauge + bpm/avg/max |
+| 348 | Speed Bars | tiny **gauge** + mph | **linear bars** + mph/avg/max | **gauge** + mph/avg/max | gauge + mph/avg/max | gauge + mph/avg/max |
+| 349 | Cadence Bars | tiny **gauge** + rpm | **linear bars** + rpm/avg/max | **gauge** + rpm/avg/max | gauge + rpm/avg/max | gauge + rpm/avg/max |
+| 350 | Power Bars | tiny **gauge** + W | **linear bars** + W/avg/max | **gauge** + W/avg/max | gauge + W/avg/max | gauge + W/avg/max |
 
-### Bars family — Edge 530
+Family-uniform across all four ids, no outlier.
+
+### Bars family — Edge 530 — MEASURED 2026-10-13
 
 | id | field | S1 half | S2 full reg | S3 full 3/A | S4 full tall | S5 full screen |
 |---|---|---|---|---|---|---|
-| 347 | HR Bars |  |  |  |  |  |
-| 348 | Speed Bars |  |  |  |  |  |
-| 349 | Cadence Bars |  |  |  |  |  |
-| 350 | Power Bars |  |  |  |  |  |
+| 347 | HR Bars | `*`**Heart Rate** — number only | **bar** + HR + AVG/MAX | **gauge** + HR + AVG/MAX | gauge + HR + AVG/MAX | largest gauge + HR + AVG/MAX |
+| 348 | Speed Bars | `*`**MPH** — number only | **bar** + MPH + AVG/MAX | **gauge** + MPH + AVG/MAX | gauge + MPH + AVG/MAX | largest gauge + MPH + AVG/MAX |
+| 349 | Cadence Bars | `*`**Cadence** — number only | **bar** + RPM + AVG/MAX | **gauge** + RPM + AVG/MAX | gauge + RPM + AVG/MAX | largest gauge + RPM + AVG/MAX |
+| 350 | Power Bars | `*`**Power** — number only | **bar** + W + AVG/MAX | **gauge** + W + AVG/MAX | gauge + W + AVG/MAX | largest gauge + W + AVG/MAX |
+
+Family-uniform across all four ids, no outlier.
+
+#### ⚠ FORM FOLLOWS ASPECT RATIO, NOT SIZE — and it is not monotonic
+
+The most interesting result in this sheet. On **both** models the widget
+shape goes **gauge → bar → gauge** as the slot grows:
+
+| slot | shape | 840 | 530 |
+|---|---|---|---|
+| S1 half, 1 unit (smallish, squarish) | **gauge** | tiny gauge | *(degraded, no widget)* |
+| S2 full, 1 unit (**wide and short**) | **linear bar** | linear bars | bar |
+| S3–S5 full, taller | **gauge** | gauge | gauge |
+
+A wide, short slot gets a horizontal bar; a squarer or taller one gets a
+circular gauge. That is the slot's **shape** choosing the widget, not its
+area — and it means "bigger is better" is false for this family in the
+middle of the range. Nothing in the Graph or composite families does this.
+
+It also retires the framing this sheet opened with. The 2026-10-09 note
+described the Bars types as circular in larger slots and linear in smaller
+full-width ones; that was right as far as it went, but the full sequence is
+**not** a single transition — the gauge returns at the small end.
+
+#### The `*` relabel rule: 3 of 4 predicted, and one real break
+
+Doc rev 159 proposed that a 530 field too small for its widget relabels to
+its **base metric** with a `*`. The Bars S1 column tests it on four fresh
+fields:
+
+| id | predicted | observed | |
+|---|---|---|---|
+| 347 | `* Heart Rate` | `*Heart Rate` | ✅ |
+| 348 | `* Speed` | **`*MPH`** | ❌ **the UNIT, not the metric** |
+| 349 | `* Cadence` | `*Cadence` | ✅ |
+| 350 | `* Power` | `*Power` | ✅ |
+
+Three held. **348 gives the unit rather than the name**, and it is not a
+transcription slip — 349 in the same pass reads `Cadence`, not `RPM`, so the
+distinction is being made deliberately. The rule is therefore *mostly* right
+and needs qualifying: the degraded label is the base metric's name **except
+for Speed, which shows its unit**. Why Speed alone does this is unknown, and
+guessing would just be a nicer-sounding version of not knowing.
+
+**Marker position is LEADING on all four**, matching id 23's `* Heart Rate`.
+
+#### ⚠ And that contradicts the August record for the same field
+
+`FIELD_ID_NAMES` names 348 from a 2026-08-11 transcription of **`Speed *`** —
+marker *trailing*, label *`Speed`*. Today, same field, same model: **`*MPH`**
+— marker *leading*, label *`MPH`*. Both differ.
+
+Three possibilities, untested:
+
+- August's transcription was loose on both counts, which is plausible given
+  it was recording field *names* and treated the marker as noise
+- a 530 firmware update changed the degraded label
+- the label differs by slot size *within* the degraded range, and the two
+  observations were at different sizes
+
+Today's reading is the more careful one and is what this sheet records. The
+August string is not corrected in `FIELD_ID_NAMES`, because that table holds
+the **full-size** name (`Speed Bars`), which is unaffected either way — but
+the discrepancy is logged because "both are real labels at different sizes"
+is exactly what turned out to be true for id 23, and the same explanation
+may apply here.
+
+#### Sub-field thresholds differ BY FAMILY on the same model
+
+Doc rev 158 established two thresholds for the 530 Graph family: width buys
+the plot, height buys the sub-fields. **Bars does not follow that.**
+
+| 530 family | widget appears | AVG/MAX appear |
+|---|---|---|
+| Graph | S2 | **S3** |
+| Bars | S2 | **S2** |
+
+So on one device, two families of graphical field have different sub-field
+thresholds. Any warning has to be per-family, not a single rule about
+graphical fields — and `GRAPH_OR_BARS_FIELD_IDS`, which lumps them into one
+set, cannot express that. This is a second reason #153 needs restructuring,
+independent of the per-model one.
+
+On the 840 both families lose their sub-fields only at S1, so the 840 has
+one threshold per family and the 530 has one for Bars and two for Graph.
 
 ## Hypothesis worth trying to break
 
