@@ -2,18 +2,71 @@
 
 *Generated 2026-10-09 from the measured grids and the row-height model.*
 
-Doug's initial pass (2026-10-09) found three things that this sheet exists
-to pin down properly:
+This sheet records **what a graphical field draws at each slot size**, per
+model. The cell to fill in is what it *draws*, not whether it works.
 
-- on the **840** a graph-style field scales all the way down to a half-width
-  slot and still draws a tiny graph
-- on the **530** the same field type minimises to just the numeric value, and
-  the 530's own editor prefixed its label with `*` to say so
-- the **Bar** types do not merely shrink, they **change form**: a circular
-  format in the larger slots, a straight-line bar in the smaller full-width
-  ones. None of the 840 fields checked so far showed a `*`.
+It started from Doug's 2026-10-09 pass, which found that the 840 and the 530
+render these fields differently and that the Bar types change *form* rather
+than merely shrinking. Several of that pass's conclusions have since been
+narrowed or overturned by measurement — see **Settled, no action** in the
+status section below for where things actually stand, and the dated sections
+further down for how each conclusion changed.
 
-So the cell to fill in is **what it draws**, not whether it works.
+## STATUS — what is left to test
+
+*Current as of 2026-10-13. Everything below this section is detail and
+working notes; this is the whole of the outstanding work.*
+
+| family | Edge 840 | Edge 530 |
+|---|---|---|
+| **Graph** 23, 343–346, 368 | **343–346 to redo** (23 ✓, 368 ✓) | ✅ complete |
+| **Bars** 347–350 | ❌ all four | ❌ all four |
+| **Composite** 351–354 | ✅ complete | **351, 353, 354** (352 ✓) |
+
+### The work, in the order that costs least
+
+1. **Redo 343–346 on the 840.** The returned rows had six values for five
+   columns, probably including a 1/4-screen row from toggling layouts. One
+   5/B screen plus one 3/A plus one 1/A covers all five columns.
+2. **Bars family, both models — the only wholly untouched block.** Eight
+   rows. 350 Power Bars across all five sizes first; if its siblings match
+   at S1 and S2, the family-uniformity shortcut applies and the rest is four
+   quick cells. Watch for the circular-vs-linear form change you noted on
+   2026-10-09, which is the thing no other family does.
+3. **Composite 351, 353, 354 on the 530.** 352 is done and the 840 showed
+   the family behaving uniformly — but uniformity on the 840 is not evidence
+   about the 530, and the models are exactly what differ here.
+4. **The `*` label TEXT on the 530 at S1.** Recorded so far as "`*` label +
+   number" without the string. The rule under test predicts `* Heart Rate`,
+   `* Speed`, `* Cadence`, `* Power`, `* Elevation` — 23 already came back as
+   `* Heart Rate`. Also note **where** the marker sits: August transcribed
+   348 as `Speed *`, trailing, while 23 leads. If position varies these may
+   be two mechanisms.
+5. **The two missing geometries, if you want them.** `4/A` gives
+   quarter-screen rows and `2/A` half-screen — neither is among the five
+   columns, because both states were left unmeasured. A 4-field layout A
+   screen answers two things at once: whether its four rows really are
+   equal (closing the height gap) and what a graph draws in a 1/4 row
+   (a sixth column).
+
+### Not needed
+
+- **A ride, for the zone counts.** Doug, 2026-10-13: a live ride shows which
+  zones become *active* but should not change the *number* of zone plots in
+  the field, which is what the editor already shows. So the band count
+  stands as geometry, and the remaining cross-device oddity — 840 `Z1–2`
+  vs 530 `Z5` at the same S3 — is a real rendering difference rather than a
+  data artifact. Optional to confirm on a ride; nothing is blocked on it.
+
+### Settled, no action
+
+- the `*` exists on the 530 and **not** on the 840 — decided by id 23
+  degrading on the 840 with no marker
+- labels change with slot size on **both** models
+- id 23 is on the 530 after all; it was hiding behind its own degraded label
+- the composite family has one threshold; the Graph family has two
+
+---
 
 ## Why this is only five columns
 
