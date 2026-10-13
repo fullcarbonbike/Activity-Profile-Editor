@@ -848,18 +848,52 @@ Cell vocabulary: `3up` all three values shown · `live+1` live plus one
 sub-field (say which) · `live` live number only, sub-fields gone ·
 `number` same as `live` but also no label · `n/a` not offered.
 
-#### Edge 840 — MEASURED 2026-10-09, all four
+#### Edge 840 — MEASURED 2026-10-09, RE-MEASURED 2026-10-13, all four
 
 | id | field | S1 half | `*` at S1? | S2-S5 full width | family matches? |
 |---|---|---|---|---|---|
-| 351 | Heart Rate (Graphical) | `3up` tiny font | no | `3up` | yes |
-| 352 | Speed (Graphical) | `3up` tiny font | no | `3up` | yes |
-| 353 | Cadence (Graphical) | `3up` tiny font | no | `3up` | yes |
-| 354 | Power (Graphical) | `3up` tiny font | no | `3up` | yes |
+| 351 | Heart Rate (Graphical) | no label; value + **BPM** small font, small AVG/MAX areas | **no** | no label; value + BPM, AVG and MAX sections | yes |
+| 352 | Speed (Graphical) | no label; value + **MPH** small font, small AVG/MAX areas | **no** | no label; value + MPH, AVG and MAX sections | yes |
+| 353 | Cadence (Graphical) | no label; value + **RPM** small font, small AVG/MAX areas | **no** | no label; value + RPM, AVG and MAX sections | yes |
+| 354 | Power (Graphical) | no label; value + **W** small font, small AVG/MAX areas | **no** | no label; value + W, AVG and MAX sections | yes |
 
-Doug checked all four, not one and an assumption — so family uniformity is
-measured here rather than inferred. Nothing degrades at any size on this
-model; only the font changes.
+Doug checked all four both times, not one and an assumption, so family
+uniformity is measured rather than inferred. Nothing degrades at any size on
+this model; only the font changes.
+
+**The second pass agrees with the first.** 2026-10-09 recorded `3up` at
+every size with no `*`; 2026-10-13 confirms it and adds the detail that
+there is **no text label at any size** — the unit alone identifies the
+field. Two passes, nine days apart, same result. Recorded as corroboration
+rather than overwriting the first, because an independent agreement is worth
+more than a tidier single entry.
+
+Doug, 2026-10-13: *"These graphical data fields, like the 530 version,
+contain no plots or bars, just small multiple fields within the primary data
+field."* — so despite the Graphical menu category, nothing is ever drawn for
+this family on either model. Confirms the 2026-10-09 decision to keep them
+out of `GRAPH_OR_BARS_FIELD_IDS`.
+
+#### The two models differ in exactly ONE cell
+
+| | S1 half-width | S2–S5 full width |
+|---|---|---|
+| **Edge 530** | `*` + text label, **single number** | no label; value + unit + AVG/MAX |
+| **Edge 840** | no label, no `*`, **all three values**, small font | no label; value + unit + AVG/MAX |
+
+Everything from S2 up is identical on both. The entire divergence is the
+half-width cell: **the 530 drops to one number and says so with a `*`; the
+840 keeps all three and shrinks the font.**
+
+That is the cleanest statement of the per-model difference anywhere in this
+sheet, and it is the exact shape #153 has to encode — not "the 530 degrades
+and the 840 scales" as a philosophy, but one named state where one model
+loses data and the other does not.
+
+Note also that the 840 shows **no label at any size** for this family, so
+the unit is the only identification a user ever gets. On the 530 the label
+appears only in the degraded half-width state — the one place it is least
+useful.
 
 #### Edge 530 — MEASURED 2026-10-13, all four
 
