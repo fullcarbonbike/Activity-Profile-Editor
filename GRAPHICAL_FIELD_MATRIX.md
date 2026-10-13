@@ -21,10 +21,13 @@ working notes; this is the whole of the outstanding work.*
 |---|---|---|
 | **Graph** 23, 343–346, 368 | **343–346 to redo** (23 ✓, 368 ✓) | ✅ complete |
 | **Bars** 347–350 | ✅ complete | ✅ complete |
-| **Composite** 351–354 | ✅ complete | **351, 353, 354** (352 ✓) |
+| **Composite** 351–354 | ✅ complete | ✅ complete |
 
-**Two blocks left: four Graph rows on the 840, and three composite rows on
-the 530.**
+**One block left: the four Graph rows on the 840 (343–346).** Everything
+else in the matrix is measured. Two small open questions remain beside it —
+the `*` label TEXT for the 530 Graph family, and whether 352 reads `*Speed`
+or `*MPH` at S1, which decides whether the unit-substitution exception is
+about Speed or about Bars.
 
 ### The work, in the order that costs least
 
@@ -35,9 +38,10 @@ the 530.**
    family-uniform on both models. Produced the sheet's most interesting
    result — form follows **aspect ratio**, gauge → bar → gauge — and showed
    that sub-field thresholds differ **by family** on the same device.
-3. **Composite 351, 353, 354 on the 530.** 352 is done and the 840 showed
-   the family behaving uniformly — but uniformity on the 840 is not evidence
-   about the 530, and the models are exactly what differ here.
+3. ~~**Composite 351, 353, 354 on the 530.**~~ ✅ **Done 2026-10-13**, all
+   four, family-uniform on the 530 as well. Showed that the composite family
+   *loses* its label as the slot grows — the opposite of the Graph family —
+   with the unit carrying the identification from S2 up.
 4. **The `*` label TEXT on the 530 at S1 — Graph family only now.** The
    Bars pass answered it for 347–350: three matched the predicted base-metric
    name, **348 gave `MPH`** (the unit) instead of `Speed`, and the marker
@@ -857,14 +861,59 @@ Doug checked all four, not one and an assumption — so family uniformity is
 measured here rather than inferred. Nothing degrades at any size on this
 model; only the font changes.
 
-#### Edge 530 — S1 established, per-field confirmation outstanding
+#### Edge 530 — MEASURED 2026-10-13, all four
 
 | id | field | S1 half | `*` at S1? | S2-S5 full width | family matches? |
 |---|---|---|---|---|---|
-| 351 | Heart Rate (Graphical) |  |  |  |  |
-| 352 | Speed (Graphical) | `live` | yes | `3up` | — |
-| 353 | Cadence (Graphical) |  |  |  |  |
-| 354 | Power (Graphical) |  |  |  |  |
+| 351 | Heart Rate (Graphical) | `*`+label, single number | yes | no label; value + **BPM**, AVG and MAX sections | yes |
+| 352 | Speed (Graphical) | `*`+label, single number | yes | no label; value + **MPH**, AVG and MAX sections | yes |
+| 353 | Cadence (Graphical) | `*`+label, single number | yes | no label; value + **RPM**, AVG and MAX sections | yes |
+| 354 | Power (Graphical) | `*`+label, single number | yes | no label; value + **W**, AVG and MAX sections | yes |
+
+Doug, 2026-10-13: *"All of the above have the `*<field type>` label in the
+half width data field and a single number field for the primary type. All of
+the other data field sizes have no label, [and a] larger section for the
+primary type (Power has W for Watts, Speed has MPH, Cadence has RPM and Heart
+Rate has BPM) and then the 2 secondary sections of the data field have the
+AVG and MAX numerical area."*
+
+*(One word in the original — "cable" — is almost certainly a typo; the
+sentence reads as intended without it. Flagged rather than silently
+smoothed.)*
+
+#### The composite family LOSES its label as it grows
+
+Worth pulling out, because it runs opposite to the Graph family. At S1 these
+fields show `*` + a text label + one number. From S2 up they show **no label
+at all** — just the value with its unit, plus the AVG and MAX sections.
+
+So as the slot grows: Graph fields *gain* a label (id 23 goes
+`HEART RATE` → `HR Zone Graph`), composite fields *lose* theirs. The unit
+carries the identification instead, which is why the unit is worth recording
+per field rather than treated as decoration.
+
+#### ⚠ This sharpens the `MPH` exception into a cheap, decisive question
+
+The Bars pass found 348 Speed Bars labelled **`*MPH`** at S1 — the unit,
+where its three siblings showed the metric name. The open question was
+whether that exception belongs to **Speed** or to the **Bars family**.
+
+These four give the test, and it costs one look:
+
+> **At S1, does 352 read `*Speed` or `*MPH`?**
+>
+> - **`*Speed`** → the exception is **Bars-specific**. Speed behaves
+>   normally elsewhere, and only the Bars family substitutes the unit.
+> - **`*MPH`** → the exception is **Speed-specific**, and the relabel rule
+>   becomes "base metric name, except Speed, which always shows its unit".
+
+Doug's note writes the S1 label generically as `*<field type>`, so it does
+not settle which. Everything else in this block is measured; this one cell
+is not, and it is the difference between two quite different rules.
+
+The same question applies to **344 Speed Graph** on the 530, whose S1 text
+is also still unrecorded. If 352 and 344 disagree, the exception is narrower
+than either reading.
 
 The 530 row for 352 is from the observation that opened this section. The
 other three are blank on purpose: the 840 pass showed the family behaving
