@@ -357,7 +357,11 @@ profiles by filename and will otherwise overwrite an existing one.
   the repo is public.
 - For **undocumented** FIT messages, trust `fit_raw_walk.parse_fit()`,
   not the garmin-fit-sdk decoder. The SDK mis-rendered `Totals.fit` and
-  produced a confident wrong conclusion (Doc rev 116).
+  produced a confident wrong conclusion (Doc rev 116). **Observed on
+  garmin-fit-sdk 21.214.0**, which is what every behaviour here was
+  verified against; `install.sh` does not pin the version, so a newer
+  SDK may differ in either direction (#156). The rule is version-
+  specific and was recorded without a version until 2026-10-13.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
