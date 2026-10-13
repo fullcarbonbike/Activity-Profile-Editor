@@ -12,6 +12,48 @@ narrowed or overturned by measurement — see **Settled, no action** in the
 status section below for where things actually stand, and the dated sections
 further down for how each conclusion changed.
 
+## ⚠ THREE FAMILIES LIVE IN ONE MENU CATEGORY — read this before matching rows
+
+The device's **Graphical** category holds all three families this sheet
+tracks, and two of this sheet's family names are inventions of mine rather
+than anything the device says. Doug, 2026-10-13: *"the 'Graphical' category
+on-device has the Heart Rate/Cadence/Power/Speed which are the ones with no
+plots or bars... The same Graphical category area also has the Heart Rate
+Graph and the others with 'Graph' in their name."*
+
+| this sheet calls it | the menu entry you actually see | ids | draws |
+|---|---|---|---|
+| **Graph family** | `Heart Rate Graph`, `Speed Graph`, `Cadence Graph`, `Power Graph`, `Elevation Graph`, `HR Zone Graph` | 23, 343–346, 368 | a plot |
+| **Bars family** | `HR Bars`, `Speed Bars`, `Cadence Bars`, `Power Bars` | 347–350 | gauge or bar |
+| **composite** *(my word)* | `Heart Rate`, `Speed`, `Cadence`, `Power` — **no suffix** | 351–354 | nothing; numbers only |
+
+**The tell is the suffix.** A menu entry ending in `Graph` or `Bars` draws
+something. A bare metric name in the Graphical category is a composite: a
+live value plus AVG and MAX, no widget at any size on either model.
+
+### And all four bare names collide with a plain field
+
+Not just Speed, which is how this started:
+
+| Graphical entry | id | plain field with the identical label | id |
+|---|---|---|---|
+| `Heart Rate` | 351 | `Heart Rate` | 13 |
+| `Speed` | 352 | `Speed` | 48 |
+| `Cadence` | 353 | `Cadence` | 3 |
+| `Power` | 354 | `Power` | 36 |
+
+**Four collisions, not one.** Earlier notes in this file and in #154 flagged
+only 352 against 48; that understated it. All four will need the
+`AMBIGUOUS_DEVICE_LABELS` treatment, and the uniqueness check specified in
+#154 will fire on all four the moment they are added to `FIELD_ID_NAMES`
+(where none of them is recorded yet).
+
+It also explains the original blind spot four times over rather than once:
+every one of these four was skipped in earlier censuses because its menu
+label matched a field already known.
+
+---
+
 ## STATUS — what is left to test
 
 *Current as of 2026-10-13. Everything below this section is detail and
