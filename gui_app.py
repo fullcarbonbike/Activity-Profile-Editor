@@ -2690,7 +2690,23 @@ class FieldPickerDialog(wx.Dialog):
         # seven window-blowup regressions in this project came from a
         # Fit()-driven panel instead. Do not copy this change elsewhere
         # without checking for that.
-        super().__init__(parent, title="Add Field", size=(460, 420))
+        # v0.27.4: 460 -> 550. The widening to 460 (v0.24.0) was sized
+        # against the then-longest row, 46 characters. Ids 351-354 arrive
+        # with a content qualifier AND a "shows as" suffix, and 351's row
+        #     Heart Rate (Avg/Max)  (id=351, shows as "Heart Rate")
+        # is 53 characters -- about 15% past what 460px was measured for.
+        # This is a wx.ListBox with LB_SINGLE and no LB_HSCROLL, so an
+        # overlong row is simply TRUNCATED: no ellipsis, no scrollbar, no
+        # indication anything was cut. A user would see "Heart Rate
+        # (Avg/Max)  (id=351, shows as..." or less and have no way to tell
+        # it apart from a neighbour.
+        #
+        # Caught before release by measuring the new rows against the
+        # longest existing one rather than by looking at the dialog --
+        # worth noting because this project has shipped this exact class
+        # of bug twice (v0.16.2/v0.16.3 ListBox and ListCtrl sizing), and
+        # both times it was found by a user with a screenshot.
+        super().__init__(parent, title="Add Field", size=(550, 420))
         self.selected_id = None
         excluded = set(exclude_ids) | CIQ_FIELD_MARKER_IDS
         self._all_choices = sorted(
