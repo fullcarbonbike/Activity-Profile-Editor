@@ -193,6 +193,25 @@ where the screen is 5 units tall (the half-width row rule).
 >
 > So the real count is **seven**, of which this sheet measures five.
 >
+> **UPDATE 2026-10-14 — both states are now measured.** Doug on both
+> models: *"the 2/A layout... are equal 1/2 portions of the display (on
+> device it just lists that layout as '2', since there is no B or C
+> option), full width stacked, and 4/A are 1/4 portions of the display,
+> full width stacked."* Equal divisions, exactly as the rule predicted —
+> but the gap was never ignorance of the rule, it was ignorance of the
+> measurement, which is why refusing the echoed figures in October was
+> right rather than pedantic.
+>
+> `fit_dump.py` 2.24.0 now holds all **24 of 24** states on the 840 and
+> **15 of 15** on the 530 — the latter with no code change, since that
+> table is a comprehension over the 840 vectors. So the seven geometries
+> are all measured; **this sheet's five columns are now simply
+> incomplete rather than wrong.** S6 (1/4 screen) and S7 (1/2 screen)
+> have no rendering data for any field. Whether that matters depends on
+> whether anything changes between 1/5 and 1/3, which the existing
+> columns bracket — if S2 and S3 behave the same for a family, S6 sits
+> between them and is unlikely to surprise.
+>
 > **How the error happened, which matters more than the error.**
 > `row_height_units()` correctly returns `None` for both states. The
 > generator that produced this list iterated over the entries *present* in
