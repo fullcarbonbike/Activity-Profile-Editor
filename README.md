@@ -554,6 +554,49 @@ Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
 
+*Doc rev 83 — refreshed 2026-10-14.* **v1.6.1: four data fields that were
+hiding behind other fields' names.** See `RELEASE_NOTES_v1.6.1.md` for the
+user-facing summary.
+
+**Ids 351–354** — `Heart Rate (Avg/Max)`, `Speed (Avg/Max)`, `Cadence
+(Avg/Max)`, `Power (Avg/Max)`. A third family in the device's Graphical
+menu alongside the Graph and Bars entries: a live numeric readout plus AVG
+and MAX, no widget at any size on either model. Confirmed on a 530 and an
+840 by placement and pull, and deployed to both.
+
+They are the **first name collisions** this catalog has held — the device
+calls each of them exactly what it calls ids 13, 48, 3 and 36 — and that
+collision is why they went unfound. Every census was built by reading menu
+labels and skipping the familiar ones, so a field wearing another field's
+name was invisible *and* left no trace of having been skipped. A new
+`check_field_name_uniqueness()` makes the rule enforceable rather than
+merely true: collisions are allowed, but a colliding id must be declared,
+so the next one fails a check instead of producing a picker a user cannot
+choose from.
+
+Naming follows this table's own convention — a content qualifier, as in
+`HR Zone 1 (time)` and `Intensity Factor (IF)`, not the menu category. The
+real device string is shown alongside, so a row reads `Speed (Avg/Max)
+(id=352, shows as "Speed")`.
+
+**Two fixes.** A favourite saved from an 840 C-variant screen came back as
+an A, silently; the clamp responsible predated C variants and was defeating
+a model-aware check that had been added for exactly this case. And the Add
+Field dialog was about to truncate its longest rows, which are now the new
+ones — it is a list with no horizontal scrolling, so a cut row gives no
+indication it was cut.
+
+**The front page was wrong.** It still described the 540, 840, 1040 and
+1050 as "currently unusable" and offline mode and Export as unbuilt, both
+untrue since v1.5.0, and asked readers to answer a question a real 840 had
+settled many times. Replaced with a Connected-vs-Offline workflow
+comparison.
+
+**Slot heights are now complete** — all 24 Edge 840 user states and all 15
+on the 530 — though nothing draws to scale yet. The useful consequence: a
+taller full-width row exists only at 1, 3, 4, 5, 6 and 7 fields, so no
+rearrangement of an 8-field screen will ever give a field more height.
+
 *Doc rev 82 — refreshed 2026-10-08.* **Row heights are measured, and the
 v1.6.0 notes are corrected rather than rewritten.**
 
