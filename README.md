@@ -44,60 +44,74 @@ rather than just hide it, clone a profile under a new name, restore a
 profile that's no longer on the device, batch several changes into one
 device restart, and automatic backups before every write.
 
-## Which Edge models this works with
+## Which Edge models this works with — and the two ways to use it
 
-**Your Edge has to mount as a normal disk for the automatic workflow to
-work.** On a Mac that means a volume appears under `/Volumes`; on Windows
-it means the device gets a drive letter. The toolkit finds your Garmin by
-looking for that mount, so if it isn't there, nothing past the first
-screen will run.
+There are **two workflows**, and which one you get depends on how your
+Edge connects to a computer. Both end with an edited profile on the
+device; they differ in who moves the file.
 
-| | |
-|---|---|
-| **Supported** | Edge models that use USB Mass Storage — including the **Edge 530**, the model this project is developed and tested against |
-| **Not currently usable** | Edge models that use **MTP** — reported for the **540, 840, 1040 and 1050** |
+| | **Connected mode** | **Offline mode** |
+|---|---|---|
+| Your Edge appears as | a normal disk — a volume under `/Volumes` on macOS, a drive letter on Windows | a "Portable Device" (MTP), or nothing browsable on macOS |
+| Models | **Edge 530** *(tested)*, and other USB Mass Storage Edges | **Edge 840** *(tested)*; **540, 1040, 1050** reported as MTP |
+| The toolkit | finds the device itself | asks you for a folder of `.fit` profiles |
+| Writing the result | **Deploy** — straight to the device | **Export** — to a folder, then you copy it across |
+| Restore from backup | yes | no, it is a device operation — the panel points you at your backup folder instead |
 
 Garmin moved the newer models to MTP (Media Transfer Protocol), which
-presents a firmware-controlled view of the device rather than a real
-disk. Windows shows it as a "Portable Device" with no drive letter;
-macOS Finder can't browse MTP at all. Either way this toolkit's device
-detection won't find it, and that's a hard stop rather than a
-degradation — you'll get "no device detected" and go no further.
+presents a firmware-controlled view rather than a real disk. Note this
+may have arrived on your device through a firmware update rather than
+being true when you bought it.
 
-Note this may have arrived on your device through a firmware update
-rather than being true when you bought it.
+Offline mode is not only for MTP devices — it is also how you edit a
+profile you pulled last week with nothing plugged in.
 
-### Using it as a profile editor on an MTP device — planned, not yet possible
+### Connected mode, step by step
 
-To be straight about the current state: **there is no working route for
-an MTP device today.** The GUI won't let you past its first screen
-without a mounted Garmin, and the Import Profile feature — which would
-otherwise let you edit a profile copied off by hand — sits behind that
-same gate. So the toolkit is currently unusable on a 540, 840, 1040 or
-1050, not merely inconvenient.
+1. Plug the Edge in and wait for it to mount.
+2. Start the toolkit; it finds the device and lists your profiles.
+3. Edit screens, fields and layouts.
+4. **Deploy.** The toolkit backs up the original first, writes, then
+   reads the file back and byte-compares before reporting success.
+5. Eject and restart the Edge.
 
-The intended route, once built, is to let you work without a connected
-device at all:
+### Offline mode, step by step
 
-1. Copy the profile off the device with an MTP browser
-   ([OpenMTP](https://openmtp.ganeshrvel.com/) or Commander One on macOS,
-   Explorer on Windows). Profiles live in `Garmin/Sports/` as `.fit`
-   files named after the profile.
-2. Import it into the toolkit and edit as normal.
-3. Export the result — already correctly named — and copy it into the
-   device's `Garmin/NewFiles/` yourself, then restart the Edge.
+1. Copy the profiles off the device with an MTP browser —
+   [OpenMTP](https://openmtp.ganeshrvel.com/) or Commander One on macOS,
+   Explorer on Windows. They live in `Garmin/Sports/` as `.fit` files
+   named after the profile.
+2. Start the toolkit and choose **"Work Without a Device…"**, then point
+   it at that folder.
+3. Edit exactly as you would with a device attached — the profile list,
+   screens view, editor, backups, Clone and the boot-message editor all
+   work the same.
+4. **Export.** It writes to a folder you choose, reads the result back
+   and byte-compares it, and checks the file's own CRC before writing
+   anything at all.
+5. Copy the exported file into `Garmin/NewFiles/` on the device and
+   restart the Edge.
 
-That needs an offline mode and an Export function, neither of which
-exists yet. Both are scoped in `PROJECT_NOTES.md` under Open items.
+**The filename matters, and the dialog handles it for you.** The Edge
+matches profiles by filename on import and silently ignores anything
+that does not match — no error, no indication, the profile simply does
+not change. The save dialog pre-fills the original filename. Change it
+anyway and you get a warning naming the consequence, not a refusal:
+exporting a spare copy under another name is legitimate.
 
-**One question would settle whether this is worth building at all:** is
-`Garmin/NewFiles/` visible and writable over MTP on your device? If the
-firmware only exposes Activities and media folders, then even with the
-above the answer is "you could edit a profile but never install it." This
-project has no MTP device to test against, so if you have one, please
-[open a discussion](https://github.com/fullcarbonbike/Activity-Profile-Editor/discussions)
-and say what you can see. That's a two-minute look in a file browser and
-it would directly shape whether this gets built.
+`startup.txt`, the custom boot message, works in both modes.
+
+### Does the `NewFiles/` route actually work over MTP?
+
+**Yes — confirmed repeatedly on an Edge 840.** An edited ROAD profile
+has gone through it end to end, including a Connect IQ field that
+survived three chained edits, and a screen using a layout variant the
+530 does not offer, which the 840 rendered correctly. A hand-built
+`Totals.fit` written the same way was also accepted.
+
+This was an open question until v1.5.0 and is recorded here because
+earlier versions of this README asked readers to help answer it.
+
 
 ## License
 
