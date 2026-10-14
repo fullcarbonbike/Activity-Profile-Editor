@@ -61,15 +61,65 @@ working notes; this is the whole of the outstanding work.*
 
 | family | Edge 840 | Edge 530 |
 |---|---|---|
-| **Graph** 23, 343–346, 368 | **343–346 to redo** (23 ✓, 368 ✓) | ✅ complete |
+| **Graph** 23, 343–346, 368 | ✅ complete | ✅ complete |
 | **Bars** 347–350 | ✅ complete | ✅ complete |
 | **Composite** 351–354 | ✅ complete | ✅ complete |
 
-**One block left: the four Graph rows on the 840 (343–346).** Everything
-else in the matrix is measured. Two small open questions remain beside it —
-the `*` label TEXT for the 530 Graph family, and whether 352 reads `*Speed`
-or `*MPH` at S1, which decides whether the unit-substitution exception is
-about Speed or about Bars.
+## ✅ THE MATRIX IS COMPLETE — 2026-10-14
+
+All fourteen fields, five slot sizes, both models. 140 cells.
+
+### The whole per-model difference is ONE slot size
+
+Measured across three families independently, and it collapses to a single
+sentence:
+
+> **At half width the 530 drops the widget; the 840 keeps it. At every
+> other size the two models render identically.**
+
+| family | S1 half-width, **530** | S1 half-width, **840** | S2 → S5 |
+|---|---|---|---|
+| Graph 343–346, 368 | `*` + label + number, **no plot** | no label, number **+ plot** | identical |
+| Bars 347–350 | `*` + label, number only, **no widget** | tiny **gauge** + value | identical |
+| Composite 351–354 | `*` + label, **single number** | no label, **all three values** | identical |
+
+**Id 23 is the exception that proves it:** it loses its plot at S1 *and* S2
+on **both** models, so its content never differs between them at any size.
+The only thing that differs for 23 is the `*` marker.
+
+So the models do not have different rendering philosophies, which is how
+this was framed at rev 157 and again at rev 158. They have **one differing
+behaviour in one slot size**, plus a marker the 530 draws and the 840 does
+not. That is something a table can hold; a philosophy is not.
+
+### What that does to #153
+
+The per-model rule the toolkit needs is now a single condition rather than a
+restructured tier system:
+
+- **half width, 530** → the field loses something; warn, and say what
+  (the plot, the widget, or the AVG/MAX sub-fields depending on family)
+- **half width, 840** → it keeps its widget; no warning
+- **any full-width slot, either model** → no per-model difference at all
+
+The second threshold still matters and is *not* per-model: **AVG/MAX appear
+only from S3 up for the Graph family on both devices**, so a full-width
+regular-height row silently costs the sub-fields — which v1.6.0 says nothing
+about on either model. Bars gets its sub-fields at S2, so that threshold is
+per-family, not universal.
+
+### Still open, neither blocking
+
+1. **Does 352 read `*Speed` or `*MPH` at S1 on the 530?** Decides whether
+   the unit-substitution seen on 348 Speed Bars is Speed-specific or
+   Bars-specific. Same question for 344.
+2. **The 4/A and 2/A geometries** — quarter-screen and half-screen
+   full-width rows, outside these five columns because both states were
+   left unmeasured. A 4-field layout A screen closes the height gap and a
+   sixth column together.
+
+Everything below this point is detail, dated working notes, and the record
+of how several of these conclusions were reached and corrected.
 
 ### The work, in the order that costs least
 
@@ -205,25 +255,29 @@ widget gone · `blank` nothing drawn · `n/a` not offered in the picker
 
 Add `*` after the value if the editor marked the label that way.
 
-### Graph family — Edge 840 — PARTIAL 2026-10-12
+### Graph family — Edge 840 — COMPLETE 2026-10-14
 
 | id | field | S1 half | S2 full reg | S3 full 3/A | S4 full tall | S5 full screen |
 |---|---|---|---|---|---|---|
 | 23 | HR Zone Graph | label `HEART RATE` + number, **no plot**, no `*` | label `HEART RATE` + number, **no plot**, no `*` | label → `HR Zone Graph`, plot Z1–2 only, **no number** | label → `HR Zone Graph`, plot Z1–5, no number | label → `HR Zone Graph`, plot Z1–5, no number |
-| 343 | Heart Rate Graph | *held — see below* | | | | |
-| 344 | Speed Graph | *held — see below* | | | | |
-| 345 | Cadence Graph | *held — see below* | | | | |
-| 346 | Power Graph | *held — see below* | | | | |
+| 343 | Heart Rate Graph | no label; number + **plot** | no label; number + plot | no label; number + plot + AVG/MAX | no label; number + larger plot + AVG/MAX | no label; number + largest plot + AVG/MAX |
+| 344 | Speed Graph | no label; number + **plot** | no label; number + plot | no label; number + plot + AVG/MAX | no label; number + larger plot + AVG/MAX | no label; number + largest plot + AVG/MAX |
+| 345 | Cadence Graph | no label; number + **plot** | no label; number + plot | no label; number + plot + AVG/MAX | no label; number + larger plot + AVG/MAX | no label; number + largest plot + AVG/MAX |
+| 346 | Power Graph | no label; number + **plot** | no label; number + plot | no label; number + plot + AVG/MAX | no label; number + larger plot + AVG/MAX | no label; number + largest plot + AVG/MAX |
 | 368 | Elevation Graph | tiny plot + single number | small plot + single number | plot + number + **ASC/DESC** | larger plot + number + **ASC/DESC** | largest plot + number + **ASC/DESC** |
 
-**343–346 are held as unmeasured, not transcribed.** The returned rows
-carried six values for five columns. Doug, on being asked which was the
-stray: *"I think I mixed in a 1/4 screen, when I toggled thru the layouts,
-but let me make sure, the 5 tests don't include that variation."* A 1/4
-screen is `4/A`, which is genuinely outside these five columns — see the
-correction at the top of this file. Left blank rather than guessed; the
-pattern suggested an answer, and a suggested answer is what the
-slot-heights sheet taught not to record.
+**343–346 filled 2026-10-14, after the redo.** Family-uniform; all four
+identical. 346's returned row carried a stray empty cell before its five
+values, and its five non-empty values are byte-identical to 343–345, so the
+cell is cosmetic and the row is recorded with the family.
+
+**The held rows turned out to match.** The earlier six-value submission,
+read with *"small plot (left) + single number"* dropped as the stray — the
+option recommended at the time — gives exactly the structure measured now:
+plot at S1 and S2 with a single number, AVG/MAX from S3. **The inference was
+correct and holding was still right.** Being right by luck is not a method;
+the slot-heights sheet, where a suggested answer came back as the answer, is
+why. Confirmation cost one redo and bought certainty about four rows.
 
 #### The `*` question is ANSWERED, not moot
 
