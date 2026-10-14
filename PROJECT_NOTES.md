@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-11, at Doc rev 160.*
+> *Last updated 2026-10-14, at Doc rev 161.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -365,6 +365,74 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 161 — refreshed 2026-10-14.* **Ids 351–354 land: the first four
+name collisions this table has ever held, named by CONTENT rather than by
+menu category, and the invariant that used to be merely true is now
+enforced.**
+
+### What they are
+
+A third family in the device's **Graphical** category, alongside the Graph
+and Bars entries: a live numeric readout plus **AVG and MAX**, and **no
+widget at any slot size on either model**. Confirmed on both by placement
+and pull, not read off a menu.
+
+Deliberately **not** in `GRAPH_OR_BARS_FIELD_IDS`. Telling a user one of
+these "needs full width to render as a graph/bar" would be nonsense for a
+field that is numbers by design.
+
+### The naming decision, and why the first proposal was wrong
+
+The device calls them exactly what it calls 13, 48, 3 and 36 — `Heart
+Rate`, `Speed`, `Cadence`, `Power`. Doug asked how to represent that, and
+chose **`(Avg/Max)`**, a content qualifier, over the `(Graphical)` I had
+proposed on 2026-10-09.
+
+His choice is better on evidence I had not weighed at the time:
+
+- this table **already qualifies by content or unit** and never by menu
+  category — `HR Zone 1 (time)`, `Intensity Factor (IF)`, `Elevation (ft)`
+- **three families share the Graphical category**, which was not yet known
+  when I proposed it. So `(Graphical)` would have fixed the clash with
+  plain `Heart Rate` while creating a fresh one against `Heart Rate Graph`
+  sitting two rows down in the same picker
+
+The picker now reads:
+
+```
+Heart Rate            (id=13)
+Heart Rate Graph      (id=343)
+HR Bars               (id=347)
+Heart Rate (Avg/Max)  (id=351, shows as "Heart Rate")
+```
+
+`AMBIGUOUS_DEVICE_LABELS` gains a **third cause** alongside its existing
+two (an icon carries part of the name; there is no label at all): the
+device's text is perfectly clear in isolation and ambiguous **only because
+another field owns it too**.
+
+### The invariant is now enforced rather than merely true
+
+`check_field_name_uniqueness()` is new. Until today the table held 206
+entries and 206 distinct strings — true, unstated, and therefore fragile.
+Collisions are **allowed**, since these four are legitimate, but a
+colliding id must be **declared** in `AMBIGUOUS_DEVICE_LABELS`.
+
+That converts an accident into a decision: the next colliding field fails a
+check instead of quietly producing a picker a user cannot choose from —
+which is exactly how 352 survived several census passes. Mutation-tested
+both ways (undeclared collision, dangling declaration); `knowledge` prints
+it.
+
+### Timing, for the record
+
+352 was first recorded **2026-10-13**; `v1.6.0` was tagged **2026-10-08**.
+So none of this was resolved before the release, as Doug recalled correctly
+— it was found five days after, and the release is unaffected because the
+ids were never in any table.
 
 ---
 
