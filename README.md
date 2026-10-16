@@ -378,6 +378,7 @@ history is in the Changelog below.
 | `fit_chain.py` | Apply several `fit_patch.py` operations in sequence before one device write |
 | `fit_clone_profile.py` | Clone a profile under a new display name (patches `sport_mesgs[0].name`) |
 | `fit_census.py` | Read-only raw screen census across a folder of profiles. Reports counts, layout variants and screen types without names, for measuring what a model actually offers |
+| `fit_sdk_check.py` | Checks whether the installed garmin-fit-sdk still mis-renders the profile-name field in a `Totals.fit`. Read-only. Exits 0 faithful, 1 mangled, 2 could not run — so a future SDK fix announces itself instead of going unnoticed |
 | `fit_raw_walk.py` | Internal support — generic FIT byte-offset walker. Not meant to be run directly, but it is what to trust for undocumented messages |
 | `fit_crc.py` | Internal support — FIT CRC-16. Not meant to be run directly |
 
