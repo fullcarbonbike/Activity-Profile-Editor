@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-14, at Doc rev 161.*
+> *Last updated 2026-10-15, at Doc rev 162.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -357,14 +357,103 @@ profiles by filename and will otherwise overwrite an existing one.
   the repo is public.
 - For **undocumented** FIT messages, trust `fit_raw_walk.parse_fit()`,
   not the garmin-fit-sdk decoder. The SDK mis-rendered `Totals.fit` and
-  produced a confident wrong conclusion (Doc rev 116). **Observed on
-  garmin-fit-sdk 21.214.0**, which is what every behaviour here was
-  verified against; `install.sh` does not pin the version, so a newer
-  SDK may differ in either direction (#156). The rule is version-
-  specific and was recorded without a version until 2026-10-13.
+  produced a confident wrong conclusion (Doc rev 116). **Not version-
+  specific, and not expected to be fixed** — confirmed identical on
+  21.213.0, 21.214.0 and 21.218.0 (Doc rev 162). An undocumented field
+  has no entry in the SDK's profile, so the decoder has no declared type
+  and guesses; there is nothing for Garmin to fix short of documenting
+  the field. Re-check any version in seconds with
+  `fit_sdk_check.py <Totals.fit>`. **The tell:** a decoded record that
+  mixes string keys with bare integer keys is telling you the integers
+  are fields the SDK is guessing at.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 162 — refreshed 2026-10-15.* **The SDK caveat is not
+version-bound after all, and will not be fixed. Three versions tested
+across five point releases, all identical — and the mechanism says they
+would be. `fit_sdk_check.py` makes it a two-second check instead of an
+assumption. #156 closed: no pin.**
+
+### What was tested
+
+| garmin-fit-sdk | result |
+|---|---|
+| 21.213.0 | mangled |
+| **21.214.0** — the project's own venv | mangled, 3 of 3 named records |
+| **21.218.0** — current as of 2026-10-06 | mangled, 4 of 4 |
+
+Same defect, same shape, no drift. The rule from Doc rev 116 stands
+unchanged.
+
+### Why it will not be fixed, which is the useful part
+
+A totals record returns its fields like this:
+
+```
+named  (in Garmin's profile):  calories, distance, message_index,
+                               sessions, sport, timer_time
+raw numbers (not in it)     :  10, 11, 12
+```
+
+**Field 10 has no entry in the SDK's profile at all.** The decoder has
+no declared type for it, so it falls back to generic string handling and
+splits the 32 bytes on every NUL run — which on a device that pads with
+uninitialised junk rather than zeros produces a list of fragments with
+the real name at element 0.
+
+That is **not a defect Garmin would recognise**. The FIT profile is
+generated from their published spec; an undocumented field cannot appear
+in it, so there is nothing to fix against. Waiting for a fix would be
+waiting for Garmin to document the field, which is a different and much
+less likely event.
+
+So the standing rule should NOT be narrowed to a version range, which is
+what this investigation set out to check. It is structural, and Doc rev
+116 already phrased it correctly: **the SDK is a convenience over
+documented messages, not ground truth for undocumented ones** — which is
+most of what this project deals in.
+
+### The generalisable tell
+
+**An undocumented field comes back keyed by its raw integer rather than
+a name.** That is visible in one line of output and is a quick way to
+spot the same hazard in any other message: if a decoded record mixes
+string keys with bare integers, the integers are fields the SDK is
+guessing at.
+
+### #156 closed
+
+- **No pin.** Drift across five point releases changed nothing here, so
+  pinning would freeze users on an older SDK to guard against a hazard
+  that does not materialise — and 21.214.0 carries the defect anyway, so
+  a pin would make the workaround permanent rather than avoid it.
+- **`fit_raw_walk` stays** for `Totals.fit`, permanently rather than
+  provisionally. The odometer work (#106, #155) depends on it and should
+  not be rewritten to prefer the SDK on "new enough" versions, because
+  there is no such version.
+- **`fit_sdk_check.py`** (new, v1.0.0) is the re-check: read-only, exits
+  0 faithful / 1 mangled / 2 could not run, written to PASS if the SDK
+  ever becomes correct so a fix would announce itself.
+
+### A correction, recorded because the pattern is the point
+
+Before this was investigated I twice asserted that `install.sh`'s header
+explains why this project avoids version-pinning, and that the reasoning
+should be read before overriding it. **There is no such reasoning** —
+not in `install.sh`, not in `install_windows.bat`, not in these notes.
+Neither dependency is pinned in either installer, and the project's only
+pin, `wxPython==4.1.1`, is a README workaround for 32-bit Windows on
+Python 3.9 forced by wheel availability.
+
+I invented a policy and then cited it as grounds to defer a decision,
+which is worse than simply being wrong: it dressed an absence of thought
+as deliberate prior judgement. Doug asked for a test instead, and the
+test settled in minutes what the invented policy would have deferred
+indefinitely.
 
 ---
 
