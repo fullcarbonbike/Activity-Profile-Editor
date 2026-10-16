@@ -568,6 +568,49 @@ Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
 
+*Doc rev 84 — refreshed 2026-10-15.* **v1.7.0: the layout diagram tells
+the truth about slot sizes.** See `RELEASE_NOTES_v1.7.0.md` for the
+user-facing summary.
+
+**Rows are drawn to scale.** The diagram had drawn every row the same
+height, which made some layouts indistinguishable — 3 fields A, B and C
+share a row structure and differ only in row height, so all three drew
+identically and a line of text was the sole distinguisher. They now draw
+as the device shows them. Plain user screens only: named types have no
+measured row heights (all twenty), and drawing a guess is how v0.26.3
+ended up rendering geometry nobody had checked.
+
+**Placement advice is per model and per family.** The old rule equated
+"shares a row" with "loses the widget" and was wrong in both directions —
+a false alarm on the 840, which draws the widget fine at half width, and
+silent on the 530, where a Graph field in a full-width regular-height row
+quietly loses its AVG and MAX. The second mattered more: the 530 is the
+device the rule was measured on, and every observation behind it came
+from the half-width case. Messages now state the remedy, which differs by
+family, and the toolkit says nothing when it cannot tell which model a
+profile came from — guessing is what produced the old advice.
+
+**The layout-shrink warning says the loss is permanent.** It always named
+the fields being dropped; it never said switching back would not restore
+them. Behaviour unchanged — the fix is a per-count cache, and the device's
+own editor manages it, so the toolkit should.
+
+**Two fixes.** The first screen no longer implies a USB cable is required,
+on the one screen every user starts on and where an 840 owner has no USB
+route at all. And the Add New Screen panel's placement warnings work
+again after stopping entirely — introduced and fixed within this release,
+found by reading call sites, because a warning that stops appearing looks
+like a screen with nothing to warn about.
+
+**New `fit_sdk_check.py`**, and a settled question. Three garmin-fit-sdk
+versions across five point releases all mis-render the `Totals.fit`
+profile-name field identically, and the mechanism says they always will:
+the field is undocumented, so it has no entry in the SDK's profile, so
+the decoder has no declared type and guesses. Not a defect Garmin would
+recognise. The standing rule to prefer this toolkit's raw parser is
+therefore structural rather than version-bound, and the SDK stays
+unpinned.
+
 *Doc rev 83 — refreshed 2026-10-14.* **v1.6.1: four data fields that were
 hiding behind other fields' names.** See `RELEASE_NOTES_v1.6.1.md` for the
 user-facing summary.
