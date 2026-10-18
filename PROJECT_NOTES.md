@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-15, at Doc rev 162.*
+> *Last updated 2026-10-18, at Doc rev 163.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -369,6 +369,112 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 163 — refreshed 2026-10-18.* **The device never deletes a data
+field. `f7` is always ten slots and the count is a read limit over it, so
+"the on-device editor restores your fields" is really "the on-device
+editor does not destroy them". #150's remaining work is therefore a
+DELETION: the toolkit erases a tail the device leaves alone.**
+
+### Measured, not inferred — three device pulls
+
+Doug built a 10-field screen containing **no Timer anywhere**, which is
+what made every result unambiguous: any `56` appearing could only be
+filler. Screen 9, `message_index` 21, f10=8:
+
+`Distance, Elapsed Time, Lap Time, Speed, Avg Speed, Elevation, Percent
+Grade, Total Ascent, Time of Day, Cadence`
+
+| pull | action, **on the device** | result |
+|---|---|---|
+| 1 | baseline, 10 fields | md5 `60135b8cc65a` |
+| 2 | shrink to 4/A | **one byte differs** — `f3` `0x0a`→`0x04` |
+| 3 | grow back to 10 | **byte-identical to pull 1** |
+| 4 | at 4/A, change slot 1 to Heart Rate | **two fields differ** — `f3`, and one `uint16` in place |
+
+Pull 4's `f7`, in hex, is the whole finding in one line:
+
+```
+060037003a003000310009000b003c003b000300
+06000d003a003000310009000b003c003b000300
+    ^^^^
+```
+
+`0x0037` (55) → `0x000d` (13). Two bytes. Slots 4–9 untouched even though
+the screen was displaying four fields at the time.
+
+### What the device actually does
+
+| action | bytes written |
+|---|---|
+| change the layout count | `f3` only |
+| change a field | one `uint16`, in place |
+| the unused tail | **never touched** |
+
+No padding, no compaction, no rebuilding the array. A full 10 → 4 → 10
+round trip returns the original file byte for byte.
+
+**Doug's own correction is the precise one: "maintained", not
+"restored".** There is no restore mechanism to find. Nothing is kept
+anywhere, because nothing is ever removed — cycling the layouts returns
+the original fields because they never left. Looking for the mechanism
+was the wrong question, and a cache built to imitate it would have been
+an elaborate way of reproducing an absence.
+
+### Structural facts, confirmed across all 31 records of each file
+
+- **`f7` is always 20 bytes = ten `uint16` slots, regardless of `f3`.**
+  The count is a read limit, not an array length — exactly what
+  `active_field_ids(mesg, field_count)` already assumed.
+- **13 of 19 configured screens carry real field ids past their `f3`.**
+  Those are survivals of earlier, larger arrangements, sitting in the
+  file untouched. Six are `0xFFFF`-padded, which now reads as "never
+  configured beyond this count" rather than "cleared".
+
+### The bug is one docstring
+
+`fit_patch.py`'s `pack_field_id_array()`: *"Shorter lists are padded with
+`0xFFFF` (unset)."* Every toolkit write erases the tail the device would
+have left in place. That single behaviour is the whole of what users
+experience as "cycling layouts loses my fields".
+
+### The fix: remove, do not add
+
+1. **Shrink** — write `f3` (and `f8` if the variant changed). Do not
+   write `f7`. *Measured.*
+2. **Grow** — write `f3` only. The ids are already there. Use
+   `DEFAULT_FILLER_FIELD_ID` only where the existing slot is `0xFFFF`.
+   *Measured.*
+3. **Field edit at position N** — overwrite slot N, preserve every other
+   slot including the hidden tail. *Measured.*
+
+No cache, no change detection, and the ambiguity flagged as the hard
+half — telling a user-chosen Timer from a toolkit-stamped one —
+**evaporates**, because nothing needs remembering.
+
+### The hazard, which is why this cannot be a one-line fix
+
+With `f3=4` and a ten-slot array, slots 4–9 hold ids the user cannot
+see. **Any write path that rebuilds the array from the visible field
+list will silently clobber them.** That is precisely today's defect, so
+the change has to land at every `f7` write site at once:
+`on_named_layout_choice()`, `fit_patch.py --fields`,
+`patch_screen_maintaining_ciq()`, and `pack_field_id_array()` itself,
+which must merge into a full ten-slot array rather than pad a short
+list. Fixing one and assuming the rest is how this class of bug
+survives.
+
+A pure count change moves no position, so mesg 170 needs no maintenance
+for it — worth confirming rather than assuming.
+
+### Consequence for v1.7.0's warning
+
+The shrink warning shipped three days ago says the loss "cannot be undone
+by switching back". Once this lands that is false, and the wording has to
+be reverted in the same release that makes it so. Shipping a true warning
+and then making it a lie is worse than never having written it.
 
 ---
 
