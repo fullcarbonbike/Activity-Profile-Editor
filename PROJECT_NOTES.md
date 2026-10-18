@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-18, at Doc rev 163.*
+> *Last updated 2026-10-18, at Doc rev 164.*
 
 **Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
 named screens.
@@ -369,6 +369,95 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 164 — refreshed 2026-10-18.* **#150 implemented and tested. The
+toolkit now writes byte-identical files to Garmin's own editor for every
+screen operation the device has. And Doug's observation that the device
+has no add/remove-field control at all exposed an inconsistency the fix
+would otherwise have shipped.**
+
+### What changed
+
+`pack_field_id_array(ids, base)` merges into the screen's current ten-slot
+array instead of padding short lists with `0xFFFF`. It rejects more than
+ten ids and a base that is not exactly ten, so any caller still passing a
+truncated list **fails loudly** rather than silently wiping a tail — which
+turned the audit from something to be thorough about into something the
+code enforces.
+
+Four write sites, each judged separately rather than uniformly:
+
+| site | treatment |
+|---|---|
+| `on_named_layout_choice` | writes `f3` + `f8` only; `f7` only when a never-configured slot needs filling |
+| `_apply_field_list` | merges into the stored array |
+| `_swap_fields` | already read-modify-wrote all ten; untouched |
+| `on_create` | still pads, correctly — a new screen has no tail to keep |
+
+### Verified byte for byte against the device
+
+| operation | toolkit | device |
+|---|---|---|
+| shrink 10 → 4 | `fb2281422f70` | `fb2281422f70` |
+| grow 4 → 10 | `60135b8cc65a` | `60135b8cc65a` *(the original)* |
+| edit one slot | `849d58abc2b1` | `849d58abc2b1` |
+
+### The v1.7.0 warning was corrected in the commit that falsified it
+
+It said the loss could not be undone by switching back. True when written
+three days earlier, false the moment this landed. It remains a
+confirmation rather than vanishing — the fields genuinely stop being
+*displayed*, and that is worth one look before a ride — but it now says
+they are kept and return. Shipping a true warning and leaving it to quietly
+become a lie would be worse than never having written it.
+
+### Doug's observation, and the asymmetry it caught
+
+> "the on-device editor doesn't have an add or remove field control, once
+> a screen is created... Once the screen create is finished the on-device
+> editor then only presents the layout control to 'add' or 'remove' fields
+> by changing the layout."
+
+So the device's **entire post-creation vocabulary is two operations**:
+change the count, change a slot. Exactly the two that were measured.
+
+That makes Add Field and Remove Field **toolkit inventions** — harmless
+until layout growth started *revealing* the parked id, at which point two
+routes to the same count disagreed:
+
+- widen 4 → 5: brings back `Avg Speed`
+- Add Field → Power: replaces it, and nothing says `Avg Speed` was consumed
+
+Both leave `f3=5`. One restores, one silently destroys. `FieldPickerDialog`
+now takes `preselect_id` and opens on whatever is parked in the slot being
+filled, so the common case lands right by default and any other choice is
+one click away. Chosen over a "really replace it?" dialog, which would add
+friction to a repeated action in order to describe a state the user can
+now simply see.
+
+**The general lesson is about inventions, not about this feature.** An
+operation the device cannot express has no behaviour to copy and nothing
+to be consistent with, so its semantics have to be chosen deliberately.
+Both of ours were chosen years ago, before there was anything for them to
+be inconsistent *with*.
+
+### Left as it is, recorded rather than hidden
+
+**Remove Field** shifts ids up, so the old last position keeps a stale
+duplicate past the count. Nothing renders it; it resurfaces only as a
+repeated field if the screen is grown back. Preserving the deeper tail is
+worth that, and Doug accepted it on test.
+
+### A toolkit gap this exposed, logged as #159
+
+The toolkit has **no count control for plain user screens**. Their layout
+dropdown offers A/B/C *at the current count*; only named screens get a
+full (count, variant) picker. The device offers count changes on both. So
+on a plain user screen, going from 10 fields to 4 means pressing Remove
+Field six times. Not a bug, but a real gap, and invisible until this work
+made the count-change path interesting.
 
 ---
 
