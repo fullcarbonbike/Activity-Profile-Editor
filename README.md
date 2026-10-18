@@ -568,6 +568,43 @@ Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
 
+*Doc rev 85 — refreshed 2026-10-18.* **v1.7.1: changing a layout no longer
+throws your data fields away.** See `RELEASE_NOTES_v1.7.1.md` for the
+user-facing summary.
+
+**The toolkit was the only thing deleting fields.** Four device pulls
+settled it: the Edge's entire behaviour for a layout count change is to
+write ONE byte, the count. The field array is always ten slots and the
+count is simply how many are shown, so a 10 → 4 → 10 round trip on the
+device returns the file byte for byte identical. Nothing is deleted,
+which is why its layouts have always appeared to remember.
+
+`fit_patch.pack_field_id_array()` had padded short lists with `0xFFFF` on
+every write — one line, and the whole of "cycling layouts loses my data
+fields". It now merges into the stored array, and rejects a short base or
+an over-long list so a caller that still truncates fails loudly instead of
+silently wiping a tail. Four write sites audited together, each judged
+separately: the layout picker writes the count alone, Change Field Type
+merges, the swap path already read-modify-wrote all ten, and new-screen
+creation still pads because there is no tail to keep.
+
+**Verified byte-identical to Garmin's own editor** for shrinking, growing
+and changing a single field, against the real device pulls.
+
+**An asymmetry caught by Doug's knowledge of the device**, not by testing:
+the Edge has no add-or-remove-field control after a screen exists — only
+the layout control and per-field changes. That makes Add Field and Remove
+Field this toolkit's own inventions, and once growth started revealing the
+parked field, widening 4→5 restored it while Add Field silently consumed
+it. The picker now opens on whatever is already in that slot. The general
+point is that an operation the device cannot express has nothing to be
+consistent with, so its semantics have to be chosen rather than inherited.
+
+**v1.7.0's warning was corrected in the same release that falsified it** —
+it said the loss could not be undone, which stopped being true. Shipping a
+true warning and leaving it to quietly become a lie would be worse than
+never having written it.
+
 *Doc rev 84 — refreshed 2026-10-15.* **v1.7.0: the layout diagram tells
 the truth about slot sizes.** See `RELEASE_NOTES_v1.7.0.md` for the
 user-facing summary.
