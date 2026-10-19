@@ -9,43 +9,33 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-18, at Doc rev 164.*
+> *Last updated 2026-10-18, at Doc rev 165.*
 
-**Shipped:** `v1.4.0` (2026-09-13) — per-type layout model for Garmin's
-named screens.
+**Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
+data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
+per-model slot warnings), `v1.6.1` (ids 351–354, the height model),
+`v1.6.0`, `v1.5.0` (offline mode, Export, per-model layout rules).
+Every one is tagged on `main` with the tag on the release-notes commit.
 
-**READY TO SHIP: `v1.5.0`** — offline mode, Export, per-model layout
-rules. `fit_dump.py` 2.10.0, `fit_patch.py` 1.18.0, `gui_app.py` 0.23.0,
-`garmin_device.py` 0.13.0, `fit_census.py` 1.1.0. Docs at PROJECT_NOTES
-rev 127, README Changelog rev 80, `RELEASE_NOTES_v1.5.0.md` written.
-Tested on both models; `TEST_PLAN_v1.5.0.md` sections A, F and G pass.
-**All that remains is the merge and tag** — see the procedure below.
+**IN FLIGHT, not yet released:** `gui_app.py` 0.29.0 (the
+`build_diagram_inputs()` refactor, committed) and 0.29.1 (#159, the
+layout picker extended to plain user screens, **awaiting bench
+verification** — `TEST_PLAN_v1.7.2.md`). Everything else is at the
+v1.7.1 versions: `fit_dump.py` 2.26.0, `fit_patch.py` 1.19.0,
+`garmin_device.py` 0.13.0, `fit_census.py` 1.1.0, `fit_sdk_check.py`
+1.0.0.
 
-### ⚠ READ FIRST — uncommitted work lives on a branch
+### ⚠ The rest of this block below is STALE and known to be
 
-**v1.5.0 work is parked on local branch `v1.5.0-wip`. `main` is clean at
-`v1.4.0` / rev 117 and must stay that way until v1.5.0 is tested.**
-Nothing is pushed; the branch is local only.
+Everything from "Hardware on hand" down was written while v1.5.0 was
+unreleased and still reads as if it were. The Doc rev stack from 127
+onward is the accurate record; this block's own rule says the newest
+rev wins. It needs one deliberate rewrite rather than another patch,
+and that is logged as its own item rather than done half-way here.
 
-**Version strings are now BUMPED** (2026-09-29, #143) — the release is
-tested on hardware and the mismatch marker has served its purpose.
-
-**When v1.5.0 is actually ready, in this order:**
-
-1. Finish and test the unbuilt pieces (#141, #142, #145) on hardware.
-2. Bump the four `__version__` strings; write `RELEASE_NOTES_v1.5.0.md`;
-   add the README `## Changelog` entry; refresh this block.
-3. `git checkout main` then `git merge v1.5.0-wip` (fast-forward if main
-   hasn't moved).
-4. **Tag on `main`, never on the branch** — a tag on `v1.5.0-wip` points
-   at a commit that isn't on main and makes the GitHub Release show a
-   detached history.
-5. `git push origin main` then push the tag, or
-   `git push origin main --follow-tags` for both.
-6. `git branch -d v1.5.0-wip` once merged.
-
-If the branch is ever abandoned instead, `main` needs nothing done — it
-never saw any of it. That is the point of the branch.
+The two things in it that were actively WRONG rather than merely old
+are removed: v1.5.0 is long shipped, and the `v1.5.0-wip` branch does
+not exist — `main` is the only branch, local and remote.
 
 **Hardware on hand:** Edge **530** (USB mass storage) — the regression
 baseline every confirmed finding rests on, deliberately kept. Edge
@@ -369,6 +359,59 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 165 — refreshed 2026-10-18.* **One layout picker now serves
+both kinds of screen. The plain-user side had a variant-only dropdown
+for no reason anyone recorded, and extending the named-type picker to
+it needed no new machinery — only feeding the same control a different
+list.**
+
+`EditScreenPanel` offered a named screen the device's own whole-layout
+menu — every `(count, variant)` state it has — and offered a plain user
+screen an A/B/C dropdown that changed the variant alone. The field
+count was reachable only through Add/Remove Field, one field at a time.
+Nine clicks from 1 field to 10, and nothing anywhere showing what the
+device actually offers.
+
+The device makes no such distinction. Its layout control is one
+up/down list on both kinds.
+
+**Nothing had to be built.** `layout_states()` has returned the
+plain-user states for a non-named f10 since it was written: 24 on an
+840, 15 on a 530. `_state_label()` already handles `f10=0`. And
+`on_named_layout_choice()` was never named-specific — the name is the
+only part of it that was. Checked before changing anything rather than
+after: every one of those 39 states round-trips consistently against
+`layout_variants_for_count()`.
+
+So the change is the two branches collapsing into one, plus deleting
+`on_layout_choice()` and `_reselect_current_variant()`. Deleted rather
+than left dormant: two writers for f8 is exactly how `LAYOUT_GRIDS` and
+`COUNTS_WITH_B_VARIANT` drifted apart unnoticed (Doc rev 112).
+
+**The one difference kept, deliberately.** Add Field and Remove Field
+stay ENABLED on a plain screen and stay disabled for a named type. For
+a named type the count is not a choice — it arrives with the layout. On
+a plain screen it is the user's, and Add Field also chooses WHICH field
+arrives, which jumping to a layout cannot. The picker is a second route
+to the count, not a replacement.
+
+**#150-safe by inheritance, which is worth stating rather than
+assuming.** The shared handler reads the stored f7 array and writes f3
+and f8 only, so cycling a plain screen's layouts now keeps its fields
+exactly as the device does. The old dropdown could not lose a field
+only because it never touched the count — it was safe by inability, and
+that protection disappears the moment the count becomes reachable. The
+handler it now shares is the one that was measured byte-identical to
+Garmin's editor in Doc rev 163.
+
+`AddScreenPanel` keeps its dropdown on purpose. It creates a screen and
+picks each field as it goes, so the count is already explicit there and
+a state picker would fight the flow rather than shorten it.
+
+Bench verification required before release: `TEST_PLAN_v1.7.2.md`.
 
 ---
 
