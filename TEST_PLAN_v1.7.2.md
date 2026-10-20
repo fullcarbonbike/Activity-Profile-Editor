@@ -53,14 +53,31 @@ The panel that has been silently broken three times.
 | # | Do | Expect |
 |---|---|---|
 | A1 | Add New Screen, set count 3, cycle A → B → C | Three **visibly different** diagrams: A three equal thirds, B short-then-two-tall, C two-tall-then-short |
-| A2 | Still at count 3, read the line under the diagram | A height note, not a blank |
+| A2 | **CORRECTED 2026-10-20.** At count 3 read the line under the diagram **at each variant, and note which model** | **840:** blank at A, a note at B *and* at C. **530:** blank at A, a note at **B only** — 3/C is unmeasured there, and a blank is the right answer. A blank at 3/A on either model is CORRECT: equal thirds, nothing to say. |
+| A2b | Read any note that does appear | It must **not** end "(not shown to scale here)" — fixed in 0.29.2; the diagram has drawn to scale since v1.7.0 |
 | A3 | Add a **Graph** field (e.g. Power Graph) to a half-width slot on the **530** | ⚠ warning appears, naming the field |
-| A4 | Same field, same slot, on the **840** | **No** warning — the 840 draws it at half width |
+| A4 | **CORRECTED 2026-10-20.** Same field, same slot, on the **840** | A warning, but a **different** one: the 530 says the plot will **not draw**; the 840 says it draws but **needs a taller row** for AVG/MAX. My original "no warning" was wrong — see the note under this table. |
 | A5 | Add a **Bars** field to a half-width slot, either model | ⚠ warning says it needs a **full-width** slot |
 | A6 | Add one of the composite fields (Heart Rate (Avg/Max) etc.) to a half-width slot on the **530** | ⚠ warning, remedy says **full-width** |
 
 A3/A4 together are the actual test: the same action on two models must
-give different answers. One of them alone proves nothing.
+give **different answers**. One of them alone proves nothing.
+
+**My A4 expectation was wrong, not the code.** I wrote "no warning" from
+v1.7.0's release note, which says the old warning was a false alarm on
+an 840. That was about the old warning's *claim* — that the widget would
+not render — not about there being nothing to say. A Graph field in a
+half-width slot is in a 1-unit row on both models, and a 1-unit row
+costs a Graph its AVG/MAX everywhere. So:
+
+| | 530, half width | 840, half width |
+|---|---|---|
+| Graph | loses the **plot** | draws the plot, loses **AVG/MAX** |
+| Bars | loses the **bars** | draws, loses AVG/MAX |
+| composite (Avg/Max) | loses **AVG/MAX** | loses nothing |
+
+Doug's observed 840 behaviour — "the graph is rendered, but not the
+AVG/MAX data" — is exactly row 1, right-hand column. **A4 PASSES.**
 
 ## B. Edit panel is unchanged by the refactor (0.29.0)
 
@@ -68,7 +85,19 @@ give different answers. One of them alone proves nothing.
 |---|---|---|
 | B1 | Open an existing plain screen, note the diagram and any warnings | Identical to what v1.7.1 showed for that screen |
 | B2 | Open a **named** screen with a content area (Segment, Lap Summary) | Content block still drawn, still at the right end (bottom for Lap Summary) |
-| B3 | Open a named screen in an **unmeasured** state (eBike Metrics at 1, 2, 3, 4, 6 or 8) | Honest blank with a note leading on the field count — **not** a drawn grid |
+| B3 | **CORRECTED 2026-10-20.** Open **Virtual Partner at a C variant** (or 8/B, 8/C, 9/B, 9/C) on the **840** | Honest blank with a note leading on the field count — **not** a drawn grid |
+| B3-530 | There is no 530 equivalent | All 190 of the 530's named states are measured. Skip this step on a 530. |
+
+**eBike Metrics was the wrong example and is my error.** It had
+unmeasured states when the v0.26.3 note was written; it has none now, on
+either model. Doug seeing a correct 6-field layout for it is the right
+answer, so **B3 as originally written passes vacuously** — it tested
+nothing.
+
+The 48 genuinely unmeasured 840 named states today are Virtual Partner,
+Reserved, GroupTrack List and the two unnamed types (64, 128) at 3/C–7/C,
+8/B, 8/C, 9/B and 9/C, plus Radar at 0/A, 5/A and 5/B. The 530 has none
+at all.
 
 B3 is the one that would regress loudly if the helper fell back to the
 generic table.
