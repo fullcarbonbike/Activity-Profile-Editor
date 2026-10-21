@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-21, at Doc rev 167.*
+> *Last updated 2026-10-21, at Doc rev 168.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -359,6 +359,83 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 168 — refreshed 2026-10-21.* **#155 ANSWERED, and the premise
+was wrong. A cloned profile DOES have a totals record — it claims a
+free slot in a fixed list. The zero odometer is an EMPTY record, not a
+missing one, so a future odometer feature can patch rather than
+create. Separately: the device has been accumulating rides on top of
+the value this project hand-wrote in Doc rev 118, which is the
+strongest result yet for #106.**
+
+Two pulls of the 840's `Totals.fit`, 2026-09-26 and 2026-10-21,
+compared record by record. Nothing in this toolkit writes
+`Totals.fit` — grepped to confirm — so every change below is the
+device's own work.
+
+### 1. The record list is a FIXED set of slots that profiles claim
+
+Eleven records in both pulls. Not a list that grows with profiles: a
+fixed table whose entries are claimed, released and **reused**.
+
+- A clone named `ROAD 3` took a slot that was previously **empty and
+  unnamed**. The device wrote the name and left everything else at
+  zero.
+- A second clone, `ROAD 2`, took over the slot that had held a factory
+  profile deleted since the first pull. **Same `message_index`, new
+  name, stats reset.** The slot is tied to position in the table, not
+  to the name.
+
+This corrects Doc rev 160's reading. Records ARE keyed by name for
+lookup, but the name is written into a slot the device allocates —
+so "the clone has no record" was never right. It has one; it is
+blank.
+
+**Consequence for #106:** the odometer feature patches an existing
+record. It does not need to create one, append to the file, or
+renumber anything — the hardest version of that work is not required.
+
+### 2. A clone's record carries `sport = 255`, a factory profile's does not
+
+Every factory or migrated profile reads `sport = 2` (cycling), whether
+or not it has ever been ridden. Both clones read `255`, the unset
+value, inherited from the blank slot they claimed.
+
+**This is the one open question left for #106.** If a value is written
+into a record whose sport is unset, does the device display it? Doc
+rev 118 proved a write is adopted, but that was into a `sport = 2`
+record. Writing distance into a clone's record may need `sport` set as
+well, and that is a one-field test rather than a design problem.
+
+### 3. The hand-written record is being ACCUMULATED ON, not overwritten
+
+The ROAD record from Doc rev 118 — distance, time, calories and
+session count supplied from Garmin Connect and patched in — has
+**grown by roughly a month of riding** since. Every one of the four
+fields advanced consistently, and the session count rose by the
+expected number of rides.
+
+So the device did not merely display the written value once and then
+reassert its own: it **took the written values as the baseline and has
+been adding to them for a month.** That is the behaviour an odometer
+feature needs and could not be assumed from a single boot-time
+reading.
+
+### 4. Unresolved, noted rather than chased
+
+- One record carries real accumulating totals with **no name at all**,
+  and it has grown between the two pulls. Which profile it belongs to
+  is unknown.
+- `f12` held the same non-zero constant in every record in the
+  September pull and is **zero in every record now**, including
+  records otherwise untouched. Something rewrote the whole file
+  between pulls — firmware update is the obvious candidate. It is not
+  a per-profile field and nothing here depends on it.
+
+**No ride figures are recorded here.** The behaviours are the finding;
+the numbers are personal data and this repo is public.
 
 ---
 
