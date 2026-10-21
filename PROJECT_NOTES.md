@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-21, at Doc rev 168.*
+> *Last updated 2026-10-21, at Doc rev 169.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -359,6 +359,58 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 169 — refreshed 2026-10-21.* **The last open question on
+#106 is closed: `sport` does NOT gate the odometer. A distance written
+into a clone's blank record displays on-device with `sport` left at
+255. #106 is now a UI job over a fully characterised write.**
+
+**The test.** One `Totals.fit`, two clone records, one variable
+between them:
+
+| record | written | `sport` |
+|---|---|---|
+| `ROAD 3` | a distance | left **unset (255)** |
+| `ROAD 2` | a different distance | set to **2** |
+
+Nine bytes changed in the file — seven payload, two CRC — with every
+other record, including the real ROAD totals, verified byte-identical
+before it left here. Copied through `NewFiles/`, device power-cycled.
+
+**Both displayed their written value.** `ROAD 2` was the control: it
+proves the write arrived. `ROAD 3` is the result: a record with
+`sport` unset renders its distance exactly the same way.
+
+So `sport = 255` means "no activity has set this yet", not "this
+record is inactive". Nothing has to be set alongside the four value
+fields.
+
+**Why two cells in one file rather than two round trips.** The
+alternative was write-one, pull, power-cycle, repeat — and a null
+result on the first pass ("still 0.00") would have been
+indistinguishable from the write not arriving at all. Pairing the
+unknown against a control answers both questions in one disconnect,
+and that is worth doing whenever a single-cell test can fail
+ambiguously.
+
+### What #106 now rests on, all of it confirmed on hardware
+
+1. A hand-written record is **accepted** by the device (rev 118).
+2. The written value becomes a **baseline the device adds to**, over a
+   month of real riding (rev 168).
+3. A clone **has** a record, blank, ready to patch — no record
+   creation needed (rev 168).
+4. A blank record needs **nothing but the value** (this rev).
+
+The remaining work is a dialog, the four-field limit stated honestly,
+and a backup of `Totals.fit` before writing. No unknowns left in the
+file format or the device's behaviour.
+
+**Leftover state:** two clone profiles are carrying deliberate junk
+odometer values. Per (2) above the device will accumulate on top of
+them, so they want resetting before either profile is ridden.
 
 ---
 
