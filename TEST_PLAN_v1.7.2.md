@@ -197,3 +197,43 @@ Anything else failing is worth reporting but does not block.
 Run **D**, then **C1–C5**, then **A3/A4**. That is about ten minutes and
 covers the destructive case, the new control, and the panel with the
 history of silent breakage.
+
+---
+
+## Results — bench run, Doug, 2026-10-18 → 2026-10-21
+
+| Section | Result |
+|---|---|
+| **A** Add panel draws and warns | **PASS** on retest, after A2 and A4 were corrected (see each) |
+| **B** Edit panel unchanged | B1, B2 **PASS**. B3 passed **vacuously** as first written; corrected step not re-run — see below |
+| **C** The new picker | **PASS**, C1–C5 |
+| **D** Count changes without losing fields | **PASS**, D1–D7 — the required section |
+| **E** Variant changes alone | **PASS**, E1–E4 |
+| **F** The refusals still refuse | **PASS**, F1–F3 |
+| **G** Nothing downstream broke | **NOT RUN** |
+
+**Every pass criterion met except G, which is untested.** D passing on all
+seven steps is the one that mattered: the picker makes the field count
+reachable on a plain screen for the first time, and the old dropdown was
+safe from #150 only because it could not reach it.
+
+**Two things found by this run, both already fixed:**
+
+- The height note said "(not shown to scale here)" on a diagram that has
+  drawn to scale since v1.7.0 (gui_app 0.29.2). Found at A2.
+- Three steps of this plan were wrong rather than the code — A2, A4 and
+  B3, each corrected and dated in place above.
+
+**Two gaps left open deliberately, neither blocking:**
+
+- **G is unrun.** Back/Discard, Pre-Flight's change list, and the
+  Favorite round-trip at an 840 C variant. None of these is on the path
+  the change altered, which is why they are last; G3 and G4 are the two
+  worth doing before a release, since a layout change is what they
+  report on.
+- **The corrected B3 was not re-run.** The honest-blank path for an
+  unmeasured named state (Virtual Partner at a C variant on the 840) is
+  therefore covered by the 1386-combination headless diff and by reading
+  the code, not by looking at it. The original step looked at eBike
+  Metrics, which has no unmeasured state and so exercised the drawn-grid
+  path instead.
