@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-18, at Doc rev 165.*
+> *Last updated 2026-10-21, at Doc rev 166.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -17,13 +17,13 @@ per-model slot warnings), `v1.6.1` (ids 351–354, the height model),
 `v1.6.0`, `v1.5.0` (offline mode, Export, per-model layout rules).
 Every one is tagged on `main` with the tag on the release-notes commit.
 
-**IN FLIGHT, not yet released:** `gui_app.py` 0.29.0 (the
-`build_diagram_inputs()` refactor, committed) and 0.29.1 (#159, the
-layout picker extended to plain user screens, **awaiting bench
-verification** — `TEST_PLAN_v1.7.2.md`). Everything else is at the
-v1.7.1 versions: `fit_dump.py` 2.26.0, `fit_patch.py` 1.19.0,
-`garmin_device.py` 0.13.0, `fit_census.py` 1.1.0, `fit_sdk_check.py`
-1.0.0.
+**READY TO SHIP: `v1.7.2`** — one layout picker for both kinds of
+screen (#159), on top of the `build_diagram_inputs()` refactor.
+`gui_app.py` 0.29.2 is the only file that changed; everything else
+stays at the v1.7.1 versions: `fit_dump.py` 2.26.0, `fit_patch.py`
+1.19.0, `garmin_device.py` 0.13.0, `fit_census.py` 1.1.0,
+`fit_sdk_check.py` 1.0.0. `TEST_PLAN_v1.7.2.md` sections A–G all pass
+on both models (2026-10-21).
 
 ### ⚠ The rest of this block below is STALE and known to be
 
@@ -359,6 +359,73 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 166 — refreshed 2026-10-21.* **v1.7.2 tested on both models,
+A–G. The run found one real defect and three defects in the test plan
+itself, which is a ratio worth recording rather than quietly
+correcting.**
+
+All seven sections pass. **D is the one that mattered** — seven steps
+of shrinking, growing, cycling and editing a 10-field plain screen with
+no Timer substitution anywhere. Before #159 the field count was
+unreachable on a plain screen except one field at a time, so the old
+A/B/C dropdown was safe from the #150 class of defect **by inability,
+not by design**. The picker removes that inability, which is precisely
+why D was marked required.
+
+**What the run actually caught.** The height note under every diagram
+ended "(not shown to scale here)". True when written; false since
+v1.7.0 taught the diagram to draw rows proportionally. For three
+releases the one line of text beside the picture told the user to
+disbelieve a picture that had become correct. Fixed in
+`build_diagram_inputs()` rather than in the fit_dump table, because the
+parenthetical is still TRUE when `row_weights` is None — an unknown
+model, or an unmeasured state, both of which still draw uniform rows.
+The table states the geometry; only the panel knows whether it drew it
+to scale, so the claim about scale belongs to the panel.
+
+**Three of the steps were wrong rather than the code**, and the pattern
+in them is the same one:
+
+- **A4** expected NO warning for a Graph field in a half-width slot on
+  an 840. I took that from v1.7.0's release note, which says the old
+  warning was a false alarm there — but that was about the old
+  warning's CLAIM (the widget will not render), not about there being
+  nothing to say. A half-width slot is a 1-unit row on both models, and
+  a 1-unit row costs a Graph its AVG/MAX everywhere. The right
+  expectation was a DIFFERENT warning, not none. Doug's 840 result —
+  "the graph is rendered, but not the AVG/MAX data" — was the code
+  being right.
+- **B3** used eBike Metrics as an example of an unmeasured named state.
+  It had unmeasured states when the v0.26.3 note was written and has
+  none now, on either model, so the step **passed vacuously** — it
+  exercised the drawn-grid path while claiming to test the honest-blank
+  one. The real unmeasured set on the 840 is Virtual Partner, Reserved,
+  GroupTrack List and unnamed types 64 and 128 at 3/C–7/C, 8/B, 8/C,
+  9/B, 9/C, plus Radar at 0/A, 5/A and 5/B. The 530 has none at all.
+- **A2** asserted a height note would be present at count 3 without
+  saying at which variant or on which model. 3/A has none on either,
+  correctly — equal thirds, nothing to report — and 3/C has none on a
+  530.
+
+**Each of the three was written from a release note or a code comment
+rather than from the current tables**, which is the same failure this
+project has logged repeatedly for comments outliving the change that
+falsified them (v0.26.2, Doc rev 132). A test plan is prose about the
+code and rots exactly as prose does. The difference is that a stale
+comment misleads a reader while a stale test step manufactures a
+**false negative** — A4 — or, worse, a **false positive** — B3, which
+would have been recorded as evidence for a path it never touched.
+
+So the corrections are marked and dated in place in the plan rather
+than silently applied. A test plan whose history is editable is not
+evidence of anything.
+
+**One gap left open and named:** the corrected B3 was not re-run, so
+the honest-blank path rests on the 1386-combination headless diff and
+on reading the code, not on having been looked at.
 
 ---
 

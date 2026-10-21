@@ -568,6 +568,44 @@ Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
 
+*Doc rev 86 — refreshed 2026-10-21.* **v1.7.2: one layout picker for both
+kinds of screen.** See `RELEASE_NOTES_v1.7.2.md` for the user-facing
+summary.
+
+An ordinary screen's field count was reachable only through Add and
+Remove Field, one field at a time — nine clicks from 1 field to 10, with
+a dropdown beside it that changed the variant alone. Garmin's named
+screens have had the device's own whole-layout menu since v1.4.0, and the
+device makes no such distinction: its layout control is one list on both
+kinds. Now so is the toolkit's.
+
+**Nothing had to be built.** `layout_states()` has returned the
+plain-user states for a non-named screen type since it was written — 24
+on an 840, 15 on a 530 — the label helper already handled it, and the
+handler was never named-specific. The change is two branches collapsing
+into one and two now-dead methods deleted, rather than kept dormant: two
+writers for the same byte is how this project's layout tables drifted
+apart once already.
+
+Add and Remove Field stay available on an ordinary screen and stay off
+for a named type. On a named type the count arrives with the layout; on
+an ordinary one it is the user's, and Add Field also chooses *which*
+field arrives, which jumping to a layout cannot.
+
+**The old dropdown was safe from the v1.7.1 data-loss class by
+inability, not by design** — it could not reach the count, so it could
+not lose a field. Making the count reachable removes that protection and
+leans entirely on the v1.7.1 fix, which is why the bench run made the
+shrink-grow-cycle section mandatory. Seven steps, both models, no field
+substituted.
+
+**Also fixed, found while testing:** the note under the layout diagram
+ended "(not shown to scale here)" on a diagram that has drawn to scale
+since v1.7.0 — three releases of text telling the reader to disbelieve a
+correct picture. It is removed only where the rows really are drawn to
+scale; where the model is unknown the diagram still draws uniform rows
+and the note still says so.
+
 *Doc rev 85 — refreshed 2026-10-18.* **v1.7.1: changing a layout no longer
 throws your data fields away.** See `RELEASE_NOTES_v1.7.1.md` for the
 user-facing summary.

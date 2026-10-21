@@ -210,10 +210,12 @@ history of silent breakage.
 | **D** Count changes without losing fields | **PASS**, D1–D7 — the required section |
 | **E** Variant changes alone | **PASS**, E1–E4 |
 | **F** The refusals still refuse | **PASS**, F1–F3 |
-| **G** Nothing downstream broke | **NOT RUN** |
+| **G** Nothing downstream broke | **PASS**, G1–G4 |
+| | |
+| **Verdict** | **Cleared for release as v1.7.2** (2026-10-21) |
 
-**Every pass criterion met except G, which is untested.** D passing on all
-seven steps is the one that mattered: the picker makes the field count
+**Every section passes.** D passing on all seven steps is the one that
+mattered: the picker makes the field count
 reachable on a plain screen for the first time, and the old dropdown was
 safe from #150 only because it could not reach it.
 
@@ -224,13 +226,8 @@ safe from #150 only because it could not reach it.
 - Three steps of this plan were wrong rather than the code — A2, A4 and
   B3, each corrected and dated in place above.
 
-**Two gaps left open deliberately, neither blocking:**
+**One gap left open deliberately, not blocking:**
 
-- **G is unrun.** Back/Discard, Pre-Flight's change list, and the
-  Favorite round-trip at an 840 C variant. None of these is on the path
-  the change altered, which is why they are last; G3 and G4 are the two
-  worth doing before a release, since a layout change is what they
-  report on.
 - **The corrected B3 was not re-run.** The honest-blank path for an
   unmeasured named state (Virtual Partner at a C variant on the 840) is
   therefore covered by the 1386-combination headless diff and by reading
