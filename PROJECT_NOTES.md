@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-21, at Doc rev 166.*
+> *Last updated 2026-10-21, at Doc rev 167.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -359,6 +359,68 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 167 — refreshed 2026-10-21.* **What the 530 → 840 setup
+migration does to a profile's odometer, from Doug's own account: it
+does NOT carry the totals across intact. After migration the odometer
+read either zero or a wildly high value. This is the only record we
+have of that behaviour, and it is the third distinct way a totals
+record can fail to match its profile.**
+
+Recorded because it was nearly lost. Asked why Garmin offers no
+odometer edit when their setup migrates profiles by name anyway, I
+read the 840's `Totals.fit`, found a ROAD record far larger than the
+four days the unit had been owned, and concluded the setup process had
+carried the totals over. **Wrong.** Those figures are the ones THIS
+PROJECT wrote — Doc rev 118, same date as the file, Doug's Connect
+year-to-date values patched into the ROAD record and imported through
+`NewFiles/`. The file I was reasoning from is this toolkit's own
+output.
+
+The method failure is worth more than the fact. The observation
+("those kilometres cannot have been earned in four days") was sound;
+the inference drew on two candidate explanations and never sought a
+third, when the third was already written down in this file. The
+corroboration offered — that the numbers were internally consistent —
+was **circular**: they are consistent because they are a real rider's
+real totals, which is equally true whoever wrote them. And the
+confirming test proposed (pull the 530's `Totals.fit` and compare)
+would have tested a question that was not the open one. Checking this
+file first would have cost one grep.
+
+### What is now known about a totals record failing to match
+
+Three distinct behaviours, only one of them previously logged:
+
+1. **A cloned profile reads zero** (Doc rev 160, open item #155). The
+   clone has a new name, `Totals.fit` keys records by profile NAME, so
+   no record matches and the device appears to hand it an unused slot.
+2. **A migrated profile reads zero OR a wildly high value** (this rev).
+   Same profile name on both devices, so name-keying alone does not
+   explain it. A wildly high value in particular suggests the new
+   device is not merely failing to find a record but is reading
+   SOMETHING — a stale slot, an uninitialised one, or a value scaled
+   under a different assumption.
+3. **A hand-written record is adopted exactly** (Doc rev 118). The
+   device accepts a file it did not author and renders the value given.
+
+(2) is the interesting one, because it is the case where the name DOES
+match and the number still comes out wrong. Whatever migration moves,
+it is not the totals record in the form the device later expects.
+
+### Open, and Doug is testing it now
+
+A fresh clone of the current ROAD profile on the 840, then read the
+Odometer data field on the clone. That distinguishes the possibilities
+in (1): a true zero means no record matched, while a non-zero or
+absurd value means it matched something it should not have. Pull
+`Totals.fit` alongside it and the record list says which.
+
+**No ride figures are recorded here or anywhere else in this repo.**
+The behaviour is the finding; the numbers are personal data and the
+repo is public. They stay out, including from examples.
 
 ---
 
