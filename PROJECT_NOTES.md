@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-21, at Doc rev 169.*
+> *Last updated 2026-10-21, at Doc rev 170.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -359,6 +359,62 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 170 — refreshed 2026-10-21.* **The 10-user-screen cap is an
+EDITOR cap, not a rendering cap. The 840 displays 14 user screens
+quite happily and only its editor tops out at 10. Found because I
+wrote a probe profile straight through `fit_patch` and sailed past a
+limit this toolkit has known about for months — the GUI guards it, the
+CLI does not.**
+
+### What the cap actually is
+
+`MAX_USER_SCREENS = 10` has been in `gui_app.py` since early on,
+"confirmed via real device testing", and Doug has hit it himself
+creating profiles on-device: the editor will not let you add an
+eleventh. The comment reads as a device-wide limit.
+
+It is not. A profile carrying **14** plain user screens renders all
+fourteen in the live screen loop. What breaks at ten is the EDITOR:
+screens past the cap appear as entries with no field count that open
+to nothing. So:
+
+| | limit |
+|---|---|
+| screens the device will **display** | more than 10 — at least 14 |
+| screens the on-device **editor** can manage | **10** |
+
+A profile over the cap is therefore legal and usable but **partly
+uneditable on-device** — the overflow screens can only be changed by
+this toolkit, which is a trap worth naming rather than a feature.
+
+### How it was found, which is the uncomfortable part
+
+The census probe needed eight new screens. `ROAD 3` already had six
+user screens; I checked which message-index slots were UNCONFIGURED,
+found fifteen, took eight, and never checked the user-screen COUNT.
+That took the profile to fourteen. `AddScreenPanel` would have refused
+at ten — I called `fit_patch.patch_screen()` directly and went around
+the guard that exists for this.
+
+**The test survived on luck.** Two of the four census hits (ids 371
+and 395) sit on screens past the cap and were only readable because
+the device still renders them and Doug fell back to the live view. Had
+the device declined to render rather than merely declining to edit,
+half the probe would have been lost with nothing saying so.
+
+### Open item: the cap is not enforced below the GUI
+
+`fit_patch.py` has no user-screen count guard at all. Neither
+`--new-slot` nor `patch_screen()` knows the limit exists; only the GUI
+panel does. A guard belongs where every write path passes, not in one
+panel — the same argument that moved `LAYOUT_GRIDS` and
+`COUNTS_WITH_B_VARIANT` into `fit_dump.py` after they drifted.
+
+It should WARN rather than refuse, now that the state is known to be
+legal and renderable. Refusing would block a thing the device does.
 
 ---
 
