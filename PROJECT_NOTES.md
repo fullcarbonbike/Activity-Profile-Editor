@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-22, at Doc rev 171.*
+> *Last updated 2026-10-22, at Doc rev 172.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -359,6 +359,80 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 172 — refreshed 2026-10-22.* **Live ride with all four new
+ids on one screen. 358 and 395 CONFIRMED by behaviour, 371 consistent
+but not discriminated, 331 still inert. The battery arithmetic also
+says something the name alone would have got wrong.**
+
+### 358 "Elevation (Asc/Desc)" — CONFIRMED
+
+Ascent and descent accumulated through the ride. The name was
+inferred from structure (the missing numeric sibling of 368) and
+is now backed by the field doing what the name says.
+
+Still NOT added to `COMPOSITE_FIELD_IDS` — see the comment at that
+set. Behaviour confirms what it *is*; what it *loses in a half-width
+slot* is a separate measurement and remains untaken.
+
+### 395 "Battery Hours" — CONFIRMED as a countdown, but NOT as a
+### current-drain estimate
+
+Read ~34–35 h at the start and 29 h after a 3:52 ride, with the
+battery at 73% at the end.
+
+| | |
+|---|---|
+| estimate dropped | ~5–6 h over 3.87 h ridden |
+| 29 h at 73% implies a full-charge figure of | **~40 h** |
+| observed drain (≈86% → 73%) | ≈3.4 %/h |
+| …which implies remaining at 73% of | **~22 h**, not 29 h |
+
+Two things follow. The ~40 h full-charge figure is plausible for an
+840 (Garmin quote roughly 26 h demanding to 42 h saver), so the field
+really is device battery life in hours. But the device's 29 h is
+**considerably more optimistic than this ride's own consumption
+implies**, so it is NOT simply "hours left at the current rate" — it
+appears to be a longer-window or idle-weighted model.
+
+Recorded deliberately as **"Battery Hours"** rather than "Battery
+Hours Remaining" or anything implying a formula. The name states what
+is displayed; the arithmetic above is the reason not to go further.
+
+### 371 "Speed Over Ground" — consistent, NOT discriminated
+
+Tracked the ordinary Speed field closely. That is what Speed Over
+Ground would do, and also what *any* speed field would do, so the
+ride did not separate the hypotheses. No sustained tree cover,
+buildings or hills, which were the conditions that might have.
+
+**There is a confound worth naming:** if the bike has no wheel speed
+sensor paired, the ordinary Speed field is ALREADY GPS-derived, and
+the two fields can never diverge on that bike no matter where it is
+ridden. Agreement is then guaranteed and tells us nothing.
+
+**The decisive test is an indoor trainer**, which the INDOOR profile
+already exists for: the wheel turns while the GPS stays put. A
+GPS-derived field must read zero while a sensor-derived one reads the
+real speed. That separates them in one minute with no weather, no
+terrain and no ambiguity — far better than hoping for a tree-lined
+descent.
+
+### 331 — still inert, and the hypothesis is now hardware
+
+Unchanged for the whole ride. Doug's reading is that it may belong to
+a sensor he does not own, and that fits everything seen: it renders
+with no label, holds `0:00`, and is unmoved by starting, riding and
+stopping.
+
+This is the shape of `KNOWN_UNRESOLVED_IDS` 520 and 578, which show a
+bare "--" until a workout step defines them — a field whose context
+simply is not present. For a duration field on an 840, absent context
+could be an eBike, a radar unit, a light, a workout, a course or a
+navigation target. **Noted as hypotheses, not narrowed**, because
+nothing on this ride distinguished them.
 
 ---
 
