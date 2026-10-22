@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-22, at Doc rev 173.*
+> *Last updated 2026-10-22, at Doc rev 174.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -359,6 +359,81 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 174 — refreshed 2026-10-22.* **Garmin's own wording for both
+fields. It CORRECTS a claim made here two revs ago about 371, confirms
+395's meaning while leaving our measurement as the more specific fact,
+and raises a question about id clustering that the probe data already
+answers awkwardly.**
+
+### ⚠ CORRECTION — nothing says 371 is GPS-derived
+
+Garmin, Venu 4 appendix:
+
+> the actual speed of travel, regardless of the course steered and
+> temporary variations in heading
+
+Doc rev 171 recorded 371 as "GPS-derived speed, independent of any
+wheel or other sensor", and rev 172 built the trainer test on that
+reading. **The documentation does not say that.** It distinguishes
+speed over the ground from heading and steering — a marine
+distinction, speed made good versus speed through the water — and
+says nothing whatever about which sensor supplies it.
+
+So "GPS-derived" was this project's gloss on a plausible-sounding
+abbreviation, asserted as if read. On a bike with a wheel speed
+sensor paired, whether SOG takes its number from GPS or from the
+wheel is **completely open**.
+
+**This makes the trainer test more valuable, not less.** It was framed
+as confirming something already believed; it is in fact the only thing
+that would settle an open question. Wheel turning, GPS stationary:
+
+| SOG reads | conclusion |
+|---|---|
+| 0 | GPS-derived, as guessed |
+| real speed | sensor-derived — the guess was wrong |
+
+### 395 confirmed, and our measurement is the sharper fact
+
+Garmin, fenix 7 appendix:
+
+> the number of hours remaining before the battery power is depleted
+
+So the meaning is exactly "hours remaining", and the name needs no
+change. Doc rev 172's caution stands alongside it rather than against
+it: Garmin states WHAT the number means, and the 840 measurement
+states HOW it is arrived at — **not from current drain.** A 3:52 ride
+consuming ≈3.4 %/h left the device claiming 29 h where that rate
+implies ≈22 h.
+
+Both facts belong in the record. The manual's one-liner would have let
+someone assume a simple remaining-at-this-rate calculation, and the
+ride says otherwise.
+
+### The SOG family, and what the probe did not find
+
+The Venu 4 appendix lists **five** SOG fields: SOG, Avg SOG, Lap SOG,
+Last Lap SOG, Max SOG. Garmin's id space clusters families tightly —
+343–354 is three families of four in strict metric order — so the
+four siblings might be expected beside 371.
+
+**The probe swept 369–399 and found only 371.** The siblings are
+therefore either outside that range or not implemented on an Edge at
+all. Given that the catalogue is shared and the Edge plainly carries
+only part of it, "implemented on a watch, absent from Edge firmware"
+is the easier explanation — but it is not established, and the
+clustering assumption that cracked 358 does not hold here.
+
+### Scale of what remains unswept
+
+**551 ids are unassigned and have never been probed**, in 25 runs of
+five or more. The largest is 101–145 (45 ids, item #163). The probe
+covered 66. This is not a gap that gets closed by more of the same
+without a reason to look somewhere specific — and "a documented field
+family whose other members are missing" is exactly such a reason.
 
 ---
 

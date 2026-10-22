@@ -358,10 +358,17 @@ FIELD_ID_NAMES = {
     40:  "Max Power",  # reported "MAX Power" -- normalized to Title Case to match this dict's existing "91: Max Speed" convention; not a factual correction, just consistent casing
     371: "Speed Over Ground",     # 840 renders: SOG
                                    # Garmin's own name -- documented in the
-                                   # Venu 4 series appendix, not the Edge's
+                                   # Venu 4 series appendix, not the Edge's:
+                                   # "the actual speed of travel, regardless
+                                   # of the course steered and temporary
+                                   # variations in heading". Note that says
+                                   # nothing about GPS -- see Doc rev 174.
     395: "Battery Hours",          # 840 renders: Battery (+ "hrs")
-                                   # Garmin's own name -- documented in the
-                                   # fenix 7 Std/Solar/Pro appendix
+                                   # Garmin's own name and wording, from the
+                                   # fenix 7 Std/Solar/Pro appendix: "hours
+                                   # remaining before the battery power is
+                                   # depleted". Measured on an 840 it is NOT
+                                   # based on current drain -- Doc rev 172.
     408: "Di2 Battery",
     411: "Di2 Shift Mode",
     441: "30s W/kg",
