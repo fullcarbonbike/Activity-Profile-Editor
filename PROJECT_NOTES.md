@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-21, at Doc rev 170.*
+> *Last updated 2026-10-22, at Doc rev 171.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -359,6 +359,86 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 171 — refreshed 2026-10-22.* **`ROAD 4` pulled back off the
+840 after a `NewFiles` import. Two results: the device sanitises
+NOTHING — all 66 unknown field ids survived byte-exact — and it
+RENUMBERS `message_index`, moving fourteen of twenty-four screens to
+different slots while preserving every screen's identity, order and
+content.**
+
+### 1. No sanitisation, on the 840 either
+
+Every one of the 66 ids the 840 does not recognise came back exactly
+as written. The device renders them as the Timer fallback and leaves
+the bytes alone. Doc rev 117 established this for the 530; it now
+holds for the 840 as well, and for ids that may be valid on no device
+at all rather than merely absent from one.
+
+That is the result the probe depended on. Had the 840 rewritten
+unknown ids, the four finds would have been unreproducible and every
+toolkit write path would need rechecking.
+
+### 2. ⚠ `message_index` IS NOT STABLE ACROSS A `NewFiles` IMPORT
+
+Matched written-to-returned by f10, which is each screen's identity:
+
+| preserved exactly | not preserved |
+|---|---|
+| f10 (identity) | **`message_index` — the "slot"** |
+| f9 (display order) | |
+| f3, f8, f12 | |
+| the full ten-slot f7 array, every screen | |
+
+Fourteen of twenty-four configured screens landed at a different
+message_index. The probe screens written at slots 11, 12, 15, 16, 18,
+19, 22, 23 came back at 20, 21, 23, 24, 25, 26, 29, 30. Pre-existing
+screens moved too.
+
+**The ordering rule was NOT determined.** The returned slots are not
+sorted by f9 and not sorted by f10 — checked both, neither holds. It
+is a repack, not a sort, and this note deliberately does not guess at
+the rule.
+
+**This does not contradict Doc rev 163's byte-identical round trip.**
+That measured EDITING AN EXISTING PROFILE IN PLACE on the device,
+which moves single bytes and renumbers nothing. This is the
+`NewFiles` IMPORT path, which evidently rewrites the file wholesale.
+Two different operations, and the distinction matters: the toolkit has
+been generalising from the in-place case.
+
+**What it means for the toolkit.** A slot number is a handle valid
+only for one pull of one file. Anything that stores a slot number and
+uses it after a deploy is referring to whatever screen happens to
+occupy that index now. Worth an audit — the GUI re-reads slots on
+every panel load, which is why this has never bitten, but that is
+luck rather than design.
+
+### 3. The four new fields, three of them now identified
+
+| id | on-device label | reading |
+|---:|---|---|
+| 371 | `SOG` | **Speed Over Ground** — GPS-derived speed, independent of any wheel or other sensor |
+| 395 | `Battery` + `hrs` | **device battery life in hours.** Doug's independent search supports it |
+| 358 | *(none)* | **Elevation with ASC/DESC sub-fields** — the missing numeric sibling of 368 Elevation Graph |
+| 331 | *(none)* | still unidentified; see below |
+
+**`nrs` was `hrs` with the top of the h clipped** in a half-width
+slot — a rendering artefact of the small cell, not a label. Worth
+recording as a hazard of reading labels off small slots at all, which
+is the method this whole census rests on.
+
+**331 remains open and is the interesting one.** Started as a ride:
+every other timer on the screen counted up and 331 stayed at `0:00`.
+It renders with NO label while holding its own value, so it is a real
+field drawing an empty state rather than an unresolved id — the
+fallback renders *with* the label "Timer". It is context-gated on
+something absent: a course, workout step, interval, lap trigger or
+navigation target.
+
+Viewing the other three in larger slots revealed nothing further.
 
 ---
 
