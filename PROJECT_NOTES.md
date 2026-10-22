@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-22, at Doc rev 174.*
+> *Last updated 2026-10-22, at Doc rev 175.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -359,6 +359,83 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 175 — refreshed 2026-10-22.* **⚠ SUPERSEDES Doc rev 170 on
+one point. The over-cap state is NOT "legal", and the guard built for
+it REFUSES rather than warns. Doug's reading was better than mine and
+the evidence was always on his side.**
+
+Rev 170 stands as the record of what was found; it is not rewritten.
+What it got wrong is the classification, in these words: *"legal and
+usable but partly uneditable on-device"*, and *"it should WARN rather
+than refuse, now that the state is known to be legal and
+renderable"*.
+
+### Why that was weak
+
+The whole case rested on **one** observation: a profile carrying
+fourteen user screens rendered all fourteen. From that I concluded the
+state was supported.
+
+Rendering is poor evidence of support. A screen loop that walks the
+display order has no reason to validate a count, so "it rendered" is
+exactly what an **unvalidated** state produces too. The observation
+was consistent with both readings and I picked one.
+
+Doug's evidence, which I had and did not weigh:
+
+- **Garmin's own editor refuses to create an eleventh user screen.**
+  He has hit that limit by hand. A vendor tool declining to produce a
+  state says something about whether the state is meant to exist.
+- **The overflow does not degrade gracefully.** Blank names, no field
+  counts, entries that open to nothing. That is a fixed-size list
+  walking off its end, not a UI deliberately presenting screens it
+  cannot edit. A supported read-only state would look like something.
+- **Nothing in the device's UI acknowledges them as screens at all.**
+
+This is the same error shape as rev 115's reading of `flags: 'read'`,
+which rev 118 overturned, and as rev 174's "GPS-derived" gloss on SOG:
+one observation, a confident classification, no weighing of what else
+would produce the same observation.
+
+### The rule the guard actually applies
+
+Not *"can the device do it"*. Add Field and Remove Field are this
+toolkit's own inventions — the Edge has no such control once a screen
+exists (rev 164) — and they stay, because a five-field screen is a
+perfectly ordinary screen afterwards.
+
+The rule is: **does the result leave the device in a state its own UI
+can manage?** Add/Remove passes. An eleventh user screen does not.
+
+### What is NOT claimed
+
+That the over-cap state causes lasting harm. Nobody has observed
+any — Doug removed `ROAD 4` as a precaution, not a diagnosis. What is
+established is that the device's editor cannot represent it, and that
+is grounds enough to refuse by default without asserting corruption.
+
+`--allow-over-cap` exists so the capability stays deliberate: the
+census probe that found ids 358, 371 and 395 needed eight extra
+screens on one profile, and that was worth doing.
+
+### Still open: was the repack caused by the over-cap state?
+
+Rev 171 recorded that a `NewFiles` import renumbers `message_index`,
+from the `ROAD 4` round trip. **That generalisation is not supported
+by one file, and that file was the over-cap one.** The repack may be
+normal import behaviour, or it may be the device normalising something
+it considered malformed — and the written file was contiguous 0–23
+while the returned one was scattered across 0–30 with seven holes,
+which is a strange shape for routine housekeeping.
+
+**The discriminator is cheap and already half-done:** the `ROAD`
+profile deployed for the ride is within cap and went through
+`NewFiles` this morning. Pulling it and diffing against what was built
+separates the two explanations. Until then rev 171's claim should be
+read as "observed once, on an over-cap file".
 
 ---
 
