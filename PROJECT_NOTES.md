@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-22, at Doc rev 172.*
+> *Last updated 2026-10-22, at Doc rev 173.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -359,6 +359,80 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 173 — refreshed 2026-10-22.* **The data-field id space is
+GARMIN-WIDE, not Edge-specific. 371 and 395 are documented — in the
+Venu 4 and fenix 7 manuals, not the Edge's. Both names were guessed
+correctly, which matters far less than what the source implies: there
+is a SECOND blind-spot mechanism behind #154, and a new place to
+look for answers.**
+
+### What Doug found
+
+| id | our name, written before the search | documented in |
+|---:|---|---|
+| 371 | Speed Over Ground | **Venu 4 series** appendix |
+| 395 | Battery Hours | **fenix 7** Std/Solar/Pro appendix |
+
+Both were derived here from a label and a behaviour, and both match
+Garmin's own naming. The code comments now cite the source, because
+"we inferred it and it looked right" and "Garmin calls it this"
+deserve to be distinguishable later.
+
+358 found no match in any manual searched so far.
+
+### The second blind-spot mechanism, which is the real finding
+
+#154 was opened on the theory that the census missed fields whose
+on-device LABEL collides with another field's — the 351–354 case.
+That is real, but it is not the whole of it.
+
+These ids come from a field catalogue shared across Garmin's product
+lines. The Edge's firmware can RENDER a catalogue entry it never
+OFFERS in its own editor menu. So:
+
+| mechanism | example | could a menu walk find it? |
+|---|---|---|
+| label collides with another field | 351–354 | **no** — the menu shows two identical rows |
+| no label at all | 331, 358 | **no** — nothing to enumerate |
+| **not in the Edge's menu at all** | **371, 395** | **no** — it is not there to walk |
+
+The third is the widest and was not in #154's framing. A menu-based
+census cannot, even in principle, enumerate fields the menu does not
+list — and the Edge evidently carries a good many, inherited from a
+catalogue built for watches, marine units and the rest of the range.
+
+**This is the argument for the write-and-look probe as the primary
+method rather than a supplement.** Writing an id and reading what the
+device draws is independent of the menu entirely, which is exactly
+why it found four fields the census could not.
+
+### A new source for candidate names
+
+Other Garmin product manuals' field appendices are now a legitimate
+research input. If the catalogue is shared, a field the Edge renders
+but does not document may well be documented by a watch.
+
+**With one standing caution:** a shared id does NOT guarantee shared
+semantics or shared units across product lines, and nothing here has
+tested that. A name adopted from another device's manual is a
+HYPOTHESIS until the Edge's own behaviour agrees with it. 371 and 395
+both have that behavioural backing — SOG tracked speed, Battery Hours
+counted down. A future name taken from a manual alone would not.
+
+### What it suggests for 331
+
+If the catalogue is Garmin-wide, 331 need not belong to any sensor a
+cyclist would own. A duration field from a marine, dive, golf or
+aviation context would render on an Edge and sit at `0:00` forever,
+because the context it waits for cannot exist on a bicycle. "Speed
+Over Ground" is itself a nautical term, which is a small piece of
+evidence that this neighbourhood of the id space is not Edge-native.
+
+Searching other product lines' appendices for an unnamed duration
+field is now a better bet than looking for a sensor to buy.
 
 ---
 
