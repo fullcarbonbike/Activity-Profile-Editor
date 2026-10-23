@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-23, at Doc rev 177.*
+> *Last updated 2026-10-23, at Doc rev 178.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -363,6 +363,65 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 178 — refreshed 2026-10-23.* **371 and 48 "Speed" are
+indistinguishable on an Edge across both conditions that could have
+separated them. Each field falls back between GPS and the wheel
+sensor, and in every test the two read the same number.**
+
+### The 2×2, completed
+
+Doug's walking test supplied the half rev 177 was missing. The two
+conditions isolate one source each:
+
+| condition | GPS | wheel sensor | 48 Speed | 371 SOG |
+|---|---|---|---|---|
+| on the trainer | stationary | turning | real speed | **same** |
+| walking, device in hand | moving | stationary | real speed | **same** |
+| outdoors, riding (rev 172) | moving | turning | real speed | **same** |
+
+Two findings fall out, and the second is the one that was not
+expected.
+
+**1. Neither field is tied to one source.** The ordinary Speed field
+is not sensor-only — walking with the device in hand, with the bike
+still, it reported walking speed. Each field evidently uses whichever
+source is available.
+
+**2. Nothing tried distinguishes them.** Isolating GPS, isolating the
+sensor, and having both — in all three the numbers agree. On an Edge,
+371 appears to be the same measurement as 48 under a different name.
+
+### Why that is the likely answer, and why it is not stated as fact
+
+"Speed over ground" is a marine distinction — speed made good across
+the earth, as against speed through the water, or as against a
+heading-corrected figure. On a boat those differ. On a bicycle there
+is no water to move through, so the distinction has nothing to
+measure, and a catalogue entry inherited from another product line
+would simply collapse onto ordinary speed. That is consistent with
+every observation.
+
+**What has actually been shown is narrower: no condition tried
+separates them.** That is not the same as identity. A condition that
+would separate them is conceivable — a deliberately wrong wheel
+circumference, for instance, would make sensor speed disagree with
+GPS speed, and whichever field preferred which source would then show
+it.
+
+**Not proposed as work.** It means misconfiguring a sensor on a bike
+whose data Doug actually keeps, to resolve a question whose answer
+changes nothing about the toolkit. Recorded as the test that exists,
+not as a test to run.
+
+### Practical upshot for a user
+
+A rider choosing between the two has **no observed reason to prefer
+371 over 48**. Noted in `FIELD_ID_NAMES` beside the id, because the
+honest answer to "what does this one do differently?" is currently
+"nothing anyone has been able to measure".
 
 ---
 

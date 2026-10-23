@@ -366,6 +366,10 @@ FIELD_ID_NAMES = {
                                    # AND IT IS NOT GPS-ONLY: on an indoor
                                    # trainer, GPS stationary, it reads a real
                                    # speed from the wheel sensor (rev 177).
+                                   # NO OBSERVED DIFFERENCE FROM 48 "Speed"
+                                   # on an Edge -- both fall back between GPS
+                                   # and sensor, and both read the same value
+                                   # in every condition tried (rev 178).
     395: "Battery Hours",          # 840 renders: Battery (+ "hrs")
                                    # Garmin's own name and wording, from the
                                    # fenix 7 Std/Solar/Pro appendix: "hours
