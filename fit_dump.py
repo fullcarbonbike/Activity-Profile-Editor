@@ -2680,10 +2680,16 @@ COMPOSITE_FIELD_IDS = {351, 352, 353, 354}
 # slot -- and nobody has yet put 358 in a half-width slot on either model
 # to see whether it drops its ASC/DESC the way 351-354 do on a 530.
 #
-# Adding it on the strength of the pattern would emit measured-sounding
-# advice from an inference, which is the defect v1.7.0 was released to
-# remove. The name is recorded because the device showed it; the family
-# membership waits for the slot test.
+# UPDATED 2026-10-23 (Doc rev 180): the slot test was done, and the
+# answer is a firm no rather than a "not yet". On the 840, 358 shows the
+# same information at every slot size down to half width -- only the font
+# shrinks -- so it loses nothing and needs no warning. And on the 530 it
+# does not EXIST: it renders as that model's Speed fallback. Since the
+# only behaviour membership would add is the 530 half-width `subfields`
+# warning, membership would produce advice about a field that model does
+# not have. Not merely unmeasured, as first recorded here -- wrong.
+#
+# 358 is correctly classified as nothing: named, no family.
 
 # id 23 breaks its family. HR Zone Graph drops its plot in a regular-height
 # full-width row as well as a half-width one, on BOTH models, where

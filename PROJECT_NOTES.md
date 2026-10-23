@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-23, at Doc rev 179.*
+> *Last updated 2026-10-23, at Doc rev 180.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -363,6 +363,75 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 180 — refreshed 2026-10-23.* **All four new ids render as
+`Speed` on the 530 — they do not exist in its firmware. That settles
+358's classification, and it promotes a known gap from theoretical to
+actual: the toolkit has no per-model field availability, and now there
+are four fields it would advise about wrongly on a 530.**
+
+### The result
+
+A copy of the 840's ROAD profile on the 530: 331, 358, 371 and 395 all
+render as **`Speed`**, which rev 117 established is the 530's fallback
+for an id it does not have. (The 840 falls back to Timer — the models
+differ, which is why the label and not the value is what distinguishes
+a real field from an absent one here.)
+
+The 530 is the older device and these are newer catalogue entries, so
+this is the expected direction. Worth having measured rather than
+assumed, because the shared-catalogue finding (rev 173) raised the
+possibility that an old device might carry entries it never advertised.
+It does not — at least not these.
+
+### 358 stays out of `COMPOSITE_FIELD_IDS`, and now for a better reason
+
+The question was whether 358 loses its ASC/DESC in a half-width slot on
+a 530, the way 351–354 do. **It cannot: the field is not there.**
+
+So the entire behaviour that family membership would add —
+`field_slot_losses()` returning `subfields` for a half-width slot on a
+530 — would be advice about a field that model renders as Speed. Not
+merely unmeasured, as rev 171 had it. **Wrong.**
+
+The 840 side is settled too (rev, Doug): same information at every slot
+size, only the font shrinks. So on the one model that has it, 358 loses
+nothing anywhere, and there is no placement warning to give.
+
+**358 is correctly classified as nothing.** Named, with no family. The
+comment beside `COMPOSITE_FIELD_IDS` should be updated from "waits for
+the slot test" to "the slot test was done and the answer is no".
+
+### ⚠ The per-model availability gap is no longer theoretical
+
+Every release since v1.7.0 has carried this in Known gaps:
+
+> **No per-model field availability.** The picker offers every known
+> field to both models. Harmless — the device substitutes Speed and
+> leaves the file alone.
+
+"Harmless" was fair when the only cost was a field quietly becoming
+Speed. It is weaker now:
+
+- the picker offers a 530 user four fields their device does not have,
+  with no indication,
+- and both advisory sets that 358 or its siblings might belong to —
+  `COMPOSITE_FIELD_IDS` and `SMALL_SLOT_UNUSABLE_FIELD_IDS` — are
+  **model-blind**, so any advisory attached to an 840-only field is
+  asserted about the 530 as well.
+
+That second point is the sharp one. It is not a missing feature; it is
+a structural obstacle to classifying any field that exists on one model
+and not the other, which is exactly the class of field the probe
+method is now good at finding.
+
+**Not built, not scoped yet.** The cheap first step is a documented set
+of ids known to be absent on a given model, with no behaviour attached
+— honest and immediately useful in the picker. Wiring the advisory sets
+to be model-aware is the larger piece and should wait for a reason
+beyond tidiness.
 
 ---
 
