@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-23, at Doc rev 178.*
+> *Last updated 2026-10-23, at Doc rev 179.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -363,6 +363,71 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 179 — refreshed 2026-10-23.* **⚠ NARROWS Doc rev 171, and
+closes #162. A `NewFiles` import does NOT renumber slots. A within-cap
+profile came back BYTE-IDENTICAL to what was written — same SHA-256,
+zero screens moved. The repack seen on `ROAD 4` was the device
+reacting to the OVER-CAP file specifically.**
+
+### The comparison
+
+`ROAD`, 7 plain user screens, built here on 2026-10-22, deployed
+through `NewFiles`, ridden for 3:52, pulled back today:
+
+| | `ROAD` (within cap) | `ROAD 4` (14 user screens) |
+|---|---|---|
+| configured screens | 17 → 17 | 24 → 24 |
+| screens at a different `message_index` | **0 of 17** | **14 of 24** |
+| whole file | **byte-identical** | rewritten |
+
+Seventeen screens, every one at the slot it was written to, every
+field array unchanged, and the file's hash unchanged. The import path
+did nothing to it at all.
+
+### What rev 171 should have said
+
+Rev 171's heading — *"it RENUMBERS `message_index`"* — was drawn from
+a single file, and rev 175 already flagged that the file was the
+over-cap one. This settles it: the renumbering is **not** a property
+of the import path. A well-formed profile passes through untouched.
+
+Rev 171's other finding stands undisturbed: the 840 sanitised none of
+the 66 unknown field ids. That was never confounded by the cap.
+
+**So `message_index` IS a stable handle across a normal deploy**, and
+#162's audit is unnecessary — there is nothing to audit, because the
+thing it was auditing for does not happen. Closing it on that basis
+rather than on having checked every caller.
+
+### A third, independent sign that over-cap is not a supported state
+
+This is the one that matters beyond bookkeeping. The device:
+
+1. refuses to create an eleventh user screen in its own editor,
+2. cannot display the overflow in that editor — blank entries, no
+   field counts, opening to nothing,
+3. and now: **rewrote the over-cap file wholesale while leaving a
+   well-formed one byte-identical.**
+
+Three independent behaviours, all pointing the same way. Doug's
+reading that Garmin would consider such a profile corrupt is better
+supported with each test, and the #161 refusal looks better for it.
+
+Still NOT claimed: lasting harm. A device normalising a file it
+dislikes is not the same as damage, and nobody has observed damage.
+
+### A note on the shape of the original error
+
+Rev 171 generalised from n=1 without recording that n=1. The
+correction took one pull of a file that already existed, which is the
+cheapest possible disconfirmation — and it was available the whole
+time, because the within-cap deploy had already happened the day
+before. The lesson is not "test more"; it is that a claim drawn from
+one observation should say so in the claim, where the next reader
+trips over it.
 
 ---
 
