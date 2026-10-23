@@ -363,6 +363,9 @@ FIELD_ID_NAMES = {
                                    # of the course steered and temporary
                                    # variations in heading". Note that says
                                    # nothing about GPS -- see Doc rev 174.
+                                   # AND IT IS NOT GPS-ONLY: on an indoor
+                                   # trainer, GPS stationary, it reads a real
+                                   # speed from the wheel sensor (rev 177).
     395: "Battery Hours",          # 840 renders: Battery (+ "hrs")
                                    # Garmin's own name and wording, from the
                                    # fenix 7 Std/Solar/Pro appendix: "hours

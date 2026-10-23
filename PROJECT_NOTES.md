@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-23, at Doc rev 176.*
+> *Last updated 2026-10-23, at Doc rev 177.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -363,6 +363,63 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 177 — refreshed 2026-10-23.* **The trainer test is in, and
+371 is NOT GPS-derived. On a trainer with the GPS stationary and the
+wheel turning, SOG reads a real speed. That is the second correction
+to the same claim of mine, from two independent directions.**
+
+### The test and the result
+
+Rev 172 designed this as the clean discriminator, and it worked
+exactly as designed:
+
+| if SOG had read | it would mean |
+|---|---|
+| **0** | GPS-derived, as I had guessed |
+| a real speed | **sensor-derived — the guess was wrong** |
+
+It read a real speed. The wheel speed sensor, or something fed by it,
+is the source.
+
+### Two corrections to one claim
+
+Doc rev 171 recorded 371 as "GPS-derived speed, independent of any
+wheel or other sensor". Rev 174 found Garmin's own description says
+nothing about GPS, so the claim had no documentary basis. This rev
+finds the hardware disagrees with it outright.
+
+Worth separating the two, because they fail differently. Rev 174
+showed the claim was **unsupported** — I had glossed a plausible
+abbreviation and written the gloss as if read. This shows it was
+**false**. An unsupported claim that happens to be true is lucky; this
+one was not even that.
+
+### What is now actually known about 371
+
+- Garmin's name and description, from the Venu 4 appendix: the speed
+  of travel regardless of the course steered and temporary variations
+  in heading.
+- It reads from a sensor, not exclusively from GPS.
+- Outdoors it tracked the ordinary Speed field closely (rev 172).
+
+**What is still open:** whether 371 ever differs from the ordinary
+Speed field on an Edge at all. Both observations so far are consistent
+with the two fields being the same number under different names — a
+marine distinction ("over ground" as against through water, or as
+against heading-corrected) inherited from the shared catalogue, with
+nothing on a bicycle to make it meaningful.
+
+The narrow question that would settle it: on the trainer, did 371 and
+the ordinary Speed field show the **same** value? Equal readings push
+toward "same source, different name". Different readings mean
+something distinguishes them and the hunt is back on.
+
+Recording the open question rather than closing the entry, because
+"probably the same" is exactly the kind of plausible-sounding guess
+that produced the GPS claim in the first place.
 
 ---
 
