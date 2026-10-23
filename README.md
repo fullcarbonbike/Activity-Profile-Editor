@@ -568,6 +568,42 @@ Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
 
+*Doc rev 87 — refreshed 2026-10-23.* **v1.7.3: three data fields that
+were never in the Edge's menu, and the ten-screen limit enforced
+everywhere.** See `RELEASE_NOTES_v1.7.3.md` for the user-facing summary.
+
+Ids 358 "Elevation (Asc/Desc)", 371 "Speed Over Ground" and 395 "Battery
+Hours" join the picker. None was reachable by the method used until now.
+
+**The field list had been built by walking the on-device menu**, which
+misses a field three ways: when its label duplicates another's (the
+Avg/Max group, v1.6.1), when it has no label at all (358), and when the
+field simply is not in the menu (371, 395). The third was not understood
+before this release and is the widest — these ids belong to a catalogue
+shared across Garmin's product range, and the Edge renders entries it
+never offers. 371 is documented in the Venu 4 manual, 395 in the fenix 7
+manual, neither in the Edge's.
+
+So the method changed to writing unknown ids into slots and reading what
+the device draws. 66 probed, 4 found. A fourth, id 331, is real and
+remains unnamed: no label, and it holds `0:00` through an entire ride
+while every other timer counts.
+
+358 and 395 are confirmed by behaviour on a real ride — ascent and
+descent accumulated, and the battery figure counted down. 358 is
+deliberately left out of the Avg/Max family despite looking like its
+missing fifth member: family membership drives the placement warnings,
+and its half-width behaviour is unmeasured.
+
+**The ten-user-screen limit now lives where every write path can see
+it.** It had lived in the GUI's Add Screen panel alone, so the command
+line could push a profile past it — which is how the field probe got
+built, eight extra screens on one profile. Such a profile rides fine and
+renders every screen, but the device's own editor shows the overflow as
+blank entries that open to nothing, so those screens can only ever be
+changed by this toolkit again. `--new-slot` now refuses, with
+`--allow-over-cap` to do it deliberately.
+
 *Doc rev 86 — refreshed 2026-10-21.* **v1.7.2: one layout picker for both
 kinds of screen.** See `RELEASE_NOTES_v1.7.2.md` for the user-facing
 summary.

@@ -9,7 +9,7 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Last updated 2026-10-22, at Doc rev 175.*
+> *Last updated 2026-10-23, at Doc rev 176.*
 
 **Shipped:** `v1.7.1` (2026-10-18) — layout changes no longer throw
 data fields away. Preceded by `v1.7.0` (row heights drawn to scale,
@@ -17,13 +17,17 @@ per-model slot warnings), `v1.6.1` (ids 351–354, the height model),
 `v1.6.0`, `v1.5.0` (offline mode, Export, per-model layout rules).
 Every one is tagged on `main` with the tag on the release-notes commit.
 
-**READY TO SHIP: `v1.7.2`** — one layout picker for both kinds of
-screen (#159), on top of the `build_diagram_inputs()` refactor.
-`gui_app.py` 0.29.2 is the only file that changed; everything else
-stays at the v1.7.1 versions: `fit_dump.py` 2.26.0, `fit_patch.py`
-1.19.0, `garmin_device.py` 0.13.0, `fit_census.py` 1.1.0,
-`fit_sdk_check.py` 1.0.0. `TEST_PLAN_v1.7.2.md` sections A–G all pass
-on both models (2026-10-21).
+**Shipped:** `v1.7.2` (2026-10-21) — one layout picker for both kinds
+of screen (#159), on top of the `build_diagram_inputs()` refactor.
+`TEST_PLAN_v1.7.2.md` sections A–G all pass on both models.
+
+**READY TO SHIP: `v1.7.3`** — three field ids the menu-walking census
+could never have found (#154), and the ten-user-screen cap enforced
+below the GUI (#161). `fit_dump.py` 2.28.0, `fit_patch.py` 1.20.0,
+`gui_app.py` 0.29.3; `garmin_device.py` 0.13.0, `fit_census.py` 1.1.0,
+`fit_sdk_check.py` 1.0.0 unchanged. CLI guard exercised on real
+profiles for all five cases and the device side re-confirmed by hand
+(2026-10-23).
 
 ### ⚠ The rest of this block below is STALE and known to be
 
@@ -359,6 +363,41 @@ profiles by filename and will otherwise overwrite an existing one.
 - **No provenance in user-facing strings.** A dialog says what will
   happen and why it matters to the reader; the test, date and hardware
   that established it go in the code comment beside it (Doc rev 119).
+
+---
+
+*Doc rev 176 — refreshed 2026-10-23.* **#161 verified on real
+profiles, and the device confirms the rule the guard encodes:
+at ten user screens the on-device editor stops offering "add", and
+offers only the System/Special screens the profile does not already
+have.**
+
+That last detail is worth more than a pass mark. `fit_dump`'s new
+`MAX_USER_SCREENS` comment asserts that **named Garmin screens do not
+count against the cap** — a profile routinely carries ten of those as
+well. That was inferred from counting a real profile. It is now
+observed directly: the editor's add menu, at the cap, still lists Map,
+Segment and the rest when they are absent. The ceiling applies to
+plain user screens alone, exactly as the constant claims.
+
+### The CLI guard, exercised
+
+| case | result |
+|---|---|
+| at cap, `--new-slot` | refused, exit 2, **no file written** |
+| same with `--allow-over-cap` | written, warning on stderr |
+| under cap, `--new-slot` | written, **silent about the cap** |
+| editing an existing screen on an over-cap profile | not refused |
+| `count_user_screens()` | 10 / 7 / 14, matching the device |
+
+The under-cap case is the one that mattered: a guard that fires when
+it should not is worse than the hole it closes.
+
+**One incidental echo**, from the override's own output: the auto-
+assigned identity printed as *"shows on-device as 'Screen 11'"*. The
+toolkit cheerfully names a screen the device's editor has no room
+for — a small independent sign that the over-cap state is outside what
+the device expects, arrived at from the opposite direction.
 
 ---
 
