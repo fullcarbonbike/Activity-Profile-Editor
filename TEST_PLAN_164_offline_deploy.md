@@ -32,21 +32,36 @@ Device plugged in, normal edit → Pre-Flight → Deploy.
 **A4 is the one that matters.** If anything about the eject/reconnect
 machine behaves differently, that is my fault and not a device quirk.
 
-## B. Offline path — the fix
+## B. Offline edit flow — ⚠ REWRITTEN 2026-10-25, the original was wrong
 
-Offline mode against a folder, edit a screen → Pre-Flight → Deploy.
+**What section B first said:** offline, edit a screen → Pre-Flight →
+Deploy, and check the Deploy page shows Export.
 
-| # | check | expect |
-|---|---|---|
-| B1 | panel heading | **"Export Profile"** |
-| B2 | main button | **"Export..."** |
-| B3 | eject / check buttons | **gone, not greyed** |
-| B4 | status text | says no device is connected and you transfer it yourself |
-| B5 | press Export | save dialog, pre-filled with the profile's own filename |
-| B6 | save it | "Verified twice" message naming the CRC |
-| B7 | after saving | status says Exported, **Export disabled**, **Done enabled** |
-| B8 | Done | returns to the profile list |
-| B9 | Pre-Flight heading | "What will change **when you put this on the device**:" |
+**That path does not exist**, and Doug walked into the discrepancy
+rather than the bug. Offline, `ViewScreensPanel`'s button becomes
+**"Export Profile..."** and dispatches **straight to the save dialog** —
+by design since #141. `show_panel("review")` has exactly one caller and
+it is the device-mode branch, so **Pre-Flight and Deploy are unreachable
+offline by this route.**
+
+So #164 never affected the ordinary offline edit flow. It affects the
+two flows that navigate DIRECTLY to `DeployPanel` — **clone** and
+restore — which is section C.
+
+**What Doug saw is a PASS, and a useful one.** That flow now runs the
+extracted `export_working_copy()`, so walking it exercises the
+refactor:
+
+| # | check | expect | 2026-10-25 |
+|---|---|---|---|
+| B1 | the button on the screens view | "Export Profile..." | **pass** |
+| B2 | pressing it | save dialog straight away, no intervening page | **pass** |
+| B3 | after saving | "Verified twice" message naming the CRC | **pass** |
+| B4 | where you land | back on the screens view, button still live | **pass** |
+| B5 | no Deploy page appears at all | correct — it is not on this path | **pass** |
+
+B4 is right rather than a leftover: you may want to export again, to a
+second location or under another name.
 
 ## C. The reported bug — clone, offline
 
@@ -89,10 +104,12 @@ is exactly the class that bit `StartupTxtPanel` before.
 
 ## Pass criteria
 
-- **A4** — the connected four-stage deploy is unchanged.
-- **B2, B3, B7** — offline offers Export, hides the device controls, and
-  ends in a state you can leave.
-- **C1** — the reported dead end is gone.
+- **A4** — the connected four-stage deploy is unchanged. **Passed.**
+- **B** — the offline edit flow still exports cleanly through the
+  extracted helper. **Passed.**
+- **C1** — the reported dead end is gone. **This is now the only test
+  of the actual fix**, since B turned out not to touch it.
+- **D** — the filename guard survived the extraction.
 - **E** — no label survives a mode switch.
 
 ## If something fails

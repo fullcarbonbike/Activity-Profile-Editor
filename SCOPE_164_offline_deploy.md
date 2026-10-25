@@ -21,8 +21,16 @@ ViewScreensPanel  -->  PreflightPanel  -->  DeployPanel
  (mode-aware)          (assert only)        (assert only)
 ```
 
-Export exists, and works, in `ProfileListPanel` — a panel this flow
-never returns to.
+Export exists, and works, on **`ViewScreensPanel`** — whose button
+becomes "Export Profile..." offline and dispatches straight to the save
+dialog, never entering this chain at all.
+
+> **Corrected 2026-10-25.** This scope first said Export lives in
+> `ProfileListPanel`. It does not. The correction matters: because the
+> ordinary offline edit flow short-circuits to Export from
+> `ViewScreensPanel`, **Pre-Flight and Deploy are unreachable offline by
+> that route**, and the defect is confined to the flows that navigate
+> DIRECTLY to `DeployPanel` — clone and restore.
 
 ## This is the third occurrence of one pattern
 
