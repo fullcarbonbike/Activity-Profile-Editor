@@ -10,7 +10,7 @@
 > wins and this block is stale; fix it.
 >
 > *Rewritten 2026-10-23 at Doc rev 180, open items refreshed
-> 2026-10-26 at rev 183. The previous version had
+> 2026-10-26 at rev 184. The previous version had
 > described v1.5.0 as unreleased since September — six releases stale —
 > and is not preserved: it was planning material for work long since
 > shipped, and every durable fact in it is in the Doc rev stack already.*
@@ -133,6 +133,104 @@ Conventions that are load-bearing rather than stylistic:
 6. **Guard the class, not the instance.** Three separate bugs came from
    fixing the call site in front of me and missing its sibling — v0.20.0
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
+
+---
+
+*Doc rev 184 — refreshed 2026-10-26.* **⚠ SUPERSEDES Doc rev 179,
+which superseded rev 171. Third attempt at one question and the second
+wrong cause. A WITHIN-CAP profile was renumbered on import, so the
+over-cap state is not what triggers it. The variable that fits every
+observation is the FILENAME. Separately: the device accepted a
+replacement under a non-matching filename, so rev 183's remaining
+doubt is resolved and the warning's claim is false in both halves.**
+
+### The test
+
+Doug changed all five fields of `ROAD_22`'s screen 4 to graph types
+and imported the result as `ROAD22.fit` — a name that does not match
+the device's own `CyclingRoadROAD_22.fit`.
+
+| | |
+|---|---|
+| configured screens sent / returned | 20 / 20 |
+| screens whose **content** differs | **0** |
+| screens that moved `message_index` | **10 of 20** |
+
+f10=3 came back holding Cadence, Elevation, Heart Rate, Power and
+Speed Graph, exactly as sent, and the device renders them.
+
+### 1. Filename does not gate acceptance — for replacement either
+
+Rev 183 showed the "wrongly-named files are ignored" rule was false
+for a NEW profile and left replacement open, because the only
+replacement test had identical content. This closes it: a
+non-matching filename **replaced an existing profile's contents**.
+
+So the rule, as written in the README, in these notes, and in the
+export dialog's warning, is false in both halves. Its only hardware
+support was a file named `...fit.editing.fit`, and whatever the device
+objected to there, it was not simply "the name is different".
+
+### 2. ⚠ The repack is NOT caused by the over-cap state
+
+Rev 179 compared a within-cap `ROAD` (byte-identical) against an
+over-cap `ROAD 4` (14 of 24 screens moved) and concluded the device
+was reacting to the over-cap file. **This profile has six user
+screens and it was renumbered.** That conclusion was wrong.
+
+All four imports, and the one variable that separates them:
+
+| import | filename vs canonical | renumbered |
+|---|---|---|
+| `ROAD`, existing, real edit | **matches** | **no — byte-identical** |
+| `ROAD 4`, new, over-cap | matches | yes |
+| `ROAD_22` first, new | differs | not captured |
+| `ROAD_22` second, existing, real edit | **differs** | **yes** |
+
+Over-cap predicts the last row would not renumber. The filename
+explains all three captured rows: **a canonically-named file passes
+through untouched; a differently-named one is rebuilt** — renamed,
+renumbered, content preserved.
+
+`ROAD 4` fits because the name I happened to give it was already the
+canonical one, so its renumbering has to be explained by something
+else — most likely that it was a NEW profile with no existing record
+to replace. That leaves two candidate variables, not one, and this
+note does not choose between them.
+
+### 3. What I keep getting wrong here, stated plainly
+
+Three revs, two wrong causes, on one question:
+
+- **rev 171**: "a `NewFiles` import renumbers slots" — from one file.
+- **rev 179**: "no it does not; the over-cap state caused it" — from
+  two files, and I treated the one difference I had noticed as the
+  cause.
+- **this rev**: over-cap is not it either.
+
+The shape is the same each time: a variable that happened to differ
+got promoted to the explanation. Rev 179 even opens by narrowing rev
+171 for exactly that error, and then commits it again in the same
+paragraph. Writing "observed once" is not sufficient; what was needed
+was listing the variables that differed and saying which were
+untested.
+
+**So this rev names its own untested variables rather than picking
+one.** New-vs-existing and canonical-vs-not are confounded in the data
+we have. The discriminating test is one import: take the current
+`CyclingRoadROAD_22.fit`, change one field, and send it back **under
+that exact name**. Unchanged slots means the filename is the variable;
+renumbered means it is something else again.
+
+### 4. The practical upshot, which does not depend on the cause
+
+**A slot number is not a stable handle across an import** unless the
+file is named canonically, and possibly not even then. Anything in the
+toolkit that remembers a `message_index` across a deploy is unsafe.
+f10 is the stable identity — it survived all four imports unchanged.
+
+This restores the concern rev 179 closed as unnecessary. **#162 should
+not have been closed**; it is reopened on this evidence.
 
 ---
 
