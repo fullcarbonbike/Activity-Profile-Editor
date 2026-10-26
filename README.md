@@ -251,6 +251,15 @@ Python, though — that path only works with the direct, no-venv install
 above; from inside a venv, launch via `python gui_app.py` in an
 activated PowerShell instead.)
 
+**⚠ Windows note, 2026-10-26.** The confirmations below are real but
+they are **dated**, and what shipped between v1.5.0 and v1.7.3 was not
+covered by them: a macOS-only call added on 2026-09-27 stopped the GUI
+launching on Windows altogether, and both confirmations predate it.
+Fixed; see the v1.7.4 notes. The CLI tools were unaffected throughout.
+Windows is not currently part of the per-release test loop, which is
+how seven releases went out with it broken — worth knowing before
+relying on an untested release there.
+
 Confirmed on Windows 11 (2026-08-19): `detect`, `screens` (both CLI
 tools), and the full GUI workflow (add a screen, deploy, restart,
 NewFiles round-trip). Also confirmed on Windows 10 32-bit (2026-08-29),
