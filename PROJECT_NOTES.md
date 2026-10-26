@@ -10,7 +10,7 @@
 > wins and this block is stale; fix it.
 >
 > *Rewritten 2026-10-23 at Doc rev 180, open items refreshed
-> 2026-10-26 at rev 184. The previous version had
+> 2026-10-26 at rev 185. The previous version had
 > described v1.5.0 as unreleased since September — six releases stale —
 > and is not preserved: it was planning material for work long since
 > shipped, and every durable fact in it is in the Doc rev stack already.*
@@ -133,6 +133,54 @@ Conventions that are load-bearing rather than stylistic:
 6. **Guard the class, not the instance.** Three separate bugs came from
    fixing the call site in front of me and missing its sibling — v0.20.0
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
+
+---
+
+*Doc rev 185 — refreshed 2026-10-26.* **Rev 184's chain verified end
+to end with the missing link supplied: the toolkit renumbers nothing,
+the device's import moved 10 of 20. Also a trap worth naming — an
+MTP-copied file's mtime is actively misleading, not merely absent.**
+
+### The complete provenance
+
+Doug's actual sequence, which matters because an intermediate file was
+missing when rev 184 was written:
+
+| step | f10=3 at slot | screens moved vs previous |
+|---|---|---|
+| 1. `ROAD_2` original | 20 | — |
+| 2. `ROAD_2` **edited** in the GUI, exported over itself | 20 | **0** |
+| 3. cloned to `ROAD22.fit`, sent to `NewFiles` | 20 | **0** |
+| 4. pulled back off the 840 | **21** | **10 of 20** |
+
+**Every toolkit step preserves `message_index` exactly.** Editing a
+screen, exporting, and cloning move nothing. The renumbering happens
+in one place: the device's import.
+
+Rev 184 reached the same conclusion with step 2 missing, and the
+missing step could have carried the renumbering — a clone of an
+already-renumbered file would have looked identical at step 4. It did
+not, so the conclusion survives with the gap closed rather than by
+assumption.
+
+### ⚠ Do not trust mtime on a file copied off the 840
+
+The device pull carries an mtime of **11:29**. Its contents include a
+change made at **16:27** — the graph fields are there. The timestamp
+is not merely missing, as Doug found when looking for one in OpenMTP;
+what does come across is **wrong**, and wrong in the direction that
+invites a false conclusion ("this is the older pull, not the new
+one").
+
+That nearly happened here: the mtimes suggested the device pull
+predated the file that produced it, which would have made the whole
+comparison look incoherent. It was caught by reading the contents.
+
+**The rule for the 840: identify a pull by what is inside it, never by
+its timestamp.** Content hashes and field arrays are the handles. This
+is a second asymmetry with the 530, where the filesystem mount gives
+honest dates — worth knowing before a "did this actually get written?"
+question comes up again.
 
 ---
 
