@@ -10,7 +10,7 @@
 > wins and this block is stale; fix it.
 >
 > *Rewritten 2026-10-23 at Doc rev 180, open items refreshed
-> 2026-10-26 at rev 182. The previous version had
+> 2026-10-26 at rev 183. The previous version had
 > described v1.5.0 as unreleased since September — six releases stale —
 > and is not preserved: it was planning material for work long since
 > shipped, and every durable fact in it is in the Doc rev stack already.*
@@ -133,6 +133,77 @@ Conventions that are load-bearing rather than stylistic:
 6. **Guard the class, not the instance.** Three separate bugs came from
    fixing the call site in front of me and missing its sibling — v0.20.0
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
+
+---
+
+*Doc rev 183 — refreshed 2026-10-26.* **Confirmed a rename rather
+than a duplicate. And the import that created `ROAD_22` contradicts
+the "device matches by filename" rule this toolkit warns users
+about — a rule whose provenance turns out to be our own docstring.**
+
+### What is now confirmed
+
+- **Rename, not duplicate.** No `ROAD22.fit` survives anywhere:
+  `NewFiles/` is empty, and both `Sports/` and `Sports/Backups/` hold
+  only `CyclingRoadROAD_22.fit`.
+- **Re-importing the identical file is a no-op.** Doug copied the same
+  `ROAD22.fit` into `NewFiles/` again and restarted: the file was
+  consumed, no new profile appeared in the device's list, and no second
+  file was written.
+
+### ⚠ The filename rule is narrower than stated, and thinly evidenced
+
+What this project tells users, in `README` Doc rev 79, in
+`PROJECT_NOTES`, and in a loud warning on the export dialog:
+
+> the device matches by filename on import. A wrongly-named file is
+> ignored with no error.
+
+**For a NEW profile that is plainly false.** `ROAD22.fit` matched no
+existing profile filename and the device imported it, created the
+profile, and renamed the file itself.
+
+Worth tracing where the rule came from, because the answer is
+uncomfortable:
+
+| source | weight |
+|---|---|
+| `write_to_newfiles()`'s docstring: *"this matters -- the device matches by filename during import"* | an assertion in our own code, **with no test recorded** |
+| `PROJECT_NOTES`, which cites *"`write_to_newfiles()`'s own docstring records that..."* | **circular** — it cites us |
+| Doug hand-copying a staged file that the device ignored | real, but **confounded** |
+
+That third one is the only hardware evidence, and the file involved was
+named `<name>_staged_<ts>.fit.editing.fit`. A device ignoring *that*
+may be rejecting the double extension, or the shape, or something else
+entirely — "wrong filename" is one hypothesis among several, and it is
+the one that got written down as fact.
+
+### What is actually still open
+
+The rule may well hold for **replacing an existing profile**, which is
+the case every deploy exercises and the case the warning is really
+about. Nothing here tests that: Doug's second import had **identical
+content**, so a successful replace and a silent rejection look exactly
+the same.
+
+**The discriminating test, one file and one restart:** change something
+visible in `ROAD22.fit` — a data field on a screen — and import it
+again under that same name.
+
+| result | meaning |
+|---|---|
+| `CyclingRoadROAD_22.fit` picks up the change | filename is **not** the match key; identity is internal (sport + display name, most likely), and the warning is wrong |
+| nothing changes | filename matching holds for replacement, and the rule simply needs splitting: new profiles accept any name, replacements do not |
+
+Either outcome settles it. The second would leave the warning correct
+and merely over-broad; the first would mean the export dialog has been
+telling users something false, on the strength of a docstring that
+cited itself.
+
+**Not changing the warning on this evidence.** It is a safe warning
+either way — matching the original filename is never wrong — and
+removing a caution because one of its two legs looks shaky is how a
+real protection gets dropped.
 
 ---
 
