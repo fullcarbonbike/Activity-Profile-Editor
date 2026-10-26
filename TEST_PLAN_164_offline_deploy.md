@@ -119,13 +119,19 @@ The panel instance is **reused** across mode switches and the labels
 are set in `_refresh()`. If that is wrong, a label from one mode
 survives into the other.
 
-| step | do | expect |
-|---|---|---|
-| E1 | **Connected**: edit a screen → Review & Deploy → the Deploy page. Do **not** write — reaching it is the test | "Deploy to Device", "Write to Device (NewFiles) →", eject/check **visible** |
-| E2 | Back out, switch to **offline**. The 530 can stay plugged in and un-ejected | — |
-| E3 | **Offline: clone a profile** → it lands on the Deploy page. Cancel rather than exporting | "Export Profile", "Export...", eject/check **gone, not greyed** |
-| E4 | Back, re-detect, **connected** again | — |
-| E5 | Reach the Deploy page a third time | everything from E1 is **back** |
+| step | do | expect | 2026-10-26 |
+|---|---|---|---|
+| E1 | **Connected**: edit a screen → Review & Deploy → the Deploy page. Do **not** write — reaching it is the test | "Deploy to Device", "Write to Device (NewFiles) →", eject/check **visible** | **pass** |
+| E2 | Back out, switch to **offline**. The 530 can stay plugged in and un-ejected | — | **pass** |
+| E3 | **Offline: clone a profile** → it lands on the Deploy page. Cancel rather than exporting | "Export Profile", "Export...", eject/check **gone, not greyed** | **pass** |
+| E4 | Back, re-detect, **connected** again | — | **pass** |
+| E5 | Reach the Deploy page a third time | everything from E1 is **back** | **pass** |
+
+**E PASSES, 2026-10-26.** E3 observed in full: "Export Profile"
+heading, "Export..." button, **Done greyed but visible** (it enables
+only after a successful export), "‹ Back to Clone Setup" live, and no
+eject or check buttons anywhere. E5 returned every connected-mode
+label correctly.
 
 **E5 is the real test.** E1–E3 would pass even if the labels were set
 once and never refreshed; only the return trip catches a stale one.
@@ -137,15 +143,15 @@ missed.
 
 ---
 
-## Pass criteria
+## Pass criteria — ALL SECTIONS PASS (2026-10-26)
 
 - **A4** — the connected four-stage deploy is unchanged. **Passed.**
 - **B** — the offline edit flow still exports cleanly through the
   extracted helper. **Passed.**
-- **C1** — the reported dead end is gone. **This is now the only test
-  of the actual fix**, since B turned out not to touch it.
+- **C1** — the reported dead end is gone. **Passed** — and it was the
+  only test of the actual fix, since B turned out not to touch it.
 - **D** — the filename guard survived the extraction. **Passed.**
-- **E** — no label survives a mode switch.
+- **E** — no label survives a mode switch. **Passed.**
 
 ## If something fails
 
