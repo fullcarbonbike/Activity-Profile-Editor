@@ -9,7 +9,8 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Rewritten 2026-10-23 at Doc rev 180. The previous version had
+> *Rewritten 2026-10-23 at Doc rev 180, open items refreshed
+> 2026-10-26 at rev 181. The previous version had
 > described v1.5.0 as unreleased since September — six releases stale —
 > and is not preserved: it was planning material for work long since
 > shipped, and every durable fact in it is in the Doc rev stack already.*
@@ -65,9 +66,21 @@ are the things worth not re-deriving:
   backup-store collision to fix first. **Parked by Doug** — nice to
   have.
 
+**⚠ BROKEN IN EVERY RELEASE SINCE v1.5.0:**
+
+- **#166** the GUI does not launch on Windows. `StartupTxtPanel`'s
+  constructor calls an OSX-only wx method behind a `hasattr` guard that
+  does not catch it, and all panels are built eagerly, so the app exits
+  before showing a window. Seven releases shipped with it because
+  Windows was last confirmed in August and the call landed in
+  September. Scoped in `SCOPE_166_windows_launch_crash.md`; the fix is
+  one line and wants a Windows launch test.
+
 **Built, not verified:**
 
-- **#164** offline deploy. Code in, needs a bench pass.
+- **#164** offline deploy. Code in, needs a bench pass
+  (`TEST_PLAN_164_offline_deploy.md` — sections A and B pass, C is the
+  one that tests the actual fix).
 
 **Small and live:**
 
@@ -77,6 +90,14 @@ are the things worth not re-deriving:
 - **#165** per-model field availability. Was cosmetic; now blocks
   classifying any field that exists on one model and not the other,
   because both advisory sets are model-blind.
+
+**Known and deliberately not built:**
+
+- **Direct MTP access on Windows.** Explorer sees an 840 natively, the
+  toolkit cannot — no drive letter, so the drive-letter scan finds
+  nothing (rev 181, tested). Offline mode plus Explorer copying is the
+  working answer; direct support would need the Windows Portable
+  Devices COM API.
 
 **Parked on someone else:**
 
@@ -112,6 +133,68 @@ Conventions that are load-bearing rather than stylistic:
 6. **Guard the class, not the instance.** Three separate bugs came from
    fixing the call site in front of me and missing its sibling — v0.20.0
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
+
+---
+
+*Doc rev 181 — refreshed 2026-10-26.* **Windows shows the 840 in File
+Explorer and the toolkit still cannot see it — tested, not inferred.
+And the same laptop brackets #166: the August build launches, v1.7.3
+does not.**
+
+### MTP is visible to Explorer and invisible to the toolkit
+
+On the Win10 laptop the Edge 840 appears at *This PC → Edge 840 →
+Internal Storage → Garmin*, with no OpenMTP equivalent needed. That is
+a genuine improvement on the Mac, where an 840 needs OpenMTP for every
+pull.
+
+**The GUI did not detect it.** Doug tried with the August build
+sitting on that laptop, 840 connected and visible in Explorer, and
+detection found nothing.
+
+That matches what `_find_garmin_root_windows()` can do: it scans drive
+letters C: through Z: for `Sports/` + `NewFiles/`. An MTP device gets
+no drive letter — what Explorer presents is a shell namespace
+extension, not a mounted filesystem — so there is no path for
+`os.listdir()` to open and nothing for the scan to find.
+
+Predicted here before the test, which is the only reason it is worth
+recording as confirmation rather than as news. The prediction could
+have been wrong; drive-letter reasoning about someone else's OS is
+exactly the kind of thing this project has got wrong before.
+
+**The workflow this gives Windows users of an 840**, which the README
+should say:
+
+1. copy profiles out of `Garmin/Sports` with Explorer
+2. point the toolkit at that folder in **offline mode**
+3. edit, Export
+4. copy the result into `Garmin/NewFiles` with Explorer, restart
+
+Every step the Mac needs OpenMTP for, Explorer does natively. The
+toolkit needs no change for this to work — offline mode was built for
+exactly this shape of problem.
+
+**Direct MTP support is NOT proposed.** It would need the Windows
+Portable Devices COM API, which means either a `pywin32` dependency or
+shelling out to PowerShell, and it would make Windows the only
+platform with direct 840 access. That is attractive and it is real
+work, and offline mode already reaches the same end. Recorded as an
+option, not an item.
+
+### The same laptop brackets #166
+
+The August build **launched** on this machine. v1.7.3 **does not**.
+
+Same hardware, same Python, same wxPython — so the failure is in the
+toolkit between those two versions, which is exactly where the git
+history put it (the call landed 2026-09-27). That is a before-and-after
+on one machine rather than an argument from dates, and it is stronger
+evidence than the archaeology alone.
+
+It also means the Win10 laptop is currently the only machine that can
+test both #166 and this, and it is borrowed. Worth keeping while the
+fix is made.
 
 ---
 
