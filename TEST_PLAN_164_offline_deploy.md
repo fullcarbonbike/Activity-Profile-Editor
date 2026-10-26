@@ -108,17 +108,32 @@ the read-back compare.
 
 ## E. Mode switching in one session — the thing most likely to be broken
 
-The panel instance is **reused** across mode switches, and the labels
-are set in `_refresh()`. If I got that wrong, a label from one mode
+⚠ **Step 2 corrected 2026-10-26**, from Doug asking how to reach the
+Deploy page offline. The original said "reach the Deploy page again"
+without saying how — and per section B, the offline *edit* flow never
+goes there. **Offline you must CLONE**, which is one of only two routes
+(clone and restore) that navigate directly to `DeployPanel`. Third
+section of this plan to be under-specified in the same way.
+
+The panel instance is **reused** across mode switches and the labels
+are set in `_refresh()`. If that is wrong, a label from one mode
 survives into the other.
 
-1. Start **connected**, go as far as the Deploy page, note the heading.
-2. Go back, switch to **offline**, reach the Deploy page again.
-3. Switch back to **connected** and reach it a third time.
+| step | do | expect |
+|---|---|---|
+| E1 | **Connected**: edit a screen → Review & Deploy → the Deploy page. Do **not** write — reaching it is the test | "Deploy to Device", "Write to Device (NewFiles) →", eject/check **visible** |
+| E2 | Back out, switch to **offline**. The 530 can stay plugged in and un-ejected | — |
+| E3 | **Offline: clone a profile** → it lands on the Deploy page. Cancel rather than exporting | "Export Profile", "Export...", eject/check **gone, not greyed** |
+| E4 | Back, re-detect, **connected** again | — |
+| E5 | Reach the Deploy page a third time | everything from E1 is **back** |
 
-Each visit must show the right heading, right button, and right
-visibility of eject/check. **A stale label here is a real bug**, and it
-is exactly the class that bit `StartupTxtPanel` before.
+**E5 is the real test.** E1–E3 would pass even if the labels were set
+once and never refreshed; only the return trip catches a stale one.
+
+**Leaving the device plugged in during E2 is safe by design**, not by
+luck: `enter_offline_mode()` sets `garmin_root = None` deliberately, so
+no device-only path has anything to reach for even if a mode check were
+missed.
 
 ---
 
