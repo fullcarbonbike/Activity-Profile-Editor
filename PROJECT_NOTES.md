@@ -10,7 +10,7 @@
 > wins and this block is stale; fix it.
 >
 > *Rewritten 2026-10-23 at Doc rev 180, open items refreshed
-> 2026-10-27 at rev 187. The previous version had
+> 2026-10-27 at rev 188. The previous version had
 > described v1.5.0 as unreleased since September — six releases stale —
 > and is not preserved: it was planning material for work long since
 > shipped, and every durable fact in it is in the Doc rev stack already.*
@@ -125,6 +125,51 @@ Conventions that are load-bearing rather than stylistic:
 6. **Guard the class, not the instance.** Three separate bugs came from
    fixing the call site in front of me and missing its sibling — v0.20.0
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
+
+---
+
+*Doc rev 188 — refreshed 2026-10-27.* **The 530 renames imported
+profiles too — so it is Edge behaviour, not an 840 quirk. And #168 is
+CONFIRMED FIXED on hardware, by the one test that could confirm it.**
+
+### The test that worked, and why the first one could not
+
+| run | deployed as | device wrote | told us |
+|---|---|---|---|
+| A1 | `CyclingRoadROAD_A1.fit` | the same | **nothing** |
+| A2 | **`zztest.fit`** | **`CyclingRoadROAD_A2.fit`** | **everything** |
+
+A1 was useless and that was my error: #169 made the suggested filename
+canonical, so a renaming device renames it to the string it already
+had. The fix for one thing destroyed the test for another, in the same
+release. Doug deliberately typing a non-canonical name is what
+separated them.
+
+With the names differing, the result is unambiguous:
+
+- the **530 renames** on import, generating
+  `Cycling<Sport><DisplayName>.fit` exactly as the 840 does (rev 182).
+  Previously observed only on the 840, so this was an open question —
+  it is now Edge behaviour across both models this project has.
+- **`on_check()` resolved it.** It found the live profile by display
+  name "ROAD A2" and reported no differences. The old code would have
+  looked for `Sports/zztest.fit`, found nothing, and said it could not
+  verify. That is #168, reproduced and fixed in one run.
+
+### What this settles about reachability
+
+Doc rev 186's worry — that #168's symptom might not be reachable on
+any hardware Doug owns, since the 840 cannot enter device mode at all
+— is answered. **It is reachable, on the 530, by the ordinary clone
+flow.** The fix is not speculative.
+
+### Still open from this run
+
+- whether the 530 also **renumbers** `message_index`, which is what
+  #162's f10 pairing is for. "No differences" is consistent with both
+  "it did not renumber" and "it did, and the pairing handled it" —
+  exactly the ambiguity that made A1 worthless. Only the returned file
+  distinguishes them.
 
 ---
 
