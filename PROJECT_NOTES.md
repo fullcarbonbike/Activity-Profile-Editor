@@ -10,7 +10,7 @@
 > wins and this block is stale; fix it.
 >
 > *Rewritten 2026-10-23 at Doc rev 180, open items refreshed
-> 2026-10-27 at rev 186. The previous version had
+> 2026-10-27 at rev 187. The previous version had
 > described v1.5.0 as unreleased since September — six releases stale —
 > and is not preserved: it was planning material for work long since
 > shipped, and every durable fact in it is in the Doc rev stack already.*
@@ -125,6 +125,72 @@ Conventions that are load-bearing rather than stylistic:
 6. **Guard the class, not the instance.** Three separate bugs came from
    fixing the call site in front of me and missing its sibling — v0.20.0
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
+
+---
+
+*Doc rev 187 — refreshed 2026-10-27.* **The device's filename rule,
+derived from 60+ profiles already on disk rather than from the bench:
+`Cycling<Sport><DisplayName>.fit`, alphanumerics verbatim, SPACE
+converted to UNDERSCORE. Which shows the toolkit's own suggestion has
+been wrong for most of Doug's profiles since the initial commit.**
+
+### The rule
+
+Doug asked whether he needed to enumerate the characters the
+on-device editor accepts. He does not — and the corpus already in
+`uploads/` answered the narrower question that actually matters.
+
+| display name | device's filename |
+|---|---|
+| `ROAD` | `CyclingRoadROAD.fit` |
+| `ROAD 2` | `CyclingRoad**ROAD_2**.fit` |
+| `ROAD_22` | `CyclingRoadROAD_22.fit` |
+| sport `Indoor Cycle` | `Cycling**Indoor_Cycle**…` |
+
+Sixty-plus profiles, no counterexamples: **alphanumerics pass through,
+a space becomes an underscore, an underscore stays.** The same mapping
+applies to the sport segment of the prefix.
+
+**No samples exist for any other punctuation**, so the rule is known
+only over that character set and should not be extrapolated.
+
+### Why enumerating the device's accepted characters is NOT needed
+
+The two namespaces are independent by design:
+
+- the **display name** may hold whatever the device accepts, within
+  the confirmed 15-character limit — not ours to restrict
+- the **filename** must be filesystem-safe, which is our rule, by
+  **allowlist** rather than blocklist, because the illegal set differs
+  per platform
+
+Knowing the device's full accepted set would only matter if the
+toolkit tried to PREDICT the generated filename exactly. Doc rev 184's
+design deliberately avoids that: #168 resolves the live profile by its
+display NAME, which the device preserves, rather than by the filename,
+which it rewrites. So the enumeration has no consumer.
+
+### What it does change: the suggestion has been wrong all along
+
+`_suggest_filename()` strips to alphanumerics and appends `.fit`,
+unchanged since the initial commit and ignoring the source profile
+entirely. For `ROAD 2` it offers `ROAD2.fit` where the device writes
+`CyclingRoadROAD_2.fit` — no prefix, and the space dropped rather than
+converted.
+
+That is wrong for **most profiles Doug owns**, since most of his names
+contain a space. It has gone unnoticed because he always typed a
+filename by hand; accepting the suggestion once, deliberately, is what
+exposed it (rev 182).
+
+Logged as #169, to be built with #162/#168. Deliberately NOT locking
+the filename field, which Doug raised: offline the exported file lands
+in a folder the user manages and another name may be wanted, and the
+device renames regardless, so a lock costs flexibility for no gain.
+
+**A side effect worth having:** the prefix makes Windows reserved-name
+collisions impossible. A profile called `CON` currently suggests
+`CON.fit`, which Windows cannot create; `CyclingRoadCON.fit` is fine.
 
 ---
 
