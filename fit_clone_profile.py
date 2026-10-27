@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "1.0.1"  # New constant, Doug's real on-device test (2026-08-19): PROFILE_NAME_MAX_CHARS = 15 -- Garmin's own Activity Profile name editor hard-blocks typing a 16th character (confirmed directly: typing past 15 switches straight to the checkmark/complete control instead of accepting more input). This is a real, CONFIRMED device UI limit -- distinct from, and much stricter than, NAME_FIELD_SIZE's 31-usable-byte storage capacity below, which patch_profile_name() already enforces safely (raises ValueError, never corrupts). A name between 16 and 31 bytes patches through this tool's raw byte write with no error -- Garmin's own software could never have produced one, so how the device actually renders it (visually truncated? something worse?) is untested territory this toolkit has no reason to create. Backs gui_app.py's new ClonePanel hard block (v0.19.9) -- Doug's explicit call, not a guess: this mirrors an independently-confirmed on-device fact the exact same way NO_SHOW_TOGGLE_TYPES (fit_patch.py) does, so it's enforced the same way (a real block, not soft guidance like startup.txt's character/line counts, which were never independently confirmed on real hardware). No functional change to patch_profile_name() itself -- this is a new reference constant only, the GUI does the enforcing. Prior entry (v1.0.0): initial version.
+__version__ = "1.0.2"  # read_profile_name() ADDED (2026-10-27, #168). The counterpart to patch_profile_name(), which could write the display name since the initial commit while nothing could read it back. Needed because the Edge RENAMES an imported profile from its own sport and display name (Doc rev 182), so the filename a caller deployed under is gone afterwards and the display name is the only handle that survives. Never raises -- a missing sport message, an unreadable file or a non-FIT file all return None, because callers are asking "which of these is mine" across a directory that may hold anything. Prior entry (1.0.1): New constant, Doug's real on-device test (2026-08-19): PROFILE_NAME_MAX_CHARS = 15 -- Garmin's own Activity Profile name editor hard-blocks typing a 16th character (confirmed directly: typing past 15 switches straight to the checkmark/complete control instead of accepting more input). This is a real, CONFIRMED device UI limit -- distinct from, and much stricter than, NAME_FIELD_SIZE's 31-usable-byte storage capacity below, which patch_profile_name() already enforces safely (raises ValueError, never corrupts). A name between 16 and 31 bytes patches through this tool's raw byte write with no error -- Garmin's own software could never have produced one, so how the device actually renders it (visually truncated? something worse?) is untested territory this toolkit has no reason to create. Backs gui_app.py's new ClonePanel hard block (v0.19.9) -- Doug's explicit call, not a guess: this mirrors an independently-confirmed on-device fact the exact same way NO_SHOW_TOGGLE_TYPES (fit_patch.py) does, so it's enforced the same way (a real block, not soft guidance like startup.txt's character/line counts, which were never independently confirmed on real hardware). No functional change to patch_profile_name() itself -- this is a new reference constant only, the GUI does the enforcing. Prior entry (v1.0.0): initial version.
 """
 fit_clone_profile.py -- patch an Activity Profile's display name
 (sport_mesgs[0].name, mesg_num=12, field 3), for cloning a profile
@@ -62,6 +62,51 @@ def field_byte_range(msg, field_def_num):
             return (cursor, cursor + size)
         cursor += size
     raise KeyError(f"field {field_def_num} not present in this message")
+
+
+def read_profile_name(path):
+    """
+    Return a profile's DISPLAY NAME -- the thing the rider sees in the
+    device's profile list -- or None if the file has no sport message
+    or cannot be read.
+
+    Added 2026-10-27 (#168). The counterpart to patch_profile_name(),
+    which has been able to write this field since the initial commit
+    while nothing could read it back.
+
+    WHY IT MATTERS. Doc rev 182: the Edge RENAMES a profile on import,
+    generating `Cycling<Sport><DisplayName>.fit` from the file's own
+    contents, so the filename a caller deployed under is gone
+    afterwards. The display name is what survives, which makes it the
+    only reliable way to find a profile again on the device.
+
+    NEVER RAISES. A missing sport message, an unreadable file or a
+    non-FIT file all return None, because every caller is asking "which
+    of these files is the one I want" over a directory that may hold
+    anything -- an exception there would be a crash, not an answer.
+    """
+    try:
+        messages = parse_fit(path)[0]
+    except Exception:
+        return None
+    msg = find_sport_message(messages)
+    if msg is None:
+        return None
+    try:
+        start, end = field_byte_range(msg, NAME_FIELD_DEF_NUM)
+    except KeyError:
+        return None
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+    except OSError:
+        return None
+    raw = data[start:end]
+    # Everything up to the first NUL. The field is fixed-width and
+    # null-padded, and the padding is NOT guaranteed to be zeros --
+    # Doc rev 116 found uninitialised junk after the terminator in a
+    # Totals.fit name field, which is what misled the SDK there.
+    return raw.split(b"\x00")[0].decode("ascii", "replace")
 
 
 def patch_profile_name(input_path, output_path, new_name):
