@@ -577,6 +577,39 @@ Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
 
+*Doc rev 88 — refreshed 2026-10-27.* **v1.7.4: the GUI starts on
+Windows again, and offline work can leave the app.** See
+`RELEASE_NOTES_v1.7.4.md`.
+
+**The Windows crash is the headline, and the testing gap behind it is
+worth stating.** One line in the boot-message editor called a
+macOS-only wx method behind a guard that checked whether the method
+*exists* — wxPython provides it everywhere and raises off macOS, so the
+guard passed and the call failed. Because every panel is constructed at
+startup, that killed the app before it drew a window. Seven releases,
+v1.5.0 through v1.7.3, shipped it. The cause of the delay was not
+subtlety — one launch catches it — but that Windows left the test loop
+in August while the offending line arrived in late September. The CLI
+tools were unaffected throughout.
+
+**Offline clone and restore had no way out.** Both navigate straight to
+the deploy page, which offered only "Write to Device" and refused when
+pressed, with export living on a panel neither flow returns to. That
+page is now mode-aware: Export offline, with the same CRC-plus-read-back
+verification, and the device-only controls hidden rather than greyed.
+The export routine itself was *extracted* and shared rather than copied,
+since it carries three separately hard-won behaviours that must not
+drift apart.
+
+**And the clone dialog's filename field** no longer stays stuck once you
+clear it — an empty field has nothing to protect, so the auto-suggestion
+resumes.
+
+Separately established and recorded while testing: **the Edge renames
+an imported profile**, constructing the filename from the profile's own
+sport and display name. The `Cycling…` convention is the device's
+output, not a rule users follow.
+
 *Doc rev 87 — refreshed 2026-10-23.* **v1.7.3: three data fields that
 were never in the Edge's menu, and the ten-screen limit enforced
 everywhere.** See `RELEASE_NOTES_v1.7.3.md` for the user-facing summary.

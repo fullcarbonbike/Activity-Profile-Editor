@@ -10,24 +10,25 @@
 > wins and this block is stale; fix it.
 >
 > *Rewritten 2026-10-23 at Doc rev 180, open items refreshed
-> 2026-10-26 at rev 185. The previous version had
+> 2026-10-27 at rev 186. The previous version had
 > described v1.5.0 as unreleased since September — six releases stale —
 > and is not preserved: it was planning material for work long since
 > shipped, and every durable fact in it is in the Doc rev stack already.*
 
-**Shipped:** `v1.7.3` (2026-10-23). Preceding it: `v1.7.2` one layout
-picker for both kinds of screen, `v1.7.1` layout changes stopped
+**Shipped:** `v1.7.4` (2026-10-27) — Windows launches again, and the
+offline deploy dead end is gone. Preceded by `v1.7.3` three new field ids and the ten-screen cap,
+`v1.7.2` one layout picker for both kinds of screen, `v1.7.1` layout changes stopped
 destroying fields, `v1.7.0` row heights drawn to scale and per-model
 slot warnings, `v1.6.1`, `v1.6.0`, `v1.5.0` offline mode. Every release
 is tagged on `main`, tag on the release-notes commit.
 
 **Current versions:** `fit_dump.py` 2.28.0 · `fit_patch.py` 1.20.0 ·
-`gui_app.py` 0.30.0 · `garmin_device.py` 0.13.0 · `fit_census.py` 1.1.0 ·
+`gui_app.py` 0.30.1 · `garmin_device.py` 0.13.0 · `fit_census.py` 1.1.0 ·
 `fit_sdk_check.py` 1.0.0
 
-**Unreleased and awaiting a bench pass:** `gui_app.py` 0.30.0 — #164,
-the offline deploy path. No headless test can drive wx, so it needs
-looking at before it ships.
+**All verified and released.** `gui_app.py` 0.30.1 carries #164, #166
+and #167, each confirmed on hardware — #164 across five sections on
+the Mac, #166 and #167 on the Windows 10 laptop that found the crash.
 
 ### Hardware
 
@@ -66,21 +67,12 @@ are the things worth not re-deriving:
   backup-store collision to fix first. **Parked by Doug** — nice to
   have.
 
-**⚠ BROKEN IN EVERY RELEASE SINCE v1.5.0:**
+**Open process question, not a code item:**
 
-- **#166** the GUI does not launch on Windows. `StartupTxtPanel`'s
-  constructor calls an OSX-only wx method behind a `hasattr` guard that
-  does not catch it, and all panels are built eagerly, so the app exits
-  before showing a window. Seven releases shipped with it because
-  Windows was last confirmed in August and the call landed in
-  September. Scoped in `SCOPE_166_windows_launch_crash.md`; the fix is
-  one line and wants a Windows launch test.
-
-**Built, not verified:**
-
-- **#164** offline deploy. Code in, needs a bench pass
-  (`TEST_PLAN_164_offline_deploy.md` — sections A and B pass, C is the
-  one that tests the actual fix).
+- Should "launch the GUI on Windows" be a release gate? Seven releases
+  shipped a Windows-fatal crash because Windows left the test loop in
+  August. One launch would have caught it. Complicated by the only
+  Windows machine being borrowed (Doc rev 186).
 
 **Small and live:**
 
@@ -133,6 +125,55 @@ Conventions that are load-bearing rather than stylistic:
 6. **Guard the class, not the instance.** Three separate bugs came from
    fixing the call site in front of me and missing its sibling — v0.20.0
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
+
+---
+
+*Doc rev 186 — refreshed 2026-10-27.* **Windows works again,
+confirmed on the machine that found it. #166 and #167 both verified,
+#164 verified across all five sections on the Mac. v1.7.4 is the
+release that makes the toolkit usable on Windows for the first time
+since September.**
+
+### Verified
+
+| | |
+|---|---|
+| **#166** GUI launches on Windows | the window appears, the app works |
+| **#167** filename auto-fill resumes after clearing the field | works in the clone flow |
+| `detect` in the GUI and from the CLI | works, as it always did |
+| **#164** offline deploy, sections A–E | all pass (Mac, 2026-10-26) |
+
+The `unsupported locale setting` line still appears at launch. That is
+the known cosmetic wx/Windows message from Doc rev 88 — a widely
+reported wxWidgets behaviour on Windows, with no locale code anywhere
+in `gui_app.py`. Unchanged, expected, not a symptom of anything here.
+
+### What actually went wrong, in one line
+
+A guard that tested for the wrong thing. `hasattr()` asks whether a
+method exists; the question that mattered was whether calling it works.
+wxPython exposes `OSXDisableAllSmartSubstitutions` on every port and
+raises off macOS, so the guard read as handled and passed straight
+through.
+
+### The process gap, which the fix does not close
+
+Seven releases shipped a Windows-fatal crash. Not because the bug was
+subtle — one launch would have caught it — but because **Windows left
+the test loop in August and nothing noticed**. The Mac is the primary
+machine, every release was tested there, and no step in the release
+procedure asks about a second platform.
+
+Doug's own framing: he had not been doing parallel testing. That is the
+honest cause, and the one-line fix does nothing about it.
+
+**Worth deciding, not decided here:** whether "launch the GUI on
+Windows" becomes a release gate. It is one action, it would have caught
+this, and it does not require the rest of the suite to be repeated.
+Noted as a question for Doug rather than a convention adopted
+unilaterally — and noting that the borrowed 32-bit laptop is currently
+the only Windows access, which makes any such gate contingent on
+hardware that is going back.
 
 ---
 
