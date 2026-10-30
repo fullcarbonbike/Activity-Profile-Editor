@@ -19,9 +19,10 @@
 > file curates out, and it is not in the obvious search path. Doc revs
 > 193–195 are what happens when you skip it.
 
-**Shipped:** `v1.7.6` (2026-10-29) — the filename warning deleted as
-false (#170), `fit_profile_diff.py`, the GUI flow chart, and #151.
-Preceded by `v1.7.5` the toolkit stops trusting handles the device
+**Shipped:** `v1.7.7` (2026-10-30) — `fit_odometer.py` (#106), and
+`Totals.fit`'s first record characterised as the device's own ledger.
+Preceded by `v1.7.6` the filename warning deleted as false (#170),
+`fit_profile_diff.py`, the GUI flow chart and #151. Before that, `v1.7.5` the toolkit stops trusting handles the device
 rewrites (#162, #168, #169) — **note: the v1.7.5 tag landed one commit
 early**, so it carries neither #170 nor its own release notes; it was
 left in place rather than moved and v1.7.6 carries both. Before that,
@@ -34,9 +35,9 @@ is tagged on `main`, tag on the release-notes commit.
 
 **Current versions:** `fit_dump.py` **2.30.0** · `fit_patch.py` 1.20.0 ·
 `gui_app.py` **0.33.0** · `fit_clone_profile.py` 1.0.2 ·
-`garmin_device.py` 0.13.1 · `fit_profile_diff.py` **1.0.0** ·
-`fit_census.py` 1.1.0 · `fit_sdk_check.py` 1.0.0 ·
-`install.sh` **1.0.4**
+`garmin_device.py` 0.13.1 · `fit_profile_diff.py` 1.0.0 ·
+`fit_odometer.py` **1.0.0** · `fit_census.py` 1.1.0 ·
+`fit_sdk_check.py` 1.0.0 · `install.sh` 1.0.4
 
 **All verified and released.** Everything in v1.7.5 and v1.7.6 was
 confirmed on the Edge 530 in device mode —
@@ -55,20 +56,38 @@ v1.7.6 carries both. **The rule that failed was not "tag the
 release-notes commit" — it was that nobody checked `git status` before
 tagging.** Commit first, confirm the tree is clean, then tag.
 
-**Next up, nothing blocking and nothing half-finished.** v1.7.6 is a
-clean stopping point: no partial work in the tree, no test plan
-mid-run, no open question that anything depends on. Three candidates
-when work resumes, in the order I would take them:
+**COMPLETE AND PARKED, 2026-10-30, at `v1.7.7`.** Doug's own
+assessment, and the right one: the toolkit does what he set out to
+build. Nothing is owed, nothing is half-finished, no test plan is
+mid-run, and no open question blocks anything. **A session opening
+this file is not inheriting a task list.**
 
-| | why this one | needs hardware? |
+Three items remain available if ever wanted, none of them a gap:
+
+| | status | needs |
 |---|---|---|
-| **#151** | smallest, self-contained, verified still real 2026-10-23 | no |
-| **#106** | fully scoped, no unknowns, parked by Doug as nice-to-have | yes, to confirm |
-| **#165** | largest; blocks classifying any field that exists on one model only | yes, both models |
+| **#165** per-model field availability | on hold, explicitly not a blocker | both models |
+| **#163** id 111 + the 101–145 block | on hold — the reporter never answered | someone else |
 
-**#151 is the best first task after a gap** — it is a refactor with a
-headless check, so it re-establishes the loop without needing the 530
-plugged in.
+*#106 was on this list and is now shipped (v1.7.7, rev 198). Two
+items remain, neither a gap.*
+
+### Why the project ends here, which is worth recording
+
+Garmin moved two things at once, and both cut against this toolkit:
+newer Edges connect over **MTP** (removing the mass-storage access the
+write path depends on), and their **on-device and Connect profile
+editors got substantially better** (removing much of the reason to
+want it). A few years ago this would have filled a real gap. It now
+does so mainly for the 530-generation hardware that never received
+the better editors — which is also the hardware it works best on.
+
+**That does not depreciate the knowledge.** The format work — ~100
+field ids Garmin does not publish, the layout and row-height models,
+the screen-state model, the device's import behaviour — stands on its
+own, and is written down with its evidence and its confidence level
+attached. That record is what let three wrong conclusions get caught
+in two days during the final week.
 
 ### Working in short sessions
 
@@ -123,6 +142,9 @@ are the things worth not re-deriving:
 | **"Active/reorderable" ≠ "shows while riding."** A separate runtime filter suppresses structurally-normal screens by ride context (Indoor hides Map and Elevation). Nothing in `data_screen` predicts it | rev 16 · `MEMORY_LOG.md` 288–302 |
 | **"Cannot Remove/Hide" has NO structural marker.** Map, ClimbPro and the last user screen are firmware logic keyed on screen TYPE, which is not stored anywhere. The toolkit's hard guards are necessarily content-derived | `MEMORY_LOG.md` 283–286 · rev 197 |
 | **`Sports/` timestamps update on ANY restart** and are not diagnostic. A backup folder's timestamp changes only on genuine content change — that one IS a reliable signal | `MEMORY_LOG.md` 240–242 · rev 197 |
+| `Totals.fit` **record 0 is a live device accumulator** — tracks a ride exactly, field for field; ignores everything the toolkit writes | rev 198, 2 rides + 3 writes |
+| a **multi-record** `Totals.fit` import works, and the device **resumes** counting from a written value | rev 198 |
+| the forum rule *"first row must equal the sum of the rest"* is **FALSE** — 5 working states, never equal | rev 198 |
 | profiles ship with **factory pre-Removed screens** — identical byte-for-byte on a fresh template, not the user's own deletion history | rev 16 · `MEMORY_LOG.md` 157–163 |
 | `mesg 13` f53 = Segments toggle · `training_settings` f63 = ClimbPro toggle · `mesg 280` = likely a Power Curve cache | rev 16 · `MEMORY_LOG.md` 212–229 |
 
@@ -130,10 +152,9 @@ are the things worth not re-deriving:
 
 **Ready to build, no unknowns:**
 
-- **#106** odometer editing (`Totals.fit`). Fully characterised across
-  revs 118/168/169; `SCOPE_106_odometer.md` has the design, including a
-  backup-store collision to fix first. **Parked by Doug** — nice to
-  have.
+- **#106 — DONE**, 2026-10-30, as `fit_odometer.py` rather than a GUI
+  panel. The CLI shape removed the prerequisite bug and two of the
+  three open questions; hardware answered the third. See rev 198.
 
 **Open process question, not a code item:**
 
@@ -219,6 +240,116 @@ Conventions that are load-bearing rather than stylistic:
 7. **Guard the class, not the instance.** Three separate bugs came from
    fixing the call site in front of me and missing its sibling — v0.20.0
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
+
+---
+
+*Doc rev 198 — 2026-10-30.* **#106 is answered in full on hardware.
+`Totals.fit` record 0 is a LIVE DEVICE-LEVEL ACCUMULATOR that tracks
+riding exactly and ignores everything the toolkit writes. A
+multi-record import works. The device resumes counting from a written
+value. And the widely-cited forum rule that "the first row must equal
+the sum of the rest" is FALSE.**
+
+### Record 0, across five events
+
+Unnamed, holds the largest numbers, present in every `Totals.fit` on
+both models. Now characterised by `TEST_PLAN_106_odometer.md` A–D:
+
+| event | record 0 |
+|---|---|
+| real ride on a profile | **moved by the ride's exact distance, time, calories and +1 ride** |
+| 100 mi written into a profile | no change |
+| 200 mi + time + calories + rides written into another | no change, all four fields |
+| four profiles reset to zero in one import | no change |
+| real ride on a reset profile — 68 m, 94 s | **+68 m / +94 s / +1 kcal / +1 — exact** |
+
+**A ride moves it, field for field, in stored units. Nothing the
+toolkit writes ever does.** Two rides and three writes agree, so this
+is established rather than inferred.
+
+The 68 m ride is the better of the two confirmations, and is quoted
+in full for that reason: a delta that small appearing identically in
+two records cannot be rounding or coincidence. The larger ride's
+figures are omitted under the no-personal-statistics rule — the
+equality is the finding, not the mileage. Doug's weather did the
+experiment a favour.
+
+**This explains the 840 corpus anomaly** (rev 198 supersedes nothing;
+the anomaly was never written up). Its record 0 held ~46 mi while its
+`ROAD` record held ~2,010 mi — because 46 mi is what that device had
+genuinely ridden since 2026-09-22, and the 2,010 was written by this
+project at rev 118. Both numbers were correct; they measure different
+things.
+
+### The three questions `SCOPE_106` left open, all settled
+
+| | result |
+|---|---|
+| does a **multi-record** import work? | **yes** — two records rewritten in one file, imported cleanly, nothing else disturbed |
+| does the import disturb record 0? | **no**, in three separate writes |
+| does the device **resume** from a written value? | **yes** — a reset profile counted up from 0 rather than restoring its old total |
+
+The third was the one way this feature could have failed quietly. A
+device that recomputed its own totals after an import would have made
+the whole tool pointless.
+
+### ⚠ The forum's "first row = sum of the rest" rule is FALSE
+
+A Garmin forum thread on exactly this problem contains an answer
+marked verified by its asker:
+
+> *"The first row has to equal the total of all profiles in the rest
+> of the rows."*
+
+**Disproved by five consecutive working device states**, each pulled
+after a successful import:
+
+| | record 0 vs the sum of the rest |
+|---|---|
+| before any test | sum is ~64 mi **lower** |
+| after test A | sum is ~36 mi **higher** |
+| after test B | sum is **236 mi higher** |
+| after test C | sum is ~64 mi lower |
+| after the ride | sum is ~64 mi lower |
+
+They have never been equal, and the sign of the difference flips.
+After test B the sum **exceeded** record 0 by 236 miles, and the
+device accepted that file, imported the next one cleanly, and resumed
+accumulating correctly.
+
+*(Differences only — the absolute figures are a rider's own totals and
+the standing constraint keeps them out of this file. The relationship
+is the finding; the numbers are not.)*
+
+**What actually went wrong in that thread is in the asker's own
+follow-up**: his FIT→CSV→FIT round-trip produced a file where *"some
+of the fields [are] in other orders and there is some hex mess or
+something added onto some of the cells."* The file that worked came
+from a different tool. The responder's other instruction — **"do not
+change the file structure"** — is the one that mattered; the
+arithmetic rule was a hypothesis attached to a fix that worked for an
+unrelated reason.
+
+**This is a direct argument for the byte-level approach.**
+`fit_odometer.py` overwrites values in place and never touches field
+order, widths, record count or message definitions, so it cannot
+produce the file that failed for him. An SDK round-trip rebuilds the
+file and can.
+
+Recorded because the rule is the top answer anyone searching will
+find, and following it means editing a record this toolkit correctly
+refuses to touch.
+
+### What this does NOT establish
+
+- **Why record 0 exists**, or what reads it. No on-device screen shows
+  a lifetime total that Doug has found.
+- **Whether time, calories and rides are read by anything.** They are
+  stored per profile and have no display either. The odometer data
+  field shows distance only, so three of the four fields are writable,
+  verifiable by file, and invisible on the device.
+- **Anything about the 840.** Same format, untested for these
+  questions, and deliberately so — see the test plan.
 
 ---
 

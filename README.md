@@ -383,6 +383,53 @@ decides whether you get a **new** profile or **replace** an existing
 one is the `--name` display name: reuse one and the device overwrites
 that profile.
 
+## The odometer
+
+Each activity profile keeps its own lifetime totals in `Totals.fit`:
+distance, moving time, calories and a ride count. Only distance has
+an on-device display (the Odometer data field).
+
+```bash
+python3 fit_odometer.py list   Totals.fit
+python3 fit_odometer.py reset  Totals.fit new.fit --profile ROAD
+python3 fit_odometer.py set    Totals.fit new.fit --profile ROAD \
+                               --distance 1234mi --time 100:30 \
+                               --calories 45000 --rides 77
+```
+
+`reset` takes `--profile` repeatedly, so a new-year reset of every
+profile is one command. Units must be explicit — `1234mi`, `1985km`,
+`100:30`, `683520s`. A bare number is refused, because the file
+stores metres and seconds and the device **accumulates on whatever
+you write**.
+
+It never writes in place, never creates or deletes a record, never
+touches a profile's name or sport, and verifies afterwards that only
+the records you named changed.
+
+**What the odometer should read is your decision** — leave it, reset
+it, or set it from any report you trust. There is no correct value to
+restore, and the tool does not imply one.
+
+### Two things worth knowing before you edit it
+
+**The first record is the device's own, and is not editable here.**
+It is unnamed, holds the largest numbers, and tracks your riding
+exactly — it grew by precisely the distance, time, calories and ride
+count of a measured ride, twice, while ignoring every value written
+into a profile record. It appears to be the unit's own lifetime
+ledger. This tool shows it and refuses to touch it.
+
+**A widely-repeated forum rule is wrong.** You will find advice that
+the first record must equal the sum of the rest. Five consecutive
+working device states from this project's testing say otherwise —
+they are never equal, and in one the sum exceeded the first record by
+236 miles with no ill effect. The instruction that actually matters
+in that thread is its other one: *do not change the file structure*.
+This tool overwrites values in place and never alters field order,
+widths or record layout, which is what an SDK CSV round-trip can do
+accidentally.
+
 ## Comparing two profiles
 
 After a deploy, the question is usually *"I sent the device this file,
@@ -423,6 +470,7 @@ history is in the Changelog below.
 | `fit_patch.py` | Patch a screen's fields, layout, order or visibility |
 | `fit_chain.py` | Apply several `fit_patch.py` operations in sequence before one device write |
 | `fit_clone_profile.py` | Clone a profile under a new display name (patches `sport_mesgs[0].name`) |
+| `fit_odometer.py` | Read, reset or set a profile's odometer in `Totals.fit` — distance, time, calories and ride count |
 | `fit_profile_diff.py` | Compare two profiles — what moved, what changed, or byte-identical. For answering "I sent the device this, it gave me back that" |
 | `make_flowchart.py` | Regenerates `GUI_FLOWCHART.pdf`. A documentation tool, not part of the app — the only file here needing a third-party package (`reportlab`) |
 | `fit_census.py` | Read-only raw screen census across a folder of profiles. Reports counts, layout variants and screen types without names, for measuring what a model actually offers |
@@ -615,6 +663,35 @@ link is missing; restore from a backup, or set it again on the device.
 Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
+
+*Doc rev 91 — refreshed 2026-10-30.* **v1.7.7: `fit_odometer.py`, and
+what the unnamed first record in `Totals.fit` actually is.** See
+`RELEASE_NOTES_v1.7.7.md`.
+
+New CLI tool to read, reset or set a profile's lifetime totals —
+distance, moving time, calories and ride count. `reset` takes
+`--profile` repeatedly, so clearing every profile for a new year is
+one command. Units must be explicit, because the file stores metres
+and seconds and the device accumulates on whatever is written. It
+never writes in place, never creates or removes a record, never
+touches a profile's name or sport, and verifies afterwards that only
+the records you named changed.
+
+**The first record is the device's own ledger.** Measured across five
+events on an Edge 530: it moved by exactly the distance, time,
+calories and ride count of a real ride — twice, the second only 68
+metres — and did not move at all for any value written into a profile
+record. Riding moves it; this toolkit never does. It is shown and
+refused for editing.
+
+**And the forum rule that the first record must equal the sum of the
+rest is false.** Five consecutive working device states, never equal,
+once differing by 236 miles in the wrong direction. What matters is
+not altering the file's structure — which byte-level patching cannot
+do and an SDK CSV round-trip can.
+
+Tested A–D on real hardware, including a ride afterwards to confirm
+the device resumes counting from a written value.
 
 *Doc rev 90 — refreshed 2026-10-29.* **v1.7.6: the export dialog's
 filename warning is deleted, because it was never true.** See
