@@ -92,12 +92,23 @@ profile you pulled last week with nothing plugged in.
 5. Copy the exported file into `Garmin/NewFiles/` on the device and
    restart the Edge.
 
-**The filename matters, and the dialog handles it for you.** The Edge
-matches profiles by filename on import and silently ignores anything
-that does not match — no error, no indication, the profile simply does
-not change. The save dialog pre-fills the original filename. Change it
-anyway and you get a warning naming the consequence, not a refusal:
-exporting a spare copy under another name is legitimate.
+**The filename is up to you.** The Edge renames profiles it imports
+from `NewFiles`, building the name from the profile's own sport and
+display name — so `ROAD 2` arrives as `CyclingRoadROAD_2.fit` whatever
+you called the file. The save dialog pre-fills the original name
+because that is the one you recognise, not because the device needs
+it. Rename it freely.
+
+**`NewFiles` is the only route that works.** Copying a profile
+straight into `Garmin/Sports` does not import it, whatever you call
+the file. This matches Garmin's own guidance, which names `NewFiles`
+as the way to restore a profile on models without Connect profile
+sync.
+
+*Corrected 2026-10-28.* Earlier versions of this README said the
+device silently ignores a differently-named file. It does not — five
+imports across both models, each renamed and applied, one returned
+byte-for-byte identical under a deliberately wrong name.
 
 `startup.txt`, the custom boot message, works in both modes.
 
@@ -364,8 +375,34 @@ by hand):
 
 ```bash
 python3 fit_clone_profile.py <staged_file> <cloned_file> --name "NewBikeName"
-python3 garmin_device.py deploy <cloned_file> <NEW_FILENAME>.fit   # filename must NOT match an existing profile
+python3 garmin_device.py deploy <cloned_file> <ANY_NAME>.fit
 ```
+
+The filename here is arbitrary — the Edge renames on import. What
+decides whether you get a **new** profile or **replace** an existing
+one is the `--name` display name: reuse one and the device overwrites
+that profile.
+
+## Comparing two profiles
+
+After a deploy, the question is usually *"I sent the device this file,
+it gave me back that one — what changed, and was it me or the
+device?"*
+
+```bash
+python3 fit_profile_diff.py SENT.fit RETURNED.fit
+```
+
+It reports byte-identity, which screens **moved** to a different slot
+(the device renumbering a new profile), and which screens **changed**,
+pairing them by screen identity rather than slot number. It prints
+what a slot-based comparison would have said too, because the
+disagreement between the two is itself the signal: identity saying
+"nothing changed" while slots say "six things changed" is the
+signature of a renumbering import.
+
+Exit status is 0 when the profiles are equivalent and 1 when they
+differ, so it works in a loop over a backup folder.
 
 ## Tools
 
@@ -386,6 +423,8 @@ history is in the Changelog below.
 | `fit_patch.py` | Patch a screen's fields, layout, order or visibility |
 | `fit_chain.py` | Apply several `fit_patch.py` operations in sequence before one device write |
 | `fit_clone_profile.py` | Clone a profile under a new display name (patches `sport_mesgs[0].name`) |
+| `fit_profile_diff.py` | Compare two profiles — what moved, what changed, or byte-identical. For answering "I sent the device this, it gave me back that" |
+| `make_flowchart.py` | Regenerates `GUI_FLOWCHART.pdf`. A documentation tool, not part of the app — the only file here needing a third-party package (`reportlab`) |
 | `fit_census.py` | Read-only raw screen census across a folder of profiles. Reports counts, layout variants and screen types without names, for measuring what a model actually offers |
 | `fit_sdk_check.py` | Checks whether the installed garmin-fit-sdk still mis-renders the profile-name field in a `Totals.fit`. Read-only. Exits 0 faithful, 1 mangled, 2 could not run — so a future SDK fix announces itself instead of going unnoticed |
 | `fit_raw_walk.py` | Internal support — generic FIT byte-offset walker. Not meant to be run directly, but it is what to trust for undocumented messages |
@@ -576,6 +615,65 @@ link is missing; restore from a backup, or set it again on the device.
 Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
+
+*Doc rev 90 — refreshed 2026-10-29.* **v1.7.6: the export dialog's
+filename warning is deleted, because it was never true.** See
+`RELEASE_NOTES_v1.7.6.md`.
+
+**The claim died in three stages**, each a softened version of the
+last: that the Edge ignores a differently-named file (false — it
+imports and renames it); that matching the name stops the device
+rewriting your file (false — a deliberately misnamed deploy came back
+byte-for-byte identical); and finally that the name matters if you
+write straight into `Garmin/Sports/` (false, and worse — that route
+does not import a profile at all, under any name). The dialog is gone
+rather than reworded. What replaces it is the fact that was true all
+along and had never been shown to a user: **`Garmin/NewFiles/` is the
+only import route.**
+
+Also in this release: **`fit_profile_diff.py`**, for comparing what
+you sent against what the device gave back, pairing screens by
+identity rather than slot number; a three-page **`GUI_FLOWCHART.pdf`**
+with the generator that rebuilds it; the last two hardcoded device
+observations moved out of the GUI into `fit_dump.py`, verified as a
+pure refactor across 6,864 states; and `install.sh` no longer tells
+Windows users the toolkit does not support them.
+
+**Note:** `v1.7.5` was tagged one commit early and contains neither
+#170 nor its own release notes. The tag was left in place rather than
+moved, and **v1.7.6 carries both releases' content**.
+
+*Doc rev 89 — refreshed 2026-10-28.* **v1.7.5: the toolkit stops
+trusting handles the device rewrites, and a warning it had been giving
+for months is deleted because it was never true.** See
+`RELEASE_NOTES_v1.7.5.md`.
+
+**Two bugs that had been hiding each other.** The Edge renames a
+profile when it imports it, generating the filename from the profile's
+own sport and display name — so after a clone deploy the post-write
+check looked for the name you chose, found nothing, and reported it
+could not verify a write that had succeeded. Separately, a device
+import can move a screen to a different internal slot, and the
+change-comparison paired screens by that slot number. Fixing the first
+alone would have exposed the second: a verification that successfully
+opens a renumbered file and then confidently describes changes nobody
+made. Both shipped together. The check now resolves the live profile
+by the display name inside the file, and screens pair on their stable
+type identity — on a real renumbered pair the old pairing reports 11
+differences on a byte-identical profile, the new one reports none.
+
+**And the filename warning was wrong in every version of itself.** The
+claim that the Edge matches by filename and silently ignores anything
+else is false; the device accepts any name and renames the file. One
+profile deployed under a deliberately wrong name returned
+byte-for-byte identical. The claim lived in eight places and is gone
+from all of them — two were found not by searching but by running the
+export and reading the dialog. What replaces it is the thing that is
+actually true and had never been shown to a user: `Garmin/NewFiles/`
+is the only route that works, and copying into `Garmin/Sports/` does
+not import a profile.
+
+All four items confirmed on an Edge 530 in device mode.
 
 *Doc rev 88 — refreshed 2026-10-27.* **v1.7.4: the GUI starts on
 Windows again, and offline work can leave the app.** See
@@ -908,10 +1006,9 @@ but it is also simply how you edit a profile you pulled last week with
 nothing plugged in. **Export** replaces Deploy: it writes to a folder
 you choose, checks the file's own CRC before writing anything, then
 reads the copy back and byte-compares before reporting success. The save
-dialog pre-fills the profile's ORIGINAL filename, because the device
-matches by filename on import and silently ignores anything else —
-no error, no indication, the profile simply does not change.
-`startup.txt` gets the same treatment.
+dialog pre-fills the profile's original filename as a convenience; the
+device renames whatever it imports, so the name you choose does not
+affect whether it works. `startup.txt` gets the same treatment.
 
 **Layout rules are per-model.** Every table in this toolkit was measured
 on an Edge 530 and applied to every device. With two models that started

@@ -9,26 +9,85 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Rewritten 2026-10-23 at Doc rev 180, open items refreshed
-> 2026-10-27 at rev 188. The previous version had
-> described v1.5.0 as unreleased since September — six releases stale —
-> and is not preserved: it was planning material for work long since
-> shipped, and every durable fact in it is in the Doc rev stack already.*
+> *Rewritten 2026-10-23 at Doc rev 180; refreshed 2026-10-27 at rev
+> 188 and **2026-10-28 at rev 195**, after v1.7.5 shipped.*
+>
+> **⚠ If you are a new session picking this up: read
+> `MEMORY_LOG.md` too.** It is the reconstruction of the project's
+> original thread, which was lost; it holds the pre-2026-08-01 work
+> and nothing else does. It is narrative, it keeps the dead ends this
+> file curates out, and it is not in the obvious search path. Doc revs
+> 193–195 are what happens when you skip it.
 
-**Shipped:** `v1.7.4` (2026-10-27) — Windows launches again, and the
-offline deploy dead end is gone. Preceded by `v1.7.3` three new field ids and the ten-screen cap,
+**Shipped:** `v1.7.6` (2026-10-29) — the filename warning deleted as
+false (#170), `fit_profile_diff.py`, the GUI flow chart, and #151.
+Preceded by `v1.7.5` the toolkit stops trusting handles the device
+rewrites (#162, #168, #169) — **note: the v1.7.5 tag landed one commit
+early**, so it carries neither #170 nor its own release notes; it was
+left in place rather than moved and v1.7.6 carries both. Before that,
+`v1.7.4` Windows launches again and the offline deploy dead end is
+gone, `v1.7.3` three new field ids and the ten-screen cap,
 `v1.7.2` one layout picker for both kinds of screen, `v1.7.1` layout changes stopped
 destroying fields, `v1.7.0` row heights drawn to scale and per-model
 slot warnings, `v1.6.1`, `v1.6.0`, `v1.5.0` offline mode. Every release
 is tagged on `main`, tag on the release-notes commit.
 
-**Current versions:** `fit_dump.py` 2.28.0 · `fit_patch.py` 1.20.0 ·
-`gui_app.py` 0.30.1 · `garmin_device.py` 0.13.0 · `fit_census.py` 1.1.0 ·
-`fit_sdk_check.py` 1.0.0
+**Current versions:** `fit_dump.py` **2.30.0** · `fit_patch.py` 1.20.0 ·
+`gui_app.py` **0.33.0** · `fit_clone_profile.py` 1.0.2 ·
+`garmin_device.py` 0.13.1 · `fit_profile_diff.py` **1.0.0** ·
+`fit_census.py` 1.1.0 · `fit_sdk_check.py` 1.0.0 ·
+`install.sh` **1.0.4**
 
-**All verified and released.** `gui_app.py` 0.30.1 carries #164, #166
-and #167, each confirmed on hardware — #164 across five sections on
-the Mac, #166 and #167 on the Windows 10 laptop that found the crash.
+**All verified and released.** Everything in v1.7.5 and v1.7.6 was
+confirmed on the Edge 530 in device mode —
+`TEST_PLAN_162_168_169.md` sections A–E and
+`TEST_PLAN_170_filename_note.md` A′/B′, all passing. #151 is a
+refactor, verified headlessly across 6,864 states. The 840 cannot
+enter device mode at all (MTP-only, never mounts), so none of the
+device-mode work is testable there.
+
+**⚠ Tagging, read this before the next release.** `v1.7.5` was tagged
+on the commit that was already `HEAD`, which predated its own release
+notes — so it carries #162/#168/#169 but not #170, and
+`RELEASE_NOTES_v1.7.5.md` was never in it. Left in place rather than
+moved, because rewriting a published tag is worse than explaining one;
+v1.7.6 carries both. **The rule that failed was not "tag the
+release-notes commit" — it was that nobody checked `git status` before
+tagging.** Commit first, confirm the tree is clean, then tag.
+
+**Next up, nothing blocking and nothing half-finished.** v1.7.6 is a
+clean stopping point: no partial work in the tree, no test plan
+mid-run, no open question that anything depends on. Three candidates
+when work resumes, in the order I would take them:
+
+| | why this one | needs hardware? |
+|---|---|---|
+| **#151** | smallest, self-contained, verified still real 2026-10-23 | no |
+| **#106** | fully scoped, no unknowns, parked by Doug as nice-to-have | yes, to confirm |
+| **#165** | largest; blocks classifying any field that exists on one model only | yes, both models |
+
+**#151 is the best first task after a gap** — it is a refactor with a
+headless check, so it re-establishes the loop without needing the 530
+plugged in.
+
+### Working in short sessions
+
+*Added 2026-10-28. Doug is moving to shorter/cheaper sessions for a
+while; this is the operating mode that suits that, and it is good
+practice regardless.*
+
+1. **One item per session.** Each of the three above is a session.
+   Finish with the Doc rev written, not with code uncommitted.
+2. **Lead with the file.** Every expensive mistake this week came from
+   reasoning about a file instead of reading one — revs 189, 193, 194.
+   "Here is the file, here is what I expected, here is what I got" in
+   the first message is worth more than any amount of discussion.
+3. **Name the item.** "#151" loads less context than describing it.
+4. **State the version you are running.** Half a day was spent in
+   October on a bug already fixed, because the laptop's version was
+   assumed rather than checked.
+5. **A new session should read this block, then `MEMORY_LOG.md`, then
+   the newest few Doc revs.** Not the whole file — it is ~200 revs.
 
 ### Hardware
 
@@ -57,6 +116,15 @@ are the things worth not re-deriving:
 | the SDK mis-renders undocumented fields **structurally**, not by version | rev 162 |
 | the data-field id space is **Garmin-wide**, shared across product lines | rev 173 |
 | the ten-user-screen cap is an **editor** cap; the device renders more but its editor cannot manage them | revs 170, 175, 179 |
+| the Edge **renames every profile it imports** to `Cycling<Sport><DisplayName>.fit`, both models; the filename you send is discarded | revs 182, 187, 188, 192 |
+| **`NewFiles` is the only import route.** Direct overwrite of `Sports/` works once, then stops permanently once a profile has touched `NewFiles` | `MEMORY_LOG.md` line 235, 2026-08-01 |
+| a device import **renumbers `message_index`** when the profile is NEW; a replacement is left alone. The filename is NOT the trigger | revs 184, 190, 192 |
+| …but an import is **not the only** renumbering mechanism: a native on-device **Remove** compacts `f9` and relocates `message_index` too | `MEMORY_LOG.md` 249–252 · rev 197 |
+| **"Active/reorderable" ≠ "shows while riding."** A separate runtime filter suppresses structurally-normal screens by ride context (Indoor hides Map and Elevation). Nothing in `data_screen` predicts it | rev 16 · `MEMORY_LOG.md` 288–302 |
+| **"Cannot Remove/Hide" has NO structural marker.** Map, ClimbPro and the last user screen are firmware logic keyed on screen TYPE, which is not stored anywhere. The toolkit's hard guards are necessarily content-derived | `MEMORY_LOG.md` 283–286 · rev 197 |
+| **`Sports/` timestamps update on ANY restart** and are not diagnostic. A backup folder's timestamp changes only on genuine content change — that one IS a reliable signal | `MEMORY_LOG.md` 240–242 · rev 197 |
+| profiles ship with **factory pre-Removed screens** — identical byte-for-byte on a fresh template, not the user's own deletion history | rev 16 · `MEMORY_LOG.md` 157–163 |
+| `mesg 13` f53 = Segments toggle · `training_settings` f63 = ClimbPro toggle · `mesg 280` = likely a Power Curve cache | rev 16 · `MEMORY_LOG.md` 212–229 |
 
 ### Open items
 
@@ -105,6 +173,20 @@ are the things worth not re-deriving:
   anywhere specific, which is the problem.
 - **358's family** — settled as *none*, correctly (rev 180).
 
+**Reasons that may be missing from this record, not bugs:**
+
+Rule 6 above exists because the project's foundational decisions
+predate this file. These are things the toolkit does unquestioningly
+whose justification is not written down here — check `MEMORY_LOG.md`
+first, then ask Doug, before treating any of them as arbitrary:
+
+- the eject-and-restart sequence after a `NewFiles` write
+- backing up `Sports/` rather than the whole `Garmin/` tree
+- the restart-after-copy requirement itself
+
+Not a task list. A list of things not to "clean up" on the assumption
+that nobody had a reason.
+
 ### How this project works, for anyone picking it up
 
 Conventions that are load-bearing rather than stylistic:
@@ -122,9 +204,681 @@ Conventions that are load-bearing rather than stylistic:
    is not. This file says which.
 5. **A claim from one observation says so in the claim.** Rev 171
    generalised from a single file and rev 179 had to undo it.
-6. **Guard the class, not the instance.** Three separate bugs came from
+6. **⚠ `MEMORY_LOG.md` IS PART OF THE RECORD. Search it.** The
+   project's original thread was lost when Doug moved to Claude Pro;
+   `MEMORY_LOG.md` (archived 2026-08-01) is its reconstruction and the
+   only place that work exists. It is narrative rather than
+   structured, and it deliberately keeps the dead ends and corrections
+   this file curates out — so it holds things nothing else does.
+   **Never conclude something is undocumented without grepping it**,
+   and never read "it isn't in the notes" as "it was never
+   established": ask Doug as the backstop. Revs 193 and 194 are the
+   worked example — I declared a foundational finding lost, had Doug
+   reconstruct it from memory, and then found it in `MEMORY_LOG.md`
+   line 235, stated more precisely than either of us had it.
+7. **Guard the class, not the instance.** Three separate bugs came from
    fixing the call site in front of me and missing its sibling — v0.20.0
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
+
+---
+
+*Doc rev 197 — 2026-10-29. The `MEMORY_LOG.md` audit rev 194 called
+for.* **All 454 lines read. The headline is not what I expected: these
+facts were not MISSING from this file — most are in Doc rev 16, about
+10,000 lines down, and absent from the one block anyone actually
+reads. Six promoted into the durable table. One qualifies a conclusion
+from last week.**
+
+### What the audit actually found
+
+I went looking for knowledge that existed only in `MEMORY_LOG.md`.
+Three items were genuinely absent from `PROJECT_NOTES.md` entirely.
+The rest were **present but unreachable** — recorded in the earliest
+revs, correct, and buried under 10,000 lines of append-only history.
+
+**That is a different problem from the one rev 194 described, and a
+worse one.** A fact that is absent can be rediscovered. A fact that is
+*recorded where nobody looks* reads, to anyone searching, exactly like
+a fact that was never established — which is how rev 193 happened. The
+State of play block exists so that picking this project up takes one
+read; a durable finding that is not in it is only nominally written
+down.
+
+### ⚠ The one that qualifies a recent conclusion
+
+Rev 192 established that **an import renumbers `message_index` when
+the profile is new, and leaves a replacement alone**. That stands.
+
+But `MEMORY_LOG.md` 249–252 records a second mechanism, from the
+project's first week:
+
+> *"When eviction DOES happen: lowest-f9 screen evicted, every
+> remaining f9 renumbered to close the gap, message_index physically
+> relocated. Same renumbering also happens on plain native Remove (not
+> just NewFiles) — general device mechanism."*
+
+So **a native on-device Remove relocates `message_index` too**, with
+no import involved. Not a contradiction — rev 192's claim is about
+imports and is unaffected — but its table row read as though imports
+were the only way slots move. They are not, and a user who removes a
+screen on the device between two toolkit sessions will see exactly the
+effect #162 was built to survive.
+
+**#162's fix is unaffected and this is why**: it pairs on f10 and does
+not care *why* slots moved. Rev 184's instruction — *do not model the
+device* — paid for itself again. Had the fix keyed on "was this a new
+profile?", this finding would have broken it.
+
+### Promoted to the durable-knowledge table
+
+| | was it in PROJECT_NOTES? |
+|---|---|
+| native Remove also relocates `message_index` | **no** |
+| "Active/reorderable" ≠ shows while riding — a runtime filter | yes, rev 16, line 10424 |
+| "Cannot Remove/Hide" has no structural marker — firmware, keyed on a type that isn't stored | **no** |
+| `Sports/` timestamps are not diagnostic; backup-folder timestamps are | **no** |
+| factory pre-Removed screens | yes, rev 16 |
+| mesg 13 f53 / training_settings f63 / mesg 280 | yes, rev 16, line 10695 |
+
+The third matters most for rule 6: the toolkit hard-blocks hiding Map
+and ClimbPro (#37), and the *reason* — that the device's own
+restriction has no byte to read, so a content-derived guard is the
+only kind possible — was written down once, in the lost thread, and
+nowhere since. That is precisely a guard someone would later "clean
+up" as arbitrary.
+
+### What was checked and deliberately NOT promoted
+
+Dev-environment paths (superseded), the 80-id dictionary (long since
+grown and living in `fit_dump`), the GUI flow sketch (built), the
+`fit_chain` and `get_device_info` build notes (shipped), and the
+`--new-slot` failure analysis (superseded by #161 and the cap work).
+Promoting those would bulk the table without adding anything true that
+is not already enforced in code.
+
+### `MEMORY_LOG.md` itself is unchanged, and stays that way
+
+Not appended to, not reorganised, not corrected. Its value is being a
+dated snapshot of one lost thread; editing it would destroy the only
+thing it is good for. **The pattern is: `MEMORY_LOG` stays frozen,
+and anything load-bearing found in it gets promoted here with a line
+citation.** Six rows now carry such citations.
+
+**This audit is done and should not need repeating.** If something
+else surfaces from it later, promote that one fact — do not re-audit.
+
+---
+
+*Doc rev 196 — 2026-10-29.* **#151 closed, and a stale claim in
+`install.sh` found while checking something else: it told Windows
+users the toolkit did not support them, three months after it did.**
+
+### #151 — the last two device facts leave the GUI
+
+`build_diagram_inputs()` held two hardcoded `elif` branches: Map at 0
+fields and Segment at 4 fields each have a variant B that changes the
+screen's **content proportions** rather than its field grid. Device
+observations, sitting in the presentation layer where `fit_patch` and
+the CLI could not see them.
+
+Now `CONTENT_COMPOSITION_NOTES` in `fit_dump`, beside
+`NAMED_SCREEN_LAYOUTS`, read through `content_composition_note(f10,
+count)` with the same *None means say nothing* contract as
+`row_height_note()`.
+
+Keyed by `(f10, count)` and **not** by variant, deliberately: the note
+describes what choosing B *does*, so it belongs to the state where the
+choice exists rather than to one side of it.
+
+**Not model-qualified, and that is a real limitation rather than an
+oversight.** Both observations are 530-only. They should move when
+#165 provides somewhere to record per-model facts — noted in the table
+itself so the next person does not have to rediscover it.
+
+**Verified as a refactor, not as working code.** Old and new logic
+replayed across **6,864 states** — every named `f10`, counts 0–10,
+variants 0–3, both products plus `None`, measured and unmeasured —
+**zero mismatches**. "The new path works" would have been the weaker
+claim; what was needed was "nothing changed."
+
+### ⚠ `install.sh` had been lying to Windows users since August
+
+Found while checking whether the installers enumerate files, which
+they do not. Both the header comment and the platform-check error gave
+the same reason for being macOS-only:
+
+> *"device detection in `garmin_device.py` isn't implemented on
+> Windows/Linux yet"*
+
+Untrue since August. `_find_garmin_root_windows()` ships (#85),
+`install_windows.bat` ships and was confirmed on hardware (#93), and
+v1.7.4 fixed the last blocker to the GUI launching on Windows 10.
+
+The script **is** still macOS-only — it uses Homebrew and checks for
+Xcode Command Line Tools. That is a fact about the **installer**, not
+about the toolkit, and the two were conflated. A Windows user who ran
+it was told the project did not support them, and the fix is to point
+at `install_windows.bat`.
+
+**Third instance this week of the same species** — #170's filename
+claim, rev 193's `Sports/` rationale, now this. All three were true
+when written, quietly stopped being true, and survived because nothing
+re-reads a comment that already sounds settled. Worth noting that none
+of the three was found by looking for it.
+
+---
+
+*Doc rev 195 — 2026-10-28, from Doug's A′1 bench run.* **Two more
+copies of the removed claim, in the two places a user is most likely
+to read it — and my 0.32.0 sweep missed them because I grepped for
+the sentence I had written rather than for the claim.**
+
+### What Doug saw
+
+He ran A′1, reported the export succeeded with no prompt either way,
+and described the success dialog in passing: an "Exported to" line, a
+"Verified twice" line, and one starting *"To put it on the Edge…"*.
+
+That third line ended: **"Keep the filename exactly as it is."** So
+did `DeployPanel`'s offline *exported* status. Both say the thing
+#170 exists to delete, immediately after export — the exact moment
+the user is about to copy the file somewhere.
+
+### Why the sweep missed them
+
+The 0.32.0 sweep grepped `matches profiles by filename`, `silently
+ignores`, `accepted-then-ignored` — **the phrasings I had written in
+the docstrings.** These two are the imperative form, sharing no
+wording with any of them.
+
+Searching for *the sentence* instead of *the claim* is a narrower
+version of the same mistake as rule 7: I guarded the instances I
+recognised. A claim can be restated in a form your grep does not
+match, and user-facing strings are where it will be, because they are
+written for people rather than copied from a comment.
+
+The sweep that would have worked searched for what a user is told to
+DO: `keep the filename`, `same name`, `must match`. Running that
+afterwards found one more — the README's clone-deploy example, which
+warned that the filename must not collide with an existing profile.
+The collision that matters is the **display name**; the filename is
+discarded on import.
+
+### Total, for one false claim
+
+| | |
+|---|---|
+| places it lived | **8** — 2 gui_app docstrings, 2 gui_app user strings, 2 garmin_device docstrings, 2 README passages |
+| found by my greps | 6 |
+| found by Doug running the thing | **2** |
+
+And the two the bench found were the only two a **user** would ever
+have read. Every one I found by searching was a comment.
+
+### Both strings now also say what MEMORY_LOG knew
+
+Rather than just dropping the false half, both now carry the true
+constraint that has been in `MEMORY_LOG.md` since 2026-08-01 and has
+never once been shown to a user: **NewFiles is the only route that
+works; copying into Garmin/Sports does not import the profile.** That
+is more useful than what was there, and it is the advice the deleted
+sentence was a corrupted memory of.
+
+---
+
+*Doc rev 194 — 2026-10-28. **CORRECTS rev 193 on where the knowledge
+was, and sharpens the finding itself.*** **The `Sports/` result was
+never lost. It is in `MEMORY_LOG.md`, line 235, dated 2026-08-01 — the
+file created for exactly this purpose. I did not search it. And the
+real finding is more precise than either of us remembered: direct
+overwrite of `Sports/` works ONCE, then stops permanently once a
+profile has touched `NewFiles`.**
+
+### The actual record
+
+> *"Direct overwrite of `Sports/<Profile>.fit` is UNRELIABLE — works
+> once, then stops taking effect permanently once a profile's touched
+> NewFiles even once (confirmed twice on Roadtest)."*
+> — `MEMORY_LOG.md`, archived 2026-08-01
+
+Which is not "it never worked". It is worse-behaved than that: it
+works on a virgin profile and then dies silently and permanently. For
+any profile this toolkit has ever deployed to, the route is dead —
+so Doug's recollection is right in practice and the mechanism is
+stranger than the summary.
+
+The same file also records the design consequence: **anything from
+this toolkit must go through `NewFiles`' import/rebuild pathway**,
+because once a profile has been through it the live-save path no
+longer applies to it.
+
+### Where the project's record actually begins
+
+| | |
+|---|---|
+| `MEMORY_LOG.md` archived | **2026-08-01** — the floor |
+| oldest observed artifact | 2026-07-31, a 530 corpus file |
+| first git commit | 2026-08-11 |
+| earliest `PROJECT_NOTES` rev dates | 2026-08-04 |
+
+### What rev 193 got wrong, and the better lesson
+
+Rev 193 said the finding "appears **nowhere**" and built a rule on
+that. It searched `PROJECT_NOTES.md` and `README.md`. It did not
+search `MEMORY_LOG.md` — **the file whose entire stated purpose is
+to be the durable copy of the lost thread**, which says so in its own
+first paragraph.
+
+So the lesson is not "the record has a floor and things below it are
+gone". It is nearly the opposite, and more useful:
+
+> **`MEMORY_LOG.md` is part of the record and is not in the obvious
+> search path.** It is the only place the pre-2026-08-01 work exists,
+> it is narrative rather than structured, and it holds dead ends and
+> corrections that `PROJECT_NOTES.md` deliberately curated out. Search
+> it before concluding anything is undocumented.
+
+Rule 6 is rewritten accordingly. The "ask Doug" advice stands as a
+backstop, but it should be the second resort, not the first — I asked
+him to be the surviving copy of something the project had already
+written down.
+
+**Three corrections in two days on the same dialog** (192, 193, 194),
+each from acting on an absence of evidence rather than going to look.
+That is now the pattern worth naming, more than any fact about
+filenames.
+
+---
+
+*Doc rev 193 — 2026-10-28, from Doug's recollection at the #170 bench
+test.* **`Garmin/Sports` is not an import route. Writing a modified
+profile directly into it was tried repeatedly in this project's
+earliest days and never worked, under any filename — which is WHY the
+toolkit uses `NewFiles`. That reason was never written down, and its
+absence let rev 192 invent an "untested" case out of it.**
+
+### The finding
+
+Garmin's own documentation names `NewFiles` as the supported route for
+restoring a profile — the method for older models that predate the
+Garmin Connect profile sync on the x40 generation. The project tried
+`Sports/` directly, repeatedly, and only made progress once it switched
+to `NewFiles`. Everything built since rests on that, silently.
+
+**Searched before writing this**: `NewFiles` appears throughout the
+notes and the README as *what the toolkit does*, and the failed
+`Sports/` experiment appears **nowhere**. The decision survived; the
+evidence for it did not.
+
+### Why it is missing, which matters more than this one fact
+
+Doug: the project's original start was **lost when he moved to Claude
+Pro**, and what exists was reconstructed from surviving files and
+memory. The `Sports/` testing almost certainly happened there.
+
+So this is not a lapse in note-taking. **The record has a floor**, and
+the material below it is the earliest work — which is also the most
+foundational, the most assumed-ever-after, and the least likely to be
+restated later precisely because it was settled so early. Every
+"obvious" thing this toolkit does is a candidate.
+
+Now rule 6 in *How this project works*, because it changes how to read
+a silence in this file: **absence below the floor means lost, not
+untested.** Ask rather than infer.
+
+### What it cost, immediately
+
+Rev 192 ended by scoping #170 as "delete or rewrite", and I rewrote —
+keeping a note on the grounds that the `Sports/` case was *untested*.
+It was not untested. It was tested early and comprehensively, and the
+answer was that the route does not work.
+
+So the note I shipped was worse than the warning it replaced. The old
+warning was false about something harmless; the new note told the user
+to preserve a filename **for a route that does not exist**, which
+implies the route does. Doug caught it on the bench.
+
+**The dialog is now deleted outright.** Three justifications died in
+order, each a softened version of the last:
+
+| | claim | killed by |
+|---|---|---|
+| 1 | the device ignores a differently-named file | rev 183 |
+| 2 | matching the name stops the device rewriting it | rev 192 |
+| 3 | keep the name for the `Sports/` route | **rev 193 — no such route** |
+
+Nothing remains to warn about.
+
+### The actual lesson, which is not about this dialog
+
+**"Untested" and "not in my notes" are different claims, and I
+conflated them.** Rev 192 searched for evidence that the `Sports/`
+route worked, found none, and recorded the gap as an open question.
+The correct reading of an undocumented decision in a project with this
+much written history is that **the reason was load-bearing and got
+lost**, not that it was never established.
+
+This file is nine months and 193 revs of exactly such reasons. The one
+category it does not cover well is the foundational decisions from
+before the file existed — they are the ones everything rests on and the
+ones least likely to be restated.
+
+**Worth a sweep**, logged rather than done now: what else does the
+toolkit do unquestioningly whose reason is nowhere in the record?
+Candidates visible from here, all plausibly from below the floor —
+the eject-and-restart sequence, backing up `Sports/` rather than the
+whole `Garmin/` tree, and the restart-after-copy requirement itself.
+
+The cheap version of this sweep is not archaeology: it is **asking
+Doug** when one of them next becomes load-bearing. He is the only
+surviving copy.
+
+---
+
+*Doc rev 192 — 2026-10-28.* **ANSWERED, after four doc revs: the
+renumbering trigger is the profile being NEW, not the filename. The
+filename hypothesis is disproven — a replacement imported under
+`qqtest.fit` came back BYTE-IDENTICAL. Which also disproves rev 183's
+surviving justification for the export dialog's filename warning.**
+
+### The experiment
+
+`ROAD_T1` edited (screen 5 field 3, `96 Battery Level` → `0
+Calories`), exported as **`qqtest.fit`**, hand-copied to `NewFiles`,
+restarted. A **replacement** under a **non-canonical** filename — the
+one cell rev 191's table was missing.
+
+| | |
+|---|---|
+| device renamed it to | `CyclingRoadROAD_T1.fit` |
+| the edit | applied, verified on the device screen |
+| slots moved | **0** |
+| content differences | **0** |
+| **md5, sent vs returned** | **`599cd0448673` — identical** |
+
+Not "no differences I checked for". The same 4742 bytes.
+
+### The completed table
+
+| case | model | new/replace | filename | renumbered |
+|---|---|---|---|---|
+| `ROAD_22` | 840 | new | non-canonical | **yes** |
+| `ROAD A2` | 530 | new | non-canonical | **yes** |
+| rev 179 | 840 | replace | canonical | no |
+| `ROAD_T1` | 530 | replace | canonical | no |
+| **`qqtest`** | **530** | **replace** | **non-canonical** | **no** |
+
+Hold the filename at non-canonical and vary only new-vs-replacement:
+**new renumbers, replacement does not.** The confound rev 184 declined
+to guess at is broken, and the filename — the candidate I twice let
+creep toward being the answer — is not it.
+
+Mechanically sensible: a new profile has to be assigned slots as the
+device writes it into its own ordering; a replacement already has
+them.
+
+**The one untested cell is new + canonical.** Not needed to break the
+confound, and it is the hardest to arrange, since a new profile under a
+canonical name requires predicting the name the device would generate.
+Leave it. "New" is consistent with all five observations and the
+filename is excluded.
+
+### ⚠ And this kills the export dialog's filename warning
+
+The warning says a differently-named file will be ignored. Rev 183
+established that claim is false, but left it a *reworded* warning
+rather than a deleted one, on this reasoning:
+
+> *"Matching the original name is still the right advice — it appears
+> to be what stops the device rewriting your file."*
+
+**That is now disproven too.** `qqtest.fit` is as non-matching as it
+gets, and the device rewrote nothing at all. So the warning has no
+surviving factual basis: the device neither ignores a differently-named
+file nor rewrites it. What it does is rename it, which costs the user
+nothing.
+
+Logged as its own item rather than fixed here — but it is now a
+**deletion or a complete rewrite**, not the reword rev 183 scoped.
+Third time this warning's rationale has been revised; the pattern is
+that each revision kept a weaker version of a claim that was simply
+untrue, which is worth more suspicion than one more careful rewording.
+
+### What it does NOT change
+
+Nothing in the shipped fix. #162 pairs by f10 regardless of why the
+device renumbers, which was rev 184's explicit design instruction —
+*do not model the device.* Knowing the trigger is now a documentation
+improvement and a better warning, not a code change.
+
+---
+
+*Doc rev 191 — 2026-10-28.* **Section B passes. And a correction to
+what Check even means: it compares SENT against LIVE, so "no
+differences" is the pass — the test plan's B2 asked for the opposite
+and contradicted its own B1.**
+
+### What `on_check()` actually compares
+
+```python
+self.verify_lines = describe_screen_changes(
+    self.frame.editing_path,   # what we SENT
+    live_path)                 # what is on the device NOW
+```
+
+A deploy that landed correctly makes those two identical. **Check
+naming your edit would mean the write had failed.** Pre-Flight is the
+panel that lists changes against the original; Check verifies arrival.
+Two different comparisons, and the test plan conflated them — B2 said
+Check should report "that change and nothing else" while B1 said it
+should verify cleanly, which cannot both be true of the same run.
+
+I repeated the wrong expectation to Doug *during* the test, before
+reading `on_check()`. He had already reported the correct result —
+"the Reconnect reported that nothing changed" — and it was his
+mentioning it in passing that prompted the read. A pass very nearly
+got recorded as needing investigation.
+
+**Same failure as rev 189, one step earlier:** asserting from what I
+remembered the code did instead of opening it. The file was two
+grep lines away, exactly as the staging profile was one request away.
+
+### B's real content, and the result
+
+| | |
+|---|---|
+| B1/B2 — ordinary deploy, Check | **pass**, no differences |
+| B3 — the pairing still *finds* real changes | **pass, in the GUI** |
+
+B3 is the risk B was written for and the one Check structurally cannot
+test. On `ROAD_T1` (530, replacement, canonical filename) Doug changed
+screen 5 field 3, `346 Power Graph` → `96 Battery Level`. Baseline
+against the post-restart pull: **exactly one difference, the edit**,
+under both pairings, zero slots moved.
+
+**And the GUI showed both halves in sequence**, which is stronger than
+the headless diff and was nearly missed:
+
+| panel | reported | meaning |
+|---|---|---|
+| Pre-Flight | "Power Graph → Battery Level" | the pairing **found** the real change |
+| Check, after reconnect | "no differences" | the write **landed** |
+
+That is the complete, correct behaviour of both comparisons in one
+run, observed on screen. It only surfaced because Doug clarified what
+he had paraphrased — my question had conflated the two panels, so his
+first answer reported only the one I asked about. **The wrong question
+got a correct answer that looked like a partial one.**
+
+So the pairing suppresses false differences (rev 190) *and* still
+reports true ones. Those are separate properties and each now has its
+own evidence.
+
+### The renumbering tally, fourth cell still missing
+
+| case | model | new/replace | filename | renumbered |
+|---|---|---|---|---|
+| `ROAD_22` | 840 | new | non-canonical | **yes** |
+| `ROAD A2` | 530 | new | non-canonical | **yes** |
+| rev 179 | 840 | replace | canonical | no |
+| **`ROAD_T1`** | **530** | **replace** | **canonical** | **no** |
+
+A clean split — but *new* and *non-canonical* still co-vary, so the
+trigger remains confounded exactly as rev 184 left it. The missing
+cell is **replacement under a non-canonical filename**, which Doug is
+running next. Still not load-bearing: the fix holds either way.
+
+---
+
+*Doc rev 190 — 2026-10-27. **SUPERSEDES rev 189, which was wrong.***
+**The 530 DID renumber on the A2 import — one screen, slot 12 → 11.
+So A2 proved #162 on hardware as well as #168, and `TEST_PLAN`
+section C is already satisfied. Rev 189 reached the opposite
+conclusion from a substitute baseline, which is the failure mode rev
+189 itself was warning about.**
+
+### What the real diff shows
+
+Doug sent the staging file. Against `zztest_clone_20261027_184741.fit`
+rather than the older `CyclingRoadROAD.fit` pull:
+
+| | |
+|---|---|
+| file size, both | 4742 bytes — *identical*, and the md5s differ |
+| screens, both | 31 |
+| screens whose content changed | **0** |
+| screens whose `message_index` moved | **1** |
+
+`f10=26` moved from slot **12** to slot **11**, swapping with the
+unconfigured screen that was at 11. Nothing else in the file changed.
+A same-size rewrite with one pair of records transposed.
+
+### This is exactly the case #162 exists for
+
+| pairing | reports |
+|---|---|
+| by `message_index` (old) | **2 differences** — slot 11 "gained a screen", slot 12 "lost one" |
+| by f10 (new) | **0 differences** |
+
+And the GUI printed **"(no difference)"** on the bench. That is only
+reachable through the f10 pairing. So the bench run did not merely
+avoid a false alarm by luck — it met the one condition that
+distinguishes the two pairings and came out right.
+
+**Both halves of this release are now confirmed on hardware**, in the
+same run, from the one test that could do it:
+
+| | status |
+|---|---|
+| **#168** — resolve the renamed profile by display name | **proven on hardware** (rev 188) |
+| **#162** — pair screens by f10 | **proven on hardware** (this rev) — previously headless only |
+
+### Why rev 189 got it backwards
+
+The staging file was not reachable from the sandbox, so I substituted
+the `CyclingRoadROAD.fit` already in `uploads/` and named the
+substitution as a caveat. The caveat was not enough: that older pull
+*already had* `f10=26` at slot 11, so the move the device made was
+exactly cancelled by the drift between the two baselines. Zero
+observed movement, and the wrong conclusion.
+
+**The lesson is not "state the caveat".** Rev 189 did state it, and
+still published a wrong finding as the headline. The lesson is that a
+substitute baseline cannot answer a question *about a one-slot
+difference* — the substitution's own drift is the same size as the
+signal. The right move was to ask for the staging file, which is what
+produced the answer within minutes of asking.
+
+Fourth time this project has had a conclusion overturned by getting
+the actual file (revs 179, 184, 188, and now this). Every one of them
+went the same way: the file was obtainable, and reasoning from the
+nearest available substitute was the error.
+
+### What this does to the trigger question
+
+Rev 189 claimed the non-canonical filename was "ruled out as a
+sufficient cause". **Withdrawn** — it was built on the same wrong
+diff. The tally now:
+
+| case | model | new or replace | filename | renumbered |
+|---|---|---|---|---|
+| `ROAD_22` (rev 171/184) | 840 | new | non-canonical | **yes** |
+| `ROAD A2` (this rev) | **530** | new | non-canonical | **yes** |
+| rev 179's import | 840 | replace | canonical | **no** |
+
+Two for two on non-canonical, and the renumbering now reproduces
+**across both models** — so it is Edge behaviour, like the renaming.
+But `canonical` and `replacement` still move together in the only
+negative case, so the trigger stays confounded exactly as rev 184 left
+it. **Still not worth chasing**: the fix holds either way by design,
+which is the whole reason rev 184 said not to model the device.
+
+---
+
+*Doc rev 189 — 2026-10-27. **SUPERSEDED by rev 190: its central
+finding is wrong.** Left in place per the append-only rule; read it
+for the method failure, not the conclusion.* **The 530 did NOT renumber on the A2
+import. So A2 confirmed #168 and told us nothing about #162 — the f10
+pairing is still proven only headlessly, and test C is still the only
+thing that can prove it on hardware.**
+
+### What the returned file says
+
+Doug sent `CyclingRoadROAD_A2.fit` back off the 530. The deployed
+`zztest.fit` staging copy is not reachable from this sandbox, so the
+comparison is against the `CyclingRoadROAD.fit` pull already in
+`uploads/` — the profile the clone descends from.
+
+| | |
+|---|---|
+| screens, both files | **31** |
+| screens whose `message_index` moved | **0** |
+| screens paired by f10 whose content differs | 4, plus one slot newly configured |
+
+Every screen sits in the slot it had in the source: `f10=104` still at
+13, `f10=32` still at 10, the unconfigured tail still filling 11–30.
+The device left the numbering alone.
+
+**Caveat, stated rather than buried:** the baseline is an older pull,
+not the exact file deployed, which is why four screens differ — those
+are Doug's own edits accumulated since, not device behaviour. The
+*slot* comparison survives that, because rev 185 established the
+toolkit's own edit/export/clone chain preserves `message_index`
+exactly, so any movement between source and returned file would have
+to be the device's.
+
+### Why this matters more than it looks
+
+The same trap as A1, one layer down. A2 reported "no difference", which
+is what a working f10 pairing looks like — and also what an unmoved
+slot set looks like through the **old** pairing. The run could not tell
+them apart, and now the file says it was the second.
+
+So:
+
+| | status after A2 |
+|---|---|
+| **#168** — resolve the renamed profile | **proven on hardware** (rev 188) |
+| **#162** — pair screens by f10 | **proven headless only** — 0 differences on the real `ROAD_22` pair where slot pairing reported 11 |
+
+The f10 pairing has still never run on the bench against a file the
+device renumbered. **Section C of `TEST_PLAN_162_168_169.md` is
+therefore not optional**, and its C3 — send the pulled file — is the
+step that stops C from passing vacuously the way A2 just did.
+
+### And the trigger is still unknown
+
+Rev 184 listed the confounded variables — non-canonical filename, new
+profile, something else — and declined to pick one. A2 removes one
+candidate rather than choosing: **a non-canonical filename alone does
+not provoke renumbering.** `zztest.fit` was as non-canonical as it
+gets, and nothing moved.
+
+What remains different about the `ROAD_22` case that did renumber: it
+was an 840 import, and it was a *new* profile rather than a
+replacement. Neither is isolated. Not worth chasing — the fix holds
+either way, by design (rev 182's "do not model the device") — but the
+model should not claim a cause it does not have.
 
 ---
 

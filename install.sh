@@ -1,9 +1,19 @@
 #!/usr/bin/env bash
 #
-# install.sh -- Setup script for the Garmin Edge 530 Activity Profile
-# Screen Editor toolkit (macOS only -- device detection in
-# garmin_device.py isn't implemented on Windows/Linux yet; see
-# README.md).
+# install.sh -- Setup script for the Activity Profile Editor for
+# Garmin Edge (macOS only; Windows users run install_windows.bat).
+#
+# CORRECTED 2026-10-29 (v1.0.4). This header, and the platform-check
+# error below, both said macOS-only BECAUSE "device detection in
+# garmin_device.py isn't implemented on Windows/Linux yet". That
+# stopped being true in August: _find_garmin_root_windows() ships,
+# install_windows.bat ships and was confirmed on hardware, and v1.7.4
+# fixed the last blocker to the GUI launching on Windows 10.
+#
+# The script is still macOS-only, for its own reasons -- it checks for
+# Xcode Command Line Tools and uses Homebrew. That is a fact about the
+# INSTALLER, not about the toolkit, and the two were conflated. A
+# Windows user running this was told the toolkit did not support them.
 #
 # What this does:
 #   1. Confirms you're on macOS.
@@ -51,7 +61,7 @@ set -euo pipefail
 # "Next steps" output also mentions it as the no-Terminal-needed
 # alternative to the two commands already listed. No change to the
 # actual dependency-install logic above. Prior entry (1.0.2):
-SCRIPT_VERSION="1.0.3"
+SCRIPT_VERSION="1.0.4"
 
 # 1.0.2 -- real bug fix (2026-08-13): once past the Xcode CLT/python3
 # checks on a real Mac (Homebrew python3 3.14, freshly installed),
@@ -114,7 +124,7 @@ die()   { error "$1"; exit 1; }
 info "install.sh v$SCRIPT_VERSION"
 info "Checking platform..."
 if [[ "$(uname -s)" != "Darwin" ]]; then
-    die "This install script currently supports macOS only -- device detection (garmin_device.py) isn't implemented on Windows or Linux yet. See README.md."
+    die "This install script is macOS only -- it uses Homebrew and Xcode Command Line Tools. The TOOLKIT itself runs on Windows: use install_windows.bat instead. See README.md."
 fi
 MAC_VERSION="$(sw_vers -productVersion 2>/dev/null || echo unknown)"
 info "macOS $MAC_VERSION detected ($(uname -m))"
