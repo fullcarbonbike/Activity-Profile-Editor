@@ -392,13 +392,16 @@ an on-device display (the Odometer data field).
 ```bash
 python3 fit_odometer.py list   Totals.fit
 python3 fit_odometer.py reset  Totals.fit new.fit --profile ROAD
+python3 fit_odometer.py reset  Totals.fit new.fit --profile "ROAD A1"
 python3 fit_odometer.py set    Totals.fit new.fit --profile ROAD \
                                --distance 1234mi --time 100:30 \
                                --calories 45000 --rides 77
 ```
 
 `reset` takes `--profile` repeatedly, so a new-year reset of every
-profile is one command. Units must be explicit — `1234mi`, `1985km`,
+profile is one command. **Quote any profile name containing a
+space** — unquoted, the shell splits it and the name arrives
+truncated. Units must be explicit — `1234mi`, `1985km`,
 `100:30`, `683520s`. A bare number is refused, because the file
 stores metres and seconds and the device **accumulates on whatever
 you write**.
@@ -663,6 +666,27 @@ link is missing; restore from a backup, or set it again on the device.
 Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
+
+*Doc rev 92 — refreshed 2026-10-31.* **v1.7.8: the odometer tool is
+confirmed on the Edge 840 and on Windows 10, and profile names with
+spaces now explain themselves.** See `RELEASE_NOTES_v1.7.8.md`.
+
+v1.7.7 named two gaps in its own release notes; both are closed. An
+odometer was set with this tool, written to an 840 over MTP, and the
+new value **read back off the device's own Odometer field** — a
+confirmed import, not just a confirmed file copy. `list` and `set`
+both verified on Windows 10.
+
+Anticipated before it was tested: the tool reproduces a `Totals.fit`
+the 840 had previously accepted to within 3 bytes of 795 — one
+`sport` byte it refuses to write by design, and the two CRC bytes.
+
+Also: an unquoted `--profile ROAD A1` now tells you to quote it
+instead of failing with "unrecognized arguments"; a near-miss name
+suggests the right one; and a mistyped path reports itself instead of
+raising a traceback. Every doc example used a single-word profile
+name, which is how that gap survived testing — all of them now show a
+spaced one.
 
 *Doc rev 91 — refreshed 2026-10-30.* **v1.7.7: `fit_odometer.py`, and
 what the unnamed first record in `Totals.fit` actually is.** See

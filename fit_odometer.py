@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-__version__ = "1.0.0"  # RESET TAKES SEVERAL PROFILES, SET TAKES ONE AND SAYS SO (2026-10-29). Doug's stated workflow is a reset every January 1st, which covers every profile at once -- four chained invocations for an annual task is the kind of friction that makes a tool go unused. `reset --profile A --profile B ...` resolves EVERY name before writing anything, so a typo among good names touches nothing rather than zeroing half the list and then failing. `set` is deliberately NOT repeatable: one set of values cannot be right for two profiles. It still takes action=append, purely so that passing two can be REFUSED -- plain argparse silently keeps the last, and quietly writing your numbers to a profile you did not name is the worst thing this tool could do. A duplicate --profile is refused too. The preview now lists what will be left Untouched, because with several names the thing worth checking before pressing y is what is NOT in the list. #106 AS A CLI, NOT A GUI PANEL (2026-10-29, Doug's design). SCOPE_106_odometer.md scoped a GUI feature with a prerequisite bug and three open questions; a path-in/path-out CLI removes all four. (1) The backup-store collision is GONE, not fixed: that bug existed because backing Totals.fit into working_dir/backups/ made it appear in Restore-a-Deleted-Profile's picker, which finds candidates by "filename ends in .fit". This tool follows fit_patch's input_file/output_file convention, never writes in place and never touches the backup store, so the collision cannot arise. (2) It WORKS ON THE 840, which the GUI version could not have -- that write path was device-mode-only and the 840 has no device mode. A file path serves both models identically. (3) "Where does Totals.fit live?" -- the user says. (4) "Direct overwrite or NewFiles?" -- neither; it emits a file and tells you to use NewFiles, which is both the proven route (rev 118) and the only route (MEMORY_LOG.md 235). UNITS ARE EXPLICIT BY REQUIREMENT, not by default: a bare number for distance or time is REFUSED. The stored units are metres and seconds, the user thinks in miles and hours, and a silent unit error here writes a wrong lifetime odometer that the device then ACCUMULATES ON -- the one mistake in this tool that is expensive and invisible. NAME IS THE ONLY KEY: field 3 (sport) is unreliable -- on Doug's own 530, GRAVEL carries sport=255 despite being a real cycling profile with hundreds of logged miles, while the zeroed test profiles carry sport=2. Same conclusion #168 reached for profile files, reached again here independently.
+__version__ = "1.0.1"  # QUOTING HINTS, FROM DOUG USING IT (2026-10-31). Half his profiles are named with a space ("ROAD A1"), and an unquoted --profile ROAD A1 fails inside argparse as "unrecognized arguments: A1" -- accurate and useless. The hint cannot live in find_one() because argparse exits before any of this module's code runs, so _Parser overrides error() and appends the fix when the message is about unrecognized arguments. find_one() separately suggests a near match for the two realistic typos: a case slip, and a name truncated at its first word, which is what an unquoted space produces when it does NOT trip argparse. Docs and --help now show a spaced example; they only ever showed single-word names, which is how the gap survived. No behaviour change to any write path. Prior entry (1.0.0): RESET TAKES SEVERAL PROFILES, SET TAKES ONE AND SAYS SO (2026-10-29). Doug's stated workflow is a reset every January 1st, which covers every profile at once -- four chained invocations for an annual task is the kind of friction that makes a tool go unused. `reset --profile A --profile B ...` resolves EVERY name before writing anything, so a typo among good names touches nothing rather than zeroing half the list and then failing. `set` is deliberately NOT repeatable: one set of values cannot be right for two profiles. It still takes action=append, purely so that passing two can be REFUSED -- plain argparse silently keeps the last, and quietly writing your numbers to a profile you did not name is the worst thing this tool could do. A duplicate --profile is refused too. The preview now lists what will be left Untouched, because with several names the thing worth checking before pressing y is what is NOT in the list. #106 AS A CLI, NOT A GUI PANEL (2026-10-29, Doug's design). SCOPE_106_odometer.md scoped a GUI feature with a prerequisite bug and three open questions; a path-in/path-out CLI removes all four. (1) The backup-store collision is GONE, not fixed: that bug existed because backing Totals.fit into working_dir/backups/ made it appear in Restore-a-Deleted-Profile's picker, which finds candidates by "filename ends in .fit". This tool follows fit_patch's input_file/output_file convention, never writes in place and never touches the backup store, so the collision cannot arise. (2) It WORKS ON THE 840, which the GUI version could not have -- that write path was device-mode-only and the 840 has no device mode. A file path serves both models identically. (3) "Where does Totals.fit live?" -- the user says. (4) "Direct overwrite or NewFiles?" -- neither; it emits a file and tells you to use NewFiles, which is both the proven route (rev 118) and the only route (MEMORY_LOG.md 235). UNITS ARE EXPLICIT BY REQUIREMENT, not by default: a bare number for distance or time is REFUSED. The stored units are metres and seconds, the user thinks in miles and hours, and a silent unit error here writes a wrong lifetime odometer that the device then ACCUMULATES ON -- the one mistake in this tool that is expensive and invisible. NAME IS THE ONLY KEY: field 3 (sport) is unreliable -- on Doug's own 530, GRAVEL carries sport=255 despite being a real cycling profile with hundreds of logged miles, while the zeroed test profiles carry sport=2. Same conclusion #168 reached for profile files, reached again here independently.
 
 """
 Read and edit a Garmin Edge `Totals.fit` -- the per-profile odometer.
 
     python3 fit_odometer.py list   TOTALS.fit
+    python3 fit_odometer.py reset  IN.fit OUT.fit --profile ROAD
     python3 fit_odometer.py reset  IN.fit OUT.fit --profile "ROAD A1"
     python3 fit_odometer.py set    IN.fit OUT.fit --profile "ROAD A1" \\
                                    --distance 2240mi --time 189:42 \\
@@ -100,9 +101,19 @@ def read_records(path):
 
     Returns a list of dicts. `raw` holds the parsed message so the
     patcher can find byte offsets without re-walking the file.
+
+    A missing or unreadable path exits with a message rather than a
+    traceback -- found by mistyping one. A stack trace is a fine
+    answer for a programming error and a poor one for a typo.
     """
+    if not os.path.isfile(path):
+        sys.exit(f"No such file: {path}")
     out = []
-    for msg in fit_raw_walk.parse_fit(path)[0]:
+    try:
+        msgs = fit_raw_walk.parse_fit(path)[0]
+    except (OSError, struct.error, ValueError, IndexError) as e:
+        sys.exit(f"Could not read {os.path.basename(path)} as a FIT file: {e}")
+    for msg in msgs:
         if msg.get('kind') != 'data' or msg.get('mesg_num') != TOTALS_MESG:
             continue
         d = {num: raw for num, _size, _type, raw in msg['fields']}
@@ -288,8 +299,23 @@ def find_one(records, name):
     """The single named record, or exit explaining why not."""
     hits = [r for r in records if r['name'] == name]
     if not hits:
-        known = ", ".join(repr(r['name']) for r in records if r['name'])
-        sys.exit(f"No record named {name!r}. Named records are: {known}\n"
+        names = [r['name'] for r in records if r['name']]
+        # Suggest before listing. The two realistic mistakes are a case
+        # slip and an unquoted space that truncated the name at the
+        # first word -- both are recognisable, so say so rather than
+        # making the user eyeball a list.
+        near = [n for n in names if n.lower() == name.lower()]
+        if not near:
+            near = [n for n in names
+                    if n.lower().startswith(name.lower() + ' ')]
+        hint = ""
+        if near:
+            hint = f"\nDid you mean {near[0]!r}?"
+            if any(' ' in n for n in near):
+                hint += (" Names with spaces need quoting: "
+                         f"--profile \"{near[0]}\"")
+        sys.exit(f"No record named {name!r}.{hint}\n"
+                 f"Named records are: {', '.join(repr(n) for n in names)}\n"
                  f"Matching is exact and case-sensitive -- it is the only "
                  f"reliable key, since the sport field is not.")
     if len(hits) > 1:
@@ -414,12 +440,32 @@ not a cap. A reset leaves it counting from zero.
 
 # --------------------------------------------------------------------- CLI
 
+class _Parser(argparse.ArgumentParser):
+    """
+    argparse with one extra hint.
+
+    Found by Doug using it: half his profiles have a space in the name
+    ("ROAD A1"), and an unquoted `--profile ROAD A1` fails inside
+    argparse as "unrecognized arguments: A1" -- true, and useless. The
+    tool's own code never runs, so the hint cannot live in find_one().
+    """
+
+    def error(self, message):
+        if 'unrecognized arguments' in message:
+            message += ("\n\nIf a profile name contains a space, quote it: "
+                        "--profile \"ROAD A1\"\n(or escape it: "
+                        "--profile ROAD\\ A1). Run `list` to see exact names.")
+        super().error(message)
+
+
 def main(argv=None):
-    p = argparse.ArgumentParser(
+    p = _Parser(
         description="Read and edit a Garmin Edge Totals.fit odometer.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Units are explicit by requirement: --distance 2240mi, "
-               "--time 189:42. A bare number is refused.")
+               "--time 189:42. A bare number is refused.\n"
+               "Quote any profile name containing a space: "
+               "--profile \"ROAD A1\"")
     sub = p.add_subparsers(dest='cmd', required=True)
 
     q = sub.add_parser('list', help="show every record, change nothing")
@@ -434,7 +480,8 @@ def main(argv=None):
     # different profiles, so repeating it could only mean a mistake.
     r.add_argument('--profile', required=True, action='append',
                    metavar='NAME',
-                   help="exact profile name; repeat for several")
+                   help='exact profile name, quoted if it has a space; '
+                        'repeat for several')
     r.add_argument('--yes', action='store_true', help="skip the confirmation")
 
     s = sub.add_parser('set', help="set one profile's totals")
@@ -445,7 +492,8 @@ def main(argv=None):
     # last one, and quietly writing your values to a profile you did
     # not name is the worst failure this tool could have.
     s.add_argument('--profile', required=True, action='append',
-                   metavar='NAME', help="exact profile name")
+                   metavar='NAME',
+                   help='exact profile name, quoted if it has a space')
     s.add_argument('--distance', type=parse_distance,
                    help="with unit: 2240mi, 3604km, 3604920m")
     s.add_argument('--time', type=parse_time,

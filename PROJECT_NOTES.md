@@ -19,9 +19,10 @@
 > file curates out, and it is not in the obvious search path. Doc revs
 > 193–195 are what happens when you skip it.
 
-**Shipped:** `v1.7.7` (2026-10-30) — `fit_odometer.py` (#106), and
-`Totals.fit`'s first record characterised as the device's own ledger.
-Preceded by `v1.7.6` the filename warning deleted as false (#170),
+**Shipped:** `v1.7.8` (2026-10-31) — the odometer tool confirmed on
+the 840 and on Windows 10, plus quoting hints. Preceded by
+`v1.7.7` `fit_odometer.py` (#106) and `Totals.fit`'s first record
+characterised as the device's own ledger, and `v1.7.6` the filename warning deleted as false (#170),
 `fit_profile_diff.py`, the GUI flow chart and #151. Before that, `v1.7.5` the toolkit stops trusting handles the device
 rewrites (#162, #168, #169) — **note: the v1.7.5 tag landed one commit
 early**, so it carries neither #170 nor its own release notes; it was
@@ -36,7 +37,7 @@ is tagged on `main`, tag on the release-notes commit.
 **Current versions:** `fit_dump.py` **2.30.0** · `fit_patch.py` 1.20.0 ·
 `gui_app.py` **0.33.0** · `fit_clone_profile.py` 1.0.2 ·
 `garmin_device.py` 0.13.1 · `fit_profile_diff.py` 1.0.0 ·
-`fit_odometer.py` **1.0.0** · `fit_census.py` 1.1.0 ·
+`fit_odometer.py` **1.0.1** · `fit_census.py` 1.1.0 ·
 `fit_sdk_check.py` 1.0.0 · `install.sh` 1.0.4
 
 **All verified and released.** Everything in v1.7.5 and v1.7.6 was
@@ -56,7 +57,7 @@ v1.7.6 carries both. **The rule that failed was not "tag the
 release-notes commit" — it was that nobody checked `git status` before
 tagging.** Commit first, confirm the tree is clean, then tag.
 
-**COMPLETE AND PARKED, 2026-10-30, at `v1.7.7`.** Doug's own
+**COMPLETE AND PARKED, 2026-10-31, at `v1.7.8`.** Doug's own
 assessment, and the right one: the toolkit does what he set out to
 build. Nothing is owed, nothing is half-finished, no test plan is
 mid-run, and no open question blocks anything. **A session opening
@@ -145,6 +146,7 @@ are the things worth not re-deriving:
 | `Totals.fit` **record 0 is a live device accumulator** — tracks a ride exactly, field for field; ignores everything the toolkit writes | rev 198, 2 rides + 3 writes |
 | a **multi-record** `Totals.fit` import works, and the device **resumes** counting from a written value | rev 198 |
 | the forum rule *"first row must equal the sum of the rest"* is **FALSE** — 5 working states, never equal | rev 198 |
+| a `Totals.fit` odometer write is confirmed on **both models** — 530 (A–D) and 840 (screen-verified), and on **Windows 10** | rev 199 |
 | profiles ship with **factory pre-Removed screens** — identical byte-for-byte on a fresh template, not the user's own deletion history | rev 16 · `MEMORY_LOG.md` 157–163 |
 | `mesg 13` f53 = Segments toggle · `training_settings` f63 = ClimbPro toggle · `mesg 280` = likely a Power Curve cache | rev 16 · `MEMORY_LOG.md` 212–229 |
 
@@ -240,6 +242,71 @@ Conventions that are load-bearing rather than stylistic:
 7. **Guard the class, not the instance.** Three separate bugs came from
    fixing the call site in front of me and missing its sibling — v0.20.0
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
+
+---
+
+*Doc rev 199 — 2026-10-31.* **`fit_odometer.py` confirmed on the
+Edge 840 and on Windows 10 — the two gaps v1.7.7 shipped with, both
+closed the day after. And the tool reproduces a file the 840 had
+already accepted, byte for byte but one.**
+
+### What Doug ran
+
+| | result |
+|---|---|
+| `list` an 840 `Totals.fit` on Windows 10 | works |
+| `set` an odometer on Windows 10 | works — no quoting, encoding or path surprises |
+| copy to the 840 over MTP, restart, **read the Odometer field** | **the value written was on screen** |
+
+**That last line is why this is an import confirmation and not a
+transfer confirmation.** A copy completing and a device importing are
+indistinguishable from the computer; only the device's own display
+separates them. The same A3-vs-A4 distinction the 530 plan was built
+around.
+
+### The reproduction test, which anticipated it
+
+Before the hardware run, the tool was pointed at the 840 file pair
+from 2026-10-21 — the original, and the hand-made version that the
+840 had accepted at the time. Driving `fit_odometer.py` to produce
+the same values gives a file **792 of 795 bytes identical** to the
+accepted one. The three differences:
+
+| offset | | |
+|---|---|---|
+| 378 | `0x02` vs `0xff` | the `sport` byte of that record — the tool refuses to write field 3, by design. Confirmed by byte range, not assumed |
+| 793–794 | trailing CRC | must differ, since the content does. Both files carry a valid CRC for their own contents |
+
+**No structural difference was left for the import to reject**, which
+is why F3/F4 passing was unremarkable rather than lucky.
+
+Worth recording separately: **that 2026-10-21 hand-made file DID
+write `sport` 255 → 2.** I had forgotten. Rev 169 later established
+sport does not gate display, so the tool's refusal to touch it is
+correct — but it does mean the accepted file is not exactly
+reproducible by the tool, and the one byte that differs is the one
+byte a human chose to change back then.
+
+### Scope, stated rather than implied
+
+- **Distance only.** The 840 has no display for time, calories or
+  rides either, so this is the same quarter-of-the-write confirmation
+  the 530 had.
+- **One profile.** The 840 multi-record case is still untested; the
+  530 proved it (section C) and nothing suggests the models differ.
+- **No file pulled back** from the 840 afterwards — screen only, one
+  instrument rather than two.
+- **Record 0 on the 840 is untested.** The corpus hints it behaves
+  the same, since that unit's record 0 holds roughly what it has
+  genuinely ridden, but no ride-and-measure cycle has been run there.
+
+### Windows was the one with a precedent
+
+#166 shipped a Windows-fatal GUI crash for seven releases because
+Windows left the test loop. `fit_odometer.py` was checked for the
+three known hazards before Doug ran it — binary file modes, zero
+non-ASCII in any printed string, no optional imports — and then
+actually run, which is the part that was missing in August.
 
 ---
 

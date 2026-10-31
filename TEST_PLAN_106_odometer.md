@@ -168,13 +168,52 @@ and restart. There is no automatic undo for this file — it is the one
 write path in the toolkit with no Restore-from-Backup behind it, which
 is itself worth remembering before pointing it at `ROAD`.
 
+## F. The 840, and Windows — ✅ PASS 2026-10-31
+
+Added after the fact. The plan deliberately excluded both; Doug ran
+them anyway, which closed the two gaps v1.7.7 shipped with.
+
+| # | do | instrument | result |
+|---|---|---|---|
+| F1 | `list` an 840 `Totals.fit` on **Windows 10** | — | **pass** |
+| F2 | `set` a profile's odometer on Windows 10 | — | **pass**, no quoting, encoding or path surprises |
+| F3 | copy the result to the 840 over MTP, restart | — | **pass** |
+| F4 | open the modified profile, read its Odometer field | **screen** | **pass** — showed the value written |
+
+**F4 is the one that matters**, and is why this is recorded as a
+confirmed import rather than a confirmed file transfer. A copy
+completing and a device importing look identical from the computer;
+only the device's own display separates them.
+
+**Scope of the claim.** Distance was verified on screen. Time,
+calories and rides were not — the 840 has no display for them either,
+so the same quarter-of-the-write limit applies as on the 530. No file
+was pulled back from the 840 afterwards, so this is one instrument,
+not two.
+
+### Supporting evidence, from before the hardware run
+
+`fit_odometer.py` reproduces a `Totals.fit` the 840 had previously
+accepted **byte for byte**, 792 of 795 bytes. The three that differ:
+one `sport` byte the tool refuses to write by design (confirmed by
+byte range to be field 3 of that record), and the two CRC bytes,
+which must differ because the content does. Both files carry a valid
+CRC for their own contents.
+
+So there was no structural difference left for the import to reject,
+which is consistent with F3/F4 being unremarkable.
+
 ## Not covered, and deliberately
 
-- **The 840.** Same tool, same file format, but no second device
-  needed to establish the behaviour. If the 530 answers these
-  questions the 840 almost certainly matches, and "almost certainly"
-  is honest here in a way it was not for the screen-layout work, where
-  the two models genuinely differed.
+- **A multi-record write on the 840.** F2 was a single profile. The
+  530 proved multi-record (section C) and nothing suggests the models
+  differ here, but it has not been done.
+- **Pulling a file back off the 840 after a write.** The 840 is
+  MTP-only, so this is a manual OpenMTP step rather than part of any
+  toolkit flow. Distance was confirmed on screen instead.
+- **Whether record 0 behaves the same on the 840.** Untested. The
+  corpus hints it does — its record 0 holds roughly what that unit has
+  genuinely ridden — but no ride-and-measure cycle has been run there.
 - **Record 0 as an editable target.** The tool refuses it. D3 observes
   it; nothing writes it.
 - **Whether Connect re-syncs any of this back.** Out of scope, and the
