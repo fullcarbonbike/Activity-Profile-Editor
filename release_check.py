@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "1.2.0"  # UNWRAPPED-LABEL RATCHET (2026-11-13), from Doug's B1 bug. A wx.StaticText whose label interpolates a filename, path or exception message widens the window to fit, and _relayout() grows and never shrinks by design, so one long label widens the window for the rest of the session -- that is #69, #105, and TWICE MORE inside #171's own bench test (the ride-type note, then the name-collision warning one branch away from it). A sweep found 28 more in gui_app.py, all predating #171. Deliberately a RATCHET rather than a gate: demanding all 28 be fixed before a tag would either block the release or get this check deleted, whereas demanding the number not GROW costs nothing and makes the class visible. The check says when the baseline can be lowered. Prior entry (1.1.0): UNDEFINED-NAME CHECK ADDED (2026-11-12), because #171 shipped a NameError past every other check in this file. gui_app called fit_clone_profile.filename_prefix_for() without importing it; Doug's bench test found it as "the clone filename stops auto-filling, but only when you pick a ride type" -- only when, because the Unchanged branch never reaches the call. py_compile passes (the name resolves at call time), `import gui_app` passes for the same reason so even a machine with wx is blind to it, and the headless harness had RE-IMPLEMENTED the picker logic rather than importing it, so it tested a copy. Uses symtable, not a hand-rolled AST scope walk: the interpreter's own per-scope symbol tables already know what is global, assigned and imported, so this borrows that judgement instead of re-deriving it badly. One false-positive class over this repo -- module dunders -- allowlisted. Prior entry (1.0.0): BUILT WHEN THE TRIGGER FIRED (2026-11-09, for v1.8.0). PROJECT_NOTES.md kept this as a CONDITIONAL item on Doug's explicit instruction (2026-10-31): raise it only when a release with real complexity comes up, not for a typo fix. #171 touches both the CLI and the GUI, so it came up. The five checks below are the ones that were re-derived by hand before each of the last three tags, and TWO OF THEM HAVE ALREADY CAUGHT REAL PROBLEMS: the missing `git status` check is how v1.7.5 got tagged one commit early, carrying neither #170 nor its own release notes, and the personal-figure sweep caught two violations in two days, both headed for a public repo -- once in a source docstring, once in a Doc rev table. Deliberately NOT a test runner and not a linter: it checks the things that go wrong between "the code works" and "the tag is right", which is a different and much smaller list. Scoped to GIT-TRACKED files only, because the risk being managed is what reaches the public repo -- untracked working notes and forum drafts legitimately contain ride figures and are nobody else's business. stdlib only, like everything else here.
+__version__ = "1.2.2"  # THIS TOOL WAS MODIFYING THE REPO IT CHECKS (2026-11-17). make_flowchart.py has no `if __name__ == "__main__"` guard -- all of its drawing runs at module scope -- so check_modules_build()'s `import make_flowchart` REGENERATED GUI_FLOWCHART.pdf, and the new /CreationDate showed up as an uncommitted change immediately after a clean commit. It would then have failed its own clean-tree test on the next run. Hidden until now only because reportlab is missing on Doug's Mac, so the import failed there before it could do anything; it fired the first time the check ran somewhere reportlab exists. A PRE-TAG CHECK MUST NOT HAVE SIDE EFFECTS. Now detects import-time work STATICALLY -- any module with executable statements at module scope beyond imports, definitions, assignments, a docstring and a __main__ guard is reported and NOT imported -- rather than keeping a list of filenames to skip, which would go stale. make_flowchart.py should get a __main__ guard too (#174), but that is a refactor of a 300-line script and not something to do between a push and a tag. Prior entry (1.2.1): THE CLEAN-TREE CHECK FAILED ITS OWN FIRST REAL USE (2026-11-17). `git status --porcelain` lists UNTRACKED files, and this repo permanently carries six untracked forum drafts that are Doug's working notes and will never be committed -- so after a correct commit and push, with all thirteen other checks passing, the tool reported "uncommitted changes" for files that had been deliberately excluded and refused to let v1.8.0 be tagged. A gate nobody can satisfy, which is the EXACT failure this file's own comments warn about twice (the personal-figure sweep, the version-claim check) and that UNWRAPPED_LABEL_BASELINE was deliberately made a ratchet to avoid. Built it anyway, one check over. Now --untracked-files=no, so it fails only on real uncommitted changes to TRACKED files; untracked files become a NOTE, because one of them might be a file you meant to add and that is worth mentioning rather than blocking on. Prior entry (1.2.0): UNWRAPPED-LABEL RATCHET (2026-11-13), from Doug's B1 bug. A wx.StaticText whose label interpolates a filename, path or exception message widens the window to fit, and _relayout() grows and never shrinks by design, so one long label widens the window for the rest of the session -- that is #69, #105, and TWICE MORE inside #171's own bench test (the ride-type note, then the name-collision warning one branch away from it). A sweep found 28 more in gui_app.py, all predating #171. Deliberately a RATCHET rather than a gate: demanding all 28 be fixed before a tag would either block the release or get this check deleted, whereas demanding the number not GROW costs nothing and makes the class visible. The check says when the baseline can be lowered. Prior entry (1.1.0): UNDEFINED-NAME CHECK ADDED (2026-11-12), because #171 shipped a NameError past every other check in this file. gui_app called fit_clone_profile.filename_prefix_for() without importing it; Doug's bench test found it as "the clone filename stops auto-filling, but only when you pick a ride type" -- only when, because the Unchanged branch never reaches the call. py_compile passes (the name resolves at call time), `import gui_app` passes for the same reason so even a machine with wx is blind to it, and the headless harness had RE-IMPLEMENTED the picker logic rather than importing it, so it tested a copy. Uses symtable, not a hand-rolled AST scope walk: the interpreter's own per-scope symbol tables already know what is global, assigned and imported, so this borrows that judgement instead of re-deriving it badly. One false-positive class over this repo -- module dunders -- allowlisted. Prior entry (1.0.0): BUILT WHEN THE TRIGGER FIRED (2026-11-09, for v1.8.0). PROJECT_NOTES.md kept this as a CONDITIONAL item on Doug's explicit instruction (2026-10-31): raise it only when a release with real complexity comes up, not for a typo fix. #171 touches both the CLI and the GUI, so it came up. The five checks below are the ones that were re-derived by hand before each of the last three tags, and TWO OF THEM HAVE ALREADY CAUGHT REAL PROBLEMS: the missing `git status` check is how v1.7.5 got tagged one commit early, carrying neither #170 nor its own release notes, and the personal-figure sweep caught two violations in two days, both headed for a public repo -- once in a source docstring, once in a Doc rev table. Deliberately NOT a test runner and not a linter: it checks the things that go wrong between "the code works" and "the tag is right", which is a different and much smaller list. Scoped to GIT-TRACKED files only, because the risk being managed is what reaches the public repo -- untracked working notes and forum drafts legitimately contain ride figures and are nobody else's business. stdlib only, like everything else here.
 """
 release_check.py -- pre-tag checks for this repo.
 
@@ -75,12 +75,36 @@ def check(label, ok, detail=""):
 
 # ---------------------------------------------------------------- 1
 def check_git_state():
-    ok, out = run("git", "status", "--porcelain")
+    # TRACKED changes only. v1.2.1, and this check FAILED ITS OWN FIRST
+    # REAL USE: `git status --porcelain` lists untracked files too, and
+    # this repo permanently carries six untracked forum drafts that are
+    # Doug's working notes and are never going to be committed. So the
+    # check reported "uncommitted changes" for files that were correctly
+    # excluded, and refused to let v1.8.0 be tagged.
+    #
+    # That is a gate nobody can satisfy -- the exact failure this file's
+    # own comments warn about twice (the personal-figure sweep, the
+    # version-claim check) and that UNWRAPPED_LABEL_BASELINE was made a
+    # ratchet to avoid. Built it anyway, one check over.
+    #
+    # Untracked files are not nothing: one of them might be a file you
+    # meant to add. But that is a thing to MENTION, not to block on, so
+    # they are a NOTE below.
+    ok, out = run("git", "status", "--porcelain", "--untracked-files=no")
     if not ok:
         check("git state", False, "not a git repo, or git unavailable")
         return
-    check("working tree clean", out == "",
-          "uncommitted changes:\n    " + "\n    ".join(out.split("\n")) if out else "")
+    check("working tree clean (tracked files)", out == "",
+          "uncommitted changes to tracked files:\n    "
+          + "\n    ".join(out.split("\n")) if out else "")
+
+    ok_u, untracked = run("git", "ls-files", "--others", "--exclude-standard")
+    if ok_u and untracked:
+        files = untracked.split("\n")
+        NOTES.append(
+            f"{len(files)} untracked file(s), deliberately not in the commit: "
+            + ", ".join(files[:6]) + ("..." if len(files) > 6 else "")
+            + " -- check none of these was meant to be added")
 
     ok_head, head = run("git", "rev-parse", "HEAD")
     ok_up, up = run("git", "rev-parse", "origin/main")
@@ -272,6 +296,35 @@ def check_no_personal_figures():
 
 
 # ---------------------------------------------------------------- 5
+def _has_import_time_work(path):
+    """
+    True when a module runs code at import time beyond imports,
+    definitions and assignments.
+
+    A module like this is not wrong to exist -- make_flowchart.py is a
+    script that draws a PDF when you run it -- but it must not be
+    IMPORTED by a checker, because importing it performs the work.
+    Docstrings and an `if __name__ == "__main__"` block are both fine
+    and are what a well-behaved script uses.
+    """
+    import ast
+    try:
+        tree = ast.parse(open(path, encoding="utf-8").read())
+    except (OSError, SyntaxError):
+        return False
+    for node in tree.body:
+        if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef,
+                             ast.AsyncFunctionDef, ast.ClassDef,
+                             ast.Assign, ast.AnnAssign)):
+            continue
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
+            continue  # a docstring
+        if isinstance(node, ast.If) and "__main__" in ast.unparse(node.test):
+            continue  # the correct way to guard a script
+        return True
+    return False
+
+
 def check_modules_build():
     broken, skipped = [], []
     for path in tracked(".py"):
@@ -282,19 +335,37 @@ def check_modules_build():
             except py_compile.PyCompileError as e:
                 broken.append(f"{path}: {e.msg.strip().splitlines()[-1]}")
                 continue
+        # ⚠ DO NOT IMPORT A MODULE THAT DOES WORK AT IMPORT TIME.
+        # v1.2.2, and this check caused the problem it is now avoiding:
+        # make_flowchart.py has no `if __name__ == "__main__"` guard, so
+        # all of its drawing runs on import -- meaning `import
+        # make_flowchart` REGENERATES GUI_FLOWCHART.pdf. This tool was
+        # therefore modifying the repository it was checking, and would
+        # then have failed its own clean-tree test on the next run. It
+        # only stayed hidden because reportlab is missing on Doug's Mac,
+        # so the import failed there before it could do anything.
+        #
+        # A pre-tag check must not have side effects. Detected
+        # statically rather than by a filename list: any module with
+        # executable statements at module scope is reported, not
+        # imported.
+        if _has_import_time_work(path):
+            skipped.append(f"{path}: does work at import time -- not imported "
+                           f"by this check (it would run that work)")
+            continue
         mod = os.path.basename(path)[:-3]
         p = subprocess.run([sys.executable, "-c", f"import {mod}"],
                            capture_output=True, text=True)
         if p.returncode:
             last = (p.stderr.strip().splitlines() or [""])[-1]
             if "ModuleNotFoundError" in last:
-                skipped.append(f"{path}: {last}")
+                skipped.append(f"{path}: dependency not on this machine -- {last}")
             else:
                 broken.append(f"{path}: {last}")
     check("every tracked module compiles and imports", not broken,
           "\n    ".join(broken))
     for s in skipped:
-        NOTES.append(f"import SKIPPED (dependency not on this machine) -- {s}")
+        NOTES.append(f"import SKIPPED -- {s}")
 
 
 # ---------------------------------------------------------------- 6

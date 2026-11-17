@@ -138,6 +138,21 @@ figures in tracked files — the repo is public.
 
 It found three of the last category on its first run.
 
+It also got its own clean-tree check wrong, and found that out the
+only way that counts: by refusing to let this release be tagged after
+a correct commit and push. `git status --porcelain` lists untracked
+files, and this repo permanently carries untracked working notes — so
+the check reported "uncommitted changes" for files that had been
+deliberately excluded. It now looks at tracked files only, and reports
+untracked ones as a note, because one of them might be something you
+meant to add.
+
+And it was quietly modifying the repository it checks. `make_flowchart.py`
+has no `if __name__ == "__main__"` guard, so importing it draws the PDF —
+and the import check imported it. A pre-tag check must not have side
+effects, so it now detects import-time work statically and reports such
+modules instead of importing them.
+
 A sixth check went in a day later, after #171's own bench test found a
 `NameError` that every other check here was blind to — a function used
 in `gui_app.py` and never imported, which only fails on the code path
@@ -153,7 +168,7 @@ interpreter's own symbol tables rather than re-deriving scope rules.
 | `fit_clone_profile.py` | 1.1.2 |
 | `gui_app.py` | 0.34.2 |
 | `fit_odometer.py` | 1.0.4 |
-| `release_check.py` | 1.2.0 |
+| `release_check.py` | 1.2.2 |
 | `make_flowchart.py` | 2.0.1 |
 | `fit_dump.py` | 2.31.0 |
 

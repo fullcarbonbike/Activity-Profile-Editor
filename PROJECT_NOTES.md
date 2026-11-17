@@ -280,6 +280,77 @@ Conventions that are load-bearing rather than stylistic:
 
 ---
 
+*Doc rev 221 — 2026-11-17.* **v1.8.0 is COMMITTED AND PUSHED. Then
+`release_check.py` failed its own first real use — twice, for two
+different reasons, and the second one means it had been MODIFYING the
+repository it checks.**
+
+### Bug 1: the clean-tree check blocked a correct release
+
+After a correct commit and push, with all thirteen other checks
+passing, it reported:
+
+```
+FAIL  working tree clean
+  ?? DOUG_FORUM_DRAFT.txt
+  ?? FORUM_POST_*.txt  (and four more)
+```
+
+`git status --porcelain` lists **untracked** files, and this repo
+permanently carries six untracked forum drafts that are deliberately
+excluded and never going to be committed. So the check would have
+blocked **every future tag, forever**.
+
+**That is a gate nobody can satisfy** — the exact failure this file's
+own comments warn about twice (the personal-figure sweep, the
+version-claim check) and that `UNWRAPPED_LABEL_BASELINE` was made a
+ratchet specifically to avoid. Built it anyway, one check over, in the
+same sitting.
+
+Fixed with `--untracked-files=no`. Untracked files are now a NOTE,
+because one of them might be something you meant to add — worth
+mentioning, not worth blocking on.
+
+### ⚠ Bug 2: the checker was writing to the repo
+
+`GUI_FLOWCHART.pdf` came back modified immediately after the clean
+commit, with nothing having regenerated it. Cause:
+
+**`make_flowchart.py` has no `if __name__ == "__main__"` guard.** All
+69 of its top-level statements run on import — so
+`check_modules_build()`'s `import make_flowchart` **drew the PDF**, and
+the fresh `/CreationDate` showed up as an uncommitted change.
+
+So the tool was mutating the thing it was inspecting, and would then
+have failed its own clean-tree test on the next run. **A pre-tag check
+must not have side effects.**
+
+It stayed hidden because **reportlab is not installed on Doug's Mac**,
+so the import failed there before it could do anything. It fired the
+first time the check ran somewhere reportlab exists. An environment
+difference concealed a logic error — the mirror image of rev 214,
+where a missing dependency concealed a `NameError`.
+
+Fixed by detecting import-time work **statically**: any module with
+executable statements at module scope beyond imports, definitions,
+assignments, a docstring and a `__main__` guard is reported and not
+imported. Deliberately not a list of filenames to skip, which goes
+stale. The sweep immediately found a **second** such module,
+`fit_profile_diff.py`.
+
+### What this says about the tool
+
+Three of its seven checks have now reported something that was not
+wrong, and one was actively harmful. The checks themselves are sound —
+they caught three real privacy figures, a `NameError` and a bug class
+with 28 instances. **The failures are all in the same place: deciding
+what counts as a problem.** Detecting a condition is easy; judging it
+is where this kept going wrong.
+
+Both fixes are in `release_check.py` 1.2.2 and go out with v1.8.0 as a
+follow-up commit, which is also why the tag goes on the tip rather
+than on the release-notes commit.
+
 *Doc rev 220 — 2026-11-17.* **Time Standing is now properly ELIMINATED
 — on arithmetic from Doug's own riding, not on a misread field. And
 the elimination is of the strongest kind available: the relationship
