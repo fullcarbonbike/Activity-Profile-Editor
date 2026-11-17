@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-__version__ = "2.0.0"  # THREE PAGES, LETTER PORTRAIT, AND HEIGHTS THAT ARE MEASURED (2026-10-28, Doug: the one-page A3 version "feels compressed and is hard to read"). v1.0.0 put the whole decision tree on one A3 sheet at 7.6pt body text; readable on a screen at 200%, not readable on paper. Now: page 1 is the branch and a mode-comparison table, page 2 is device mode top to bottom, page 3 is offline mode, at 9.6pt. THE REAL FIX WAS measure(): v1.0.0 hand-guessed every box height, which survived A3 by luck and spilled text past six borders the moment the type got bigger. measure() mirrors box()'s own cursor arithmetic and step() sizes from content -- change one, change both. Caught by rendering each page to PNG and looking at it, not by reading the code. ROOT DECISION IS DELIBERATE: the chart branches on "does the Edge mount as a disk?", not on the model number. Model numbers appear as a hint because that is how people think about it, but 530-vs-840 is a proxy for mass-storage-vs-MTP, the mount test is what find_garmin_root() actually does, and offline mode is also correct for a mass-storage Edge with nothing plugged in -- which a model-based question gets wrong. Needs reportlab; it is the only non-stdlib dependency in the repo and it is a DOC tool, not part of the app.
+__version__ = "2.0.1"  # RIDE TYPE ADDED TO THE CLONE STEP (2026-11-11, #171). The capability table and both Clone entries -- device mode and offline -- described cloning as copying a profile under a new NAME, which is all it could do before v1.8.0. Clone can now also set the ride type, which is the part that separates one bike's totals from another's in Garmin Connect, so the chart said less than the app does. Also states the thing the GUI warns about and the chart could not: the screens come from the SOURCE profile, not from the Edge's own template for the chosen type (rev 206). Caught by regenerating for the release and reading what the old text claimed. NOTE on the PDF: the committed GUI_FLOWCHART.pdf had a diff consisting ENTIRELY of /CreationDate, /ModDate and /ID -- the page content streams were byte-identical -- from an earlier regeneration that changed nothing. That diff was discarded rather than committed; this one changes real content. Prior entry (2.0.0): THREE PAGES, LETTER PORTRAIT, AND HEIGHTS THAT ARE MEASURED (2026-10-28, Doug: the one-page A3 version "feels compressed and is hard to read"). v1.0.0 put the whole decision tree on one A3 sheet at 7.6pt body text; readable on a screen at 200%, not readable on paper. Now: page 1 is the branch and a mode-comparison table, page 2 is device mode top to bottom, page 3 is offline mode, at 9.6pt. THE REAL FIX WAS measure(): v1.0.0 hand-guessed every box height, which survived A3 by luck and spilled text past six borders the moment the type got bigger. measure() mirrors box()'s own cursor arithmetic and step() sizes from content -- change one, change both. Caught by rendering each page to PNG and looking at it, not by reading the code. ROOT DECISION IS DELIBERATE: the chart branches on "does the Edge mount as a disk?", not on the model number. Model numbers appear as a hint because that is how people think about it, but 530-vs-840 is a proxy for mass-storage-vs-MTP, the mount test is what find_garmin_root() actually does, and offline mode is also correct for a mass-storage Edge with nothing plugged in -- which a model-based question gets wrong. Needs reportlab; it is the only non-stdlib dependency in the repo and it is a DOC tool, not part of the app.
 
 """Regenerate GUI_FLOWCHART.pdf.
 
@@ -171,7 +171,7 @@ ty -= 7*mm
 rows = [
   ("Edit screens, fields, layout, order, show/hide", "yes", "yes"),
   ("Add or remove a screen · save a Favorite",      "yes", "yes"),
-  ("Clone a profile under a new name",                "yes", "yes"),
+  ("Clone a profile — new name, and a new ride type", "yes", "yes"),
   ("Import a .fit profile from anywhere",             "yes", "yes"),
   ("Edit the boot message (startup.txt)",             "yes", "yes"),
   ("Restore from a backup, or re-create a deleted profile", "yes", "no"),
@@ -249,8 +249,8 @@ arrow(W/2, yy, W/2, yy-8*mm, accent=DEV); yy -= 8*mm
 yy = step(yy, 40*mm, "2.  Choose what to do",
    ["*View Screens →        edit the profile",
     "        Change fields and layout variant, reorder or hide screens, add or remove one. Save any screen as a Favorite to reuse in another profile.",
-    "*Clone...                     copy it under a new name",
-    "        The suggested filename matches what the Edge will generate. Screens copy across; the odometer starts at zero.",
+    "*Clone...                     copy it under a new name, on a new bike",
+    "        Set the clone’s Ride type — Road, Gravel, Ebike and the rest — and its rides count under that category in Garmin Connect, which is what separates one bike’s totals from another’s. Screens copy across from the source, not from the Edge’s own template for that type. The odometer starts at zero, and the suggested filename matches what the Edge will generate.",
     "*Restore from Backup...",
     "        Any earlier snapshot — including profiles you deleted from the device, which are re-created.",
     "*Import Profile...       a .fit from anywhere",
@@ -299,7 +299,7 @@ arrow(W/2, yy, W/2, yy-5.5*mm, accent=OFF); yy -= 5.5*mm
 yy = step(yy, 33*mm, "3.  Choose what to do",
    ["*View Screens →        edit the profile",
     "        The same editor with the same guards. Everything about screens, fields and layouts works offline.",
-    "*Clone...                     works offline",
+    "*Clone...                     works offline, Ride type included",
     "*Import Profile...       works offline",
     "*Startup Message...   reads and writes startup.txt in the folder",
     "",

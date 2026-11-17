@@ -113,6 +113,11 @@ informative:
 
 - **record 0 grew by the ride** → it is a live device-level
   accumulator, and the "independent total" reading is supported
+  *(this is what was observed — and the reading it supported has
+  since been RETRACTED TWICE. Record 0 was later seen to DECREASE on
+  an 840. See Doc rev 201: the growth is real, the interpretation of
+  it was not. Left as written because it records what the test
+  expected, which is the point of a test plan.)*
 - **record 0 unchanged** → it is something else entirely
 - **record 0 jumped by a reset profile's old value** → the device
   reconciles, and resetting a profile has side effects on it

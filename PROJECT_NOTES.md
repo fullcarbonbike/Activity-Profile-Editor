@@ -73,6 +73,35 @@ Three items remain available if ever wanted, none of them a gap:
 *#106 was on this list and is now shipped (v1.7.7, rev 198). Two
 items remain, neither a gap.*
 
+### 📌 Conditional, not a task: `release_check.py`
+
+**Raise this ONLY if a release with real complexity comes up** — a
+change touching the CLI or the GUI, not a typo fix. Doug's explicit
+instruction, 2026-10-31: remind him then, otherwise leave it alone.
+
+Before each of the last three tags the same checks were run by hand,
+rewritten from scratch each time:
+
+- working tree clean; `HEAD == origin/main`
+- every `X.Y.Z` in the release notes matches that file's `__version__`
+- no personal ride figures anywhere in `*.py` / `*.md` (public repo)
+- every module compiles and imports
+- the release-notes file for this version exists and is tracked
+
+**Two of those caught real problems.** The missing `git status` is how
+`v1.7.5` got tagged one commit early, carrying neither #170 nor its
+own release notes. The personal-figure sweep caught two violations in
+two days, both headed for the public repo — once in a source
+docstring, once in a Doc rev table.
+
+~100 lines, stdlib, exit non-zero on failure.
+
+**Why it is not built:** the project is complete and parked. A release
+tool for a project that may never release again is ceremony, and "I
+will need it eventually" is how unused code gets written. The trigger
+above is the whole point — build it when there is a release to use it
+on, not before.
+
 ### Why the project ends here, which is worth recording
 
 Garmin moved two things at once, and both cut against this toolkit:
@@ -136,6 +165,8 @@ are the things worth not re-deriving:
 | the SDK mis-renders undocumented fields **structurally**, not by version | rev 162 |
 | the data-field id space is **Garmin-wide**, shared across product lines | rev 173 |
 | the ten-user-screen cap is an **editor** cap; the device renders more but its editor cannot manage them | revs 170, 175, 179 |
+| a profile's `sport` is always 2; **`sub_sport` is the field that varies**, and it supplies the filename's middle segment | rev **203** |
+| mesg 12 **field 10 is the profile colour** (3-byte RGB, inherited by clones) — inferred, not device-confirmed | rev **203** |
 | the Edge **renames every profile it imports** to `Cycling<Sport><DisplayName>.fit`, both models; the filename you send is discarded | revs 182, 187, 188, 192 |
 | **`NewFiles` is the only import route.** Direct overwrite of `Sports/` works once, then stops permanently once a profile has touched `NewFiles` | `MEMORY_LOG.md` line 235, 2026-08-01 |
 | a device import **renumbers `message_index`** when the profile is NEW; a replacement is left alone. The filename is NOT the trigger | revs 184, 190, 192 |
@@ -143,7 +174,11 @@ are the things worth not re-deriving:
 | **"Active/reorderable" ≠ "shows while riding."** A separate runtime filter suppresses structurally-normal screens by ride context (Indoor hides Map and Elevation). Nothing in `data_screen` predicts it | rev 16 · `MEMORY_LOG.md` 288–302 |
 | **"Cannot Remove/Hide" has NO structural marker.** Map, ClimbPro and the last user screen are firmware logic keyed on screen TYPE, which is not stored anywhere. The toolkit's hard guards are necessarily content-derived | `MEMORY_LOG.md` 283–286 · rev 197 |
 | **`Sports/` timestamps update on ANY restart** and are not diagnostic. A backup folder's timestamp changes only on genuine content change — that one IS a reliable signal | `MEMORY_LOG.md` 240–242 · rev 197 |
-| `Totals.fit` **record 0 is a live device accumulator** — tracks a ride exactly, field for field; ignores everything the toolkit writes | rev 198, 2 rides + 3 writes |
+| a ride lands in its **profile record and record 0 together**, identical field for field — including rides from ANOTHER device, matched by profile name, additive and never authoritative | revs 198, 200, **201** |
+| record 0 **IS an accumulator**; an apparent decrease was correct bookkeeping measured against a file the toolkit wrote, not a device pull | rev **202** |
+| the cross-device sync is **BIDIRECTIONAL**, and a ride can land in record 0 with **no matching profile** to hold it | rev **202** |
+| ⚠ **a comparison may only use two GENUINE device pulls.** A file the toolkit wrote is an input, not a baseline — this error caused revs 189 and 201 | rev **202** |
+| **nothing the toolkit writes ever moves record 0** | revs 198, 201 |
 | a **multi-record** `Totals.fit` import works, and the device **resumes** counting from a written value | rev 198 |
 | the forum rule *"first row must equal the sum of the rest"* is **FALSE** — 5 working states, never equal | rev 198 |
 | a `Totals.fit` odometer write is confirmed on **both models** — 530 (A–D) and 840 (screen-verified), and on **Windows 10** | rev 199 |
@@ -242,6 +277,1638 @@ Conventions that are load-bearing rather than stylistic:
 7. **Guard the class, not the instance.** Three separate bugs came from
    fixing the call site in front of me and missing its sibling — v0.20.0
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
+
+---
+
+*Doc rev 220 — 2026-11-17.* **Time Standing is now properly ELIMINATED
+— on arithmetic from Doug's own riding, not on a misread field. And
+the elimination is of the strongest kind available: the relationship
+runs BACKWARDS.**
+
+### Doug's observation
+
+*"For the most part I was only standing while in the sprint or at
+least starting it, to get close to the target wattage, it doesn't seem
+like the total number of sprints would add up to the time being
+displayed."*
+
+Right, and it is worse than not adding up:
+
+| | sprints | max possible standing | displayed | ratio |
+|---|---|---|---|---|
+| 11-10 | 10 × 10 s | **100 s** | 860 s | 8.6× |
+| 11-17 | 28 × 10 s | **280 s** | 821 s | 2.9× |
+
+**The ride with FEWER sprints displayed MORE.** 2.8× the standing
+opportunities produced a lower number. Standing time cannot fall as
+standing rises, so no amount of extra standing on climbs rescues it —
+the direction is wrong, not just the magnitude.
+
+**And the device is not recording standing at all** in either file:
+`stand_count`-shaped lap field 72 is 255 (unset) in every lap of both
+activities. Rev 218 retracted my earlier claim that lap field 71 was
+standing seconds; with 72 unset as well, there is no standing data in
+these files whatsoever.
+
+### Why this one matters more than the count of eliminations
+
+Rev 218 withdrew the original Time Standing elimination because it
+rested on a misread field, leaving the candidate formally open. It is
+now closed on evidence that does not depend on any field
+identification at all — just the sprint count, the sprint duration,
+and the two displayed values. **An elimination that survives without
+trusting my own field decoding is worth more than one that doesn't**,
+given the last three decodings I got wrong.
+
+### Field 331, current state
+
+| eliminated | on what |
+|---|---|
+| Recovery Time | resets per ride |
+| the step's target duration | identical 0:10 steps, different values |
+| the interval-block total | −200 s vs +21 s across two workouts |
+| time above a power threshold | no threshold 80–450 W fits both |
+| time above an HR threshold | no threshold 90–175 bpm fits both |
+| coasting / zero-power time | 866 s vs 363 s in the workout window |
+| **Time Standing** | **inverted relationship, rev 220** |
+
+**One surviving lead**, and it is weak: 860/3460 = 24.9%,
+821/3200 = 25.7% of the workout. Both workouts are within 8% of each
+other in total length, so a constant ≈820–860 s and a constant ≈25%
+cannot be told apart on this data.
+
+**The discriminating experiment is a workout of very different
+length**, with the prediction written down first: a 30-minute workout
+gives ~7:30 under the ratio reading and ~13–14 min under the constant
+reading. Those cannot both hold.
+
+**Cheapest test still outstanding:** a hard ride with no workout at
+all. 00:00 would make the field workout-scoped and retire every
+effort-based candidate at once.
+
+*Doc rev 219 — 2026-11-17.* **⚠ RETRACTION, from Doug catching an
+assumption I never checked: the two field-331 observations came from
+DIFFERENT workouts. That voids the inference I drew from them — and it
+also kills the interval-block hypothesis outright, with numbers.**
+
+### The assumption
+
+Rev 218 said the 860 s and 821 s readings came from "the same
+programmed workout" and concluded the value must be
+performance-dependent. Doug: *"Was the previous activity with the
+14:20 the same Sprint workout? I seem to recall one of the Sprint
+workouts Garmin presents is a total of 58 minutes and the other is
+53."*
+
+He was right. The step labels say so outright:
+
+| | step label | structure | workout total |
+|---|---|---|---|
+| 2026-11-10 | `2x5x0:10@415W` | 2×5 sprints, **120 s** recoveries | 57:40 |
+| 2026-11-17 | `2x14x0:10@290W` | 2×14 sprints, **20 s** recoveries | 53:20 |
+
+**Two different built-in workouts**, matching his recollection of a
+58-minute and a 53-minute one. The "same workout, different values"
+reasoning is withdrawn entirely. I had the step label in hand for the
+second ride and never pulled it for the first.
+
+### ✅ That kills the interval-block hypothesis
+
+Rev 218 noted the 11-17 display (821 s) sat 21 s from the measured
+sprint-plus-recovery total (800 s) and called it "close". With the
+11-10 workout decoded, the relationship collapses:
+
+| | sprints + recoveries | displayed | difference |
+|---|---|---|---|
+| 11-10 | 1060 s | 860 s | **−200 s** |
+| 11-17 | 800 s | 821 s | **+21 s** |
+
+−200 against +21 is not a relationship. **The +21 was a coincidence
+made to look like a pattern by a single data point**, and the second
+workout's much longer recoveries (120 s versus 20 s) are what exposed
+it. A hypothesis fitted to one observation is just that observation
+restated.
+
+### Two more eliminated, by computation
+
+| candidate | result |
+|---|---|
+| seconds above a power threshold | **no** — no threshold 80–450 W fits both within 40 s |
+| seconds above an HR threshold | **no** — no threshold 90–175 bpm fits both within 40 s |
+
+Both tested against the 1 Hz record stream in each file. With one free
+parameter and two targets a fit would have been cheap — and there
+isn't one, which makes these real eliminations rather than failures to
+search hard enough.
+
+### Where 331 stands: four eliminations, one weak lead
+
+**Eliminated:** Recovery Time (per-ride reset), the step's target
+duration (values differ between workouts of identical step duration),
+the interval-block total (above), time above a power or HR threshold
+(above). **Withdrawn rather than eliminated:** Time Standing — rev 218
+retracted the basis for that one and it has not been retested.
+
+**The only surviving numerical coincidence:** 860/3460 = 24.9% and
+821/3200 = 25.7% of the workout. Two points and a suspiciously round
+fraction; recorded as a lead, not a finding.
+
+**And neither value appears in its own activity file.** Checked
+exactly, every message and every field, in both. Whatever 331 shows is
+device state the activity never carries, so no amount of file analysis
+will name it — only a prediction tested on the device will.
+
+### The lesson worth keeping
+
+Three of my readings in two days turned out wrong — lap f71 as standing
+time, lap f41 as a time, and now these as one workout — and **all
+three were cases of not checking a label that was sitting in the
+file.** The step label `2x5x0:10@415W` was two lines of code away the
+whole time. The pattern is not carelessness about data, it is
+confidence about context.
+
+*Doc rev 218 — 2026-11-17.* **#171 IS COMPLETE. C7 passed with a
+GUI-made clone, so the shipped feature is confirmed end to end, and
+record 0 is now shown to AGGREGATE across profiles. Separately: the
+mystery field 331 produced a far better observation — and it forced
+TWO RETRACTIONS of my own earlier readings.**
+
+### C7, and the whole plan
+
+`GRVLROAD`, cloned from the 840's `ROAD` **through the GUI picker**
+rather than hand-patched — the shipped feature, not a proxy. A 2.98
+mile ride registered on Garmin Connect as a **Gravel** ride.
+
+| | miles | timer | kcal | rides |
+|---|---|---|---|---|
+| `ROAD` | +56.20 | +17,727 | +1,855 | +3 |
+| `GRVLROAD` | +2.98 | +949 | +100 | +1 |
+| **record 0** | **+59.18** | **+18,676** | **+1,955** | **+4** |
+
+Exact sums in all four fields. **Record 0 AGGREGATES across profiles**
+— the first interval measured with several rides on two profiles, which
+no single-ride observation could establish. Seven observations now.
+`GRVLROAD` claimed blank slot 8, as rev 207's pool predicts.
+
+Every section A–G of `TEST_PLAN_v1.8.0.md` passes.
+
+### Field 331: the workout is now fully decoded
+
+Doug repeated the same built-in workout and watched the field
+throughout. The activity file names the workout: step label
+**`2x14x0:10@290W`**, step name `Sprint`.
+
+| step | |
+|---|---|
+| 0 | 20 min warm-up |
+| 1–2 | 10 s sprint / 20 s recovery |
+| 3 | repeat ×14 |
+| 4 | 5 min between sets |
+| 5 | repeat ×2 (the whole set) |
+| 6 | 15 min cool-down |
+
+58 laps, one per step instance: 28 sprints, 26 recoveries (each set
+ends on a sprint, so the last recovery is dropped), total **3200 s =
+53:20** — matching Doug's "a little over 53 minutes".
+
+**What he saw:** `00:10` after a few early sprints, then no change for
+the rest of the 53 minutes, then a jump to **`13:41`** the moment the
+workout signalled completion, then no change through the ride home.
+
+| | |
+|---|---|
+| displayed | 821 s (13:41) |
+| sprints + recoveries, measured | 800 s (13:20) |
+| difference | **+21 s** |
+| previous run of the SAME workout | 860 s (14:20) |
+
+**Close to the interval-block total, and not equal to it.** And 821
+appears **nowhere in the activity file** — checked exactly, every
+message, every field.
+
+**The two runs differing (860 vs 821) is itself informative:** the
+same programmed workout gave different values, so the final figure is
+performance-dependent, not a constant read out of the workout
+definition. That rules out "the step's target duration", which the
+early `00:10` had made tempting — `0:10` is literally the sprint
+duration in the step label.
+
+### ⚠ TWO RETRACTIONS
+
+**Lap field 71 is the WORKOUT STEP INDEX, not standing time.** Values
+across the 58 laps are 0, 1, 2, 4, 6 and 65535 — exactly the step
+indices, with 65535 for the ride home outside the workout. In rev 163
+I summed them as seconds and reported "standing time sums to 36 s over
+22 laps", and used that to **eliminate Time Standing as a candidate**.
+That elimination rested on a misread field and is withdrawn. (Time
+Standing is still a poor fit on other grounds — 28 ten-second sprints
+is 4:40, not 13:41 — but it was eliminated for the wrong reason.)
+
+**Lap field 41 is total_work in joules, not a time.** f41 divided by
+lap timer tracks the lap's average power to within a unit on every lap
+checked. My earlier search "found 821 at (19, 41)" was an artefact of
+a ±2 tolerance matching lap 42's **820 joules**. A coincidence of
+magnitude, nothing more — and a reminder that a tolerance window makes
+a search report things it did not find.
+
+### The next test, and why it is a sharp one
+
+The displayed value is close to the interval-block total. So: run a
+workout with a **different** interval structure and predict the value
+before looking. A different sprint count or duration changes the
+predicted total substantially; if the display tracks it, the field is
+an interval or in-target timer, and if it does not, that reading dies
+with a number rather than an impression.
+
+Still a curiosity, still parked, still touching nothing in the toolkit.
+
+*Doc rev 217 — 2026-11-16.* **RIDE_TYPES IS NOT PER-MODEL. The 530
+offers the same nine Ride Types as the 840 — including the later enum
+additions, on the older device. That was the one genuinely open
+question left in #171, and it resolved the opposite way to the
+expectation.**
+
+### The result
+
+Section D1. The nine were read off an 840 (rev 205), and the #171
+scope said plainly that if the 530's menu differed, the table would be
+per-model *"like so much else here (#165)"* and the picker would be
+offering 530 users a list that was not theirs.
+
+It does not differ. **The 530 shows all nine**, Gravel (46),
+Emountain (47), Commute (48) and Tour (49) included — the four latest
+`sub_sport` enum additions, present on the OLDER of the two devices.
+
+| | varies by Edge model? |
+|---|---|
+| data **fields** (#146, #153, #165) | **yes**, established repeatedly |
+| **layout** rules per screen type | **yes** |
+| the filename label for a sub_sport | yes — by enum age, revs 205-206 |
+| **ride types** | **no**, across 530 and 840 |
+
+**The expectation was wrong in a useful direction**, and the reason it
+was wrong is worth noting: everything else this project has probed
+turned out per-model, so per-model became the prior. It is not a law.
+
+Two models, one owner, one account — not asserted as universal for a
+540/1040/1050. But it is no longer a provisional 840 reading either,
+and nothing in the picker needs qualifying by model.
+`fit_clone_profile` 1.1.2 says so where the table lives, instead of
+the old comment implying 840-only provenance.
+
+### D2, and a limit that is now permanent
+
+D2 passed as the C1–C6 equivalent on the 530 — clone with a type
+change, deploy, restart, verify on-device — minus the ride.
+
+**⚠ The 530 can never complete the Connect half.** Doug removed it
+from Garmin Connect deliberately, to stop it overwriting training
+status, FTP and HR data sourced from the 840. So the Connect
+categorisation check is **untestable** on the 530 rather than merely
+untested, and permanently so.
+
+That is the right call for his data and it narrows the test matrix:
+C7 on the 840 is the only route to that answer. The most important
+remaining step is now also the only one that can answer its question.
+
+*Doc rev 216 — 2026-11-15.* **`fit_dump.py screens` now names the
+profile and its ride type, from Doug's own suggestion during section C
+— and it is the same gap, in the same header, that the model line
+closed fourteen months of revisions ago.**
+
+### The suggestion
+
+Verifying a clone's ride type in section C meant running `fit_dump`
+and then reading mesg 12 by hand. Doug: *"would it make sense for the
+fit_dump screens to have an item in the header to display the Profile
+Ride Type as well?"*
+
+Yes — and the precedent is explicit. `cmd_screens()` already carries
+this comment, from when the **model** line was added:
+
+> *"Doug's report (2026-09-28) was that `screens` never said, and
+> `dump` said it only amid everything else."*
+
+Identical shape: the information is in the file, the tool that prints
+everything else about the profile did not print it, and the person
+who noticed both times was the one using it rather than the one
+writing it.
+
+### What it prints
+
+```
+Profile: GRAVEL  --  ride type Gravel (gravel_cycling, sub_sport 46)
+Device model: Edge 840
+```
+
+Three decisions worth recording:
+
+**The SDK's name is not the rider's name.** `garmin_fit_sdk` decodes
+`sub_sport` to `gravel_cycling`; the device's menu says `Gravel`. Both
+are shown, because a user matching this against their Edge needs the
+second and anyone reading the FIT spec needs the first.
+
+**The import goes fit_dump → fit_clone_profile, not the reverse.** The
+ride-type table lives in the module that WRITES the field, which must
+stay SDK-free (stdlib plus `fit_raw_walk` and `fit_crc`). `fit_dump`
+already depends on the SDK, so importing a stdlib-only module costs it
+nothing. Reversing it would drag the SDK into the writer.
+
+**A `sub_sport` outside the nine gets its raw value and a plain
+statement**, never an invented label — another model's menu or a
+non-device-authored file are both real possibilities, and guessing
+would be the rev 205 "`<label>_cycling`" error again.
+
+### Where it sits, and the decision it brushes against
+
+Above the `Device model:` line, whose own comment says *"model line
+first"*. That decision stands for what it was about — the model being
+absent from `screens` and buried in `dump`. One line of identity above
+it does not bury it, and "which profile is this" reads before "whose
+layout rules apply". Recorded because deviating from a documented
+choice silently is how the choice gets lost.
+
+### Added mid-bench-test, deliberately
+
+Normally the wrong moment. Justified here because it is **read-only
+and touches no path A–F exercises** — new functions plus one print in
+`cmd_screens`. It gets its own test section G rather than being
+slipped in unverified, and G4 is specifically the claim that `dump`
+and `diff` did **not** change.
+
+*Doc rev 215 — 2026-11-13.* **⚠ FOURTH ENTRY UNDER RULE 7. The
+window-widening fix in 0.34.1 wrapped one branch of an if/else and
+left its sibling raw, so the same bug reappeared one branch away.
+Doug found it in B1. An AST sweep says there are 28 more of the same
+shape, all predating #171 — and `release_check.py` now ratchets the
+count instead of pretending otherwise.**
+
+### The bug
+
+`_update_validation()` sets `validation_text` from two branches. 0.34.1
+wrapped the success branch and not the problem branch, so:
+
+> starting a clone name as `ROAD`, intending `ROAD_B1` — the name
+> momentarily matches an existing profile, the collision warning
+> appears unwrapped, and the window widens again
+
+**Rule 7 is "guard the class, not the instance", and wrapping one
+branch of a two-branch label is as pure an instance-fix as exists.**
+The rule's own entry already lists three cases; this is the fourth,
+and it happened one day after I quoted the rule back while fixing a
+different bug.
+
+### Fixed structurally, not per-site
+
+New module-level `wrapped_label(text)`: hard-wraps one assembled
+string, preserves its own `\n\n` paragraph breaks, returns `""` for
+empty. It wraps around a `SetLabel()` **argument**, so a caller with
+several branches can route every branch through it without being
+restructured — which is what makes forgetting one harder.
+
+### The sweep, and why 28 are left alone
+
+An AST pass for `SetLabel()` calls taking interpolated text with no
+wrapper found **33** across `gui_app.py`:
+
+| | |
+|---|---|
+| `ClonePanel` | 2 — both now wrapped |
+| `ImportPanel` | 2 — both now wrapped |
+| seven other panels | **28, all predating #171** |
+
+`ImportPanel` was included because it has the identical
+name-plus-filename validation pair, and #167 already recorded it as
+this panel's sibling — fixing one and not the other is the same
+mistake at a larger scale.
+
+**The 28 are deliberately NOT fixed here.** Layout changes in this
+file have caused same-day regressions twice (#51, #53), a release
+being bench-tested is the wrong moment, and most of those labels will
+never see a long value. But leaving them unrecorded is how a class
+stays invisible, so `release_check.py` 1.2.0 adds a **ratchet**: the
+count may not grow past 28, the check says when the baseline can be
+lowered, and it does not demand the backlog be cleared to cut a tag.
+
+A gate nobody can satisfy gets deleted; a ratchet gets kept. Same
+reasoning as the three false-positive corrections in revs 213–214,
+arrived at from the opposite direction.
+
+---
+
+*Doc rev 214 — 2026-11-12.* **#171 shipped a NameError past every
+check in `release_check.py`, and the reason is that the verification
+tested a COPY of the code rather than the code. Doug's bench test
+caught it. The check that would have caught it now exists.**
+
+### The bug
+
+`gui_app` called `fit_clone_profile.filename_prefix_for()` and never
+imported it. Doug's report: *"if I change the Ride Type the New
+Filename field doesn't autofill at all. It will only autofill if the
+Ride Type is left at Unchanged."*
+
+**"Only when you pick a type" is the whole diagnosis.** The Unchanged
+branch of `_prefix_for_suggestion()` returns `_source_prefix()` and
+never reaches the missing name, so exactly one of the two paths raised.
+
+### ⚠ Why four layers of verification all missed it
+
+| | why it was blind |
+|---|---|
+| `py_compile` | the name resolves at CALL time, not compile time |
+| `import gui_app` | same reason — it imports fine, even with wx present |
+| the headless picker harness | **it RE-IMPLEMENTED the picker logic instead of importing it** |
+| the byte-identical clone check | exercises `fit_clone_profile`, which was never broken |
+
+The third row is the real failure. The harness was written to work
+around having no wx, and in doing so it tested a faithful copy of the
+logic — which cannot, even in principle, catch a missing import in the
+original. **A test that reimplements what it is testing proves the
+reimplementation.**
+
+### The check that catches it
+
+`release_check.py` 1.1.0 adds **no undefined names in tracked
+modules**, via `symtable` rather than a hand-rolled AST scope walk —
+the interpreter's own per-scope symbol tables already know what is
+global, assigned and imported, so the check borrows that judgement
+instead of re-deriving it badly. Confirmed against the broken source:
+it reports `filename_prefix_for` in `_prefix_for_suggestion`, and
+reports nothing after the fix. One false-positive class across all 14
+tracked modules — module dunders — allowlisted.
+
+### ⚠ And the version-claim check cried wolf twice in one sitting
+
+It read `python3 release_check.py 1.8.0` in the new release notes as a
+claim that the module is at version 1.8.0. Two passes to fix:
+
+1. skip fenced code blocks — didn't help, the usage line is *inline*
+   code, not a fence
+2. ignore a (module, version) pair when both sit inside the **same
+   inline-code span**: a command has them together, a version table
+   separates them
+
+Verified it still catches a real mismatch by planting one. **Three
+times now a check in this file has reported something that was not
+wrong** — the personal-figure sweep twice, this once. Same lesson each
+time, and it is worth stating plainly because the failure mode is not
+a missed bug: **a gate that reports things that are not wrong gets
+switched off, and then it catches nothing at all.**
+
+---
+
+*Doc rev 213 — 2026-11-09.* **#171 IS BUILT: a Ride Type picker in
+the Clone Profile panel and `--sub-sport` on the CLI. The generated
+file is BYTE-IDENTICAL to the hand-patched one that passed all ten
+hardware steps. `release_check.py` finally exists, and found three
+rider-attributed figures in a tracked file on its first run.**
+
+### What shipped
+
+| | |
+|---|---|
+| `fit_clone_profile.py` | 1.0.2 → **1.1.0** |
+| `gui_app.py` | 0.33.0 → **0.34.0** |
+| `release_check.py` | **new, 1.0.0** |
+
+`patch_profile()` replaces `patch_profile_name()` as the write path
+and can set either or both fields in one pass with one CRC recompute;
+`patch_profile_name()` delegates to it, so there is one write path
+rather than two to keep in step.
+
+### Verification, in the order it was done
+
+1. **The generated file matches the proven one byte for byte.**
+   `--name GRAVEL --sub-sport gravel_cycling` over the 840 `ROAD`
+   pull produces md5 `6f1007f11fa3` — the hand-patched file from rev
+   204 that went through all ten test steps. This is the strongest
+   test available and it is why #171 is a feature rather than an
+   experiment.
+2. **No regression on the old path.** `patch_profile_name()` output
+   compared against the pre-#171 code from git over 25 corpus
+   profiles: 0 mismatches.
+3. **Guards refuse what they should.** `hand_cycling` and
+   `apnea_diving` rejected with the accepted list; a bare `46`
+   rejected because the SDK name is required; no arguments rejected.
+4. **No side effects.** `--name` alone leaves `sub_sport` at the
+   source's value; only mesg 12 and the trailing CRC ever change.
+5. **Picker logic** exercised headlessly against the real table and
+   real files, since wx is not available here: entry 0 writes
+   nothing, entry 0's label degrades gracefully when the source's
+   sub_sport is outside the nine, and the template warning fires for
+   eight of nine types but **not** when the source's own type is
+   re-picked.
+
+Bench testing on hardware is `TEST_PLAN_v1.8.0.md`.
+
+### `release_check.py` — the trigger fired
+
+The conditional item at the top of this file said to raise it only for
+a release with real complexity. #171 touches the CLI and the GUI, so
+it came up, and it is built: clean tree, `HEAD == origin/main`,
+release notes present and tracked, every version claimed in the notes
+matching the module that declares it, every module compiling and
+importing, and no rider-attributed distance figures in tracked files.
+
+**⚠ And the first version of its privacy check was bad.** It flagged
+24 lines, of which 21 were invented examples (`--distance 2240mi` in
+help text) or the measured ride deltas the findings rest on. **A check
+that cries wolf twenty times gets ignored**, which is worse than not
+having one — so it was retargeted: a figure is flagged only when the
+surrounding sentence *attributes* it to the rider ("Doug's", "his
+own", "real odometer"). 24 hits became 3, and all 3 are real.
+
+### ⚠ Three live violations of the standing constraint
+
+The constraint is "no personal ride statistics in `PROJECT_NOTES.md`
+or `README.md` — the repo is public." Found in **this file**:
+
+| line | figure |
+|---|---|
+| 9897 | a lifetime mileage, "his own rough recollection" |
+| 9918 | a lifetime mileage and its raw metre value, "Doug's real odometer reading" |
+| 13801 | the same figure again |
+
+All three are in **committed** Doc revs, which collides with the other
+standing rule: committed revs are superseded, never rewritten. Flagged
+rather than silently edited, and **Doug chose redaction**: the figures
+are replaced, every surrounding sentence is intact, and each site
+carries an inline note saying a figure was redacted and why — so the
+difference from the published tag is explained rather than mysterious,
+which is what the never-rewrite rule is actually protecting.
+
+The findings survive whole. "`distance` is plain metres with no scale
+factor, confirmed exactly against a real device reading to within the
+device's own 0.1 mi rounding" needs the unit and the exactness, not
+the number.
+
+Worth being plain about the limit: these revs are already published
+and tagged, so redaction reduces future exposure and does not undo
+past exposure.
+
+### ⚠ And the check missed a fourth figure, twice over
+
+The raw metre value sat on the *same line* as one of the mileages it
+converted to, and the check did not see it — no unit suffix, so no
+pattern matched. **A privacy check that only recognises units misses
+the rawest form of the data.**
+
+Adding `\d{6,9}` plus a personal marker fixed that and immediately
+re-broke the noise problem: it flagged a **forum thread ID** and a
+**backup path timestamp**, both attributed to Doug, neither a
+distance. The second attempt requires the number to sit directly
+behind a distance word — `distance`, `odometer`, `mileage`, `metres` —
+which timestamps and IDs never do. Six probe cases, all correct: both
+original misses caught, all four lookalikes ignored.
+
+**Twice in one sitting the first version of this check was too
+broad.** Worth stating as a rule: a privacy check earns its place by
+being *specific*, because the failure mode is not a missed hit, it is
+being switched off after the fifth false alarm.
+
+---
+
+*Doc rev 212 — 2026-11-09.* **#171 IS PROVEN END TO END. A written
+`sub_sport` is accepted by the device, kept across a restart, applied
+to the ride it records, and honoured by Garmin Connect — the ride
+lands under GRAVEL in both Reports and Goals. Every step of
+`TEST_PLAN_171_sub_sport.md` has now passed.**
+
+### Steps 8–10
+
+A short gravel ride on the hand-patched `GRAVEL` profile.
+
+| | distance | timer | calories | rides |
+|---|---|---|---|---|
+| `GRAVEL` record | +98 m | +165 s | +2 | +1 |
+| record 0 | +98 m | +165 s | +2 | +1 |
+
+Identical, nothing else moved. `GRAVEL` went from all-zero to its
+first ride. **Fifth observation of the record-0 pattern, and the first
+on a profile this project created.**
+
+Connect shows the activity, categorised correctly, and **Reports and
+Goals both register the distance under Gravel** — which is the claim
+the whole item existed to test. Strava picked it up too.
+
+### ⚠ The Connect check was nearly misread, for a reason worth keeping
+
+At first look Goals showed nothing, and the obvious reading was that
+Connect had ignored the `sub_sport`. **It had not — the ride was 98
+metres.** A distance goal renders that as 0.0 or 0.1 miles, so there
+was nothing visible to see yet, and the figure appeared after a delay.
+
+**A null result from an underpowered test is not a negative result.**
+The test plan asked for "one ride" without saying how long, and at
+0.06 miles the measurement could not have distinguished success from
+failure in the aggregate view. What rescued it was checking the
+**activity's own type** in Connect's activity list rather than the
+goal total — the activity list reads the field directly, the Goals
+page reads a rounded sum of it.
+
+Worth generalising: when a test looks at an aggregate, check that the
+input is large enough to move the aggregate before believing the
+answer.
+
+### Where #171 stands
+
+Every open question is closed:
+
+| | |
+|---|---|
+| device accepts a written `sub_sport` | rev 204 |
+| device keeps it across a restart | rev 209 |
+| screens, order and CIQ fields survive | revs 204, 209 |
+| the device relocates slots but repairs mesg 170 itself | revs 209, 210 |
+| the ride is labelled with the new type | **rev 212** |
+| **Connect honours it, in Reports and Goals** | **rev 212** |
+
+**Clear to build.** Shape is settled in `SCOPE_171_sub_sport.md`: a
+Ride Type picker in the GUI's Clone Profile panel defaulting to the
+source's value, `--sub-sport` on `fit_clone_profile.py` underneath,
+SDK names only, restricted to the device's nine Ride Types (rev 205),
+lookup table not derivation (rev 206), and a warning when the chosen
+type differs from the source's because the screens come from the
+clone and not from the device's template for that type (rev 206).
+
+---
+
+*Doc rev 211 — 2026-11-08.* **`file_id.number` is the profile's SLOT
+ORDINAL, and the device corrected the one we sent — a third instance
+of rev 210's rule. It also confirms the ten-profile ceiling from an
+entirely separate message. And Doug's timestamp question is not
+answerable from file content, by construction.**
+
+### A fourth device-side change we had missed
+
+Hunting for a timestamp turned up one inside the 208 bytes of rev 209:
+
+| file | `file_id.number` |
+|---|---|
+| `ROAD` (our source) | 5 |
+| `GRAVEL` as we sent it | 5 — inherited |
+| `GRAVEL`, pull #1 | **3** |
+| `GRAVEL`, pull #2 | 3 |
+
+Across all 840 profiles in the corpus the value runs **0 to 9** and
+tracks which profile slot the file came from, not the file. So the
+device **restored its own value**, exactly as it did for the slot
+arrangement and the colour. Rev 210's rule now has three independent
+instances.
+
+**And 0–9 is ten slots.** Rev 207 predicted a ten-profile ceiling from
+the `totals` pool being 1 accumulator + 10 named records. `file_id`
+and `Totals.fit` are unrelated messages in unrelated files, and both
+say ten. Still not a *test* — nobody has tried to create an eleventh
+profile — but two independent structures agreeing is better than one.
+
+**The toolkit never reads or writes `file_id`**, so a clone carries
+the source's `number` and the device fixes it. Harmless, and now
+observed rather than assumed.
+
+### ⚠ `time_created` is unset, and the timestamp question is unanswerable
+
+`file_id.time_created` is `0xFFFFFFFF` on **every** profile file in
+the corpus — device-created, toolkit-written, both. There is no
+internal timestamp in these files.
+
+So Doug's question — did an identical import rewrite `Sports/` or get
+skipped — **cannot be answered from file content.** Identical bytes are
+identical whether they were rewritten or left alone; the question is
+about filesystem metadata, and MTP as exposed by OpenMTP does not show
+it. That is a property of the question, not a gap in the data.
+
+What *is* established: the device rewrites whenever anything it owns
+differs — arrangement, colour and `number` were all corrected on the
+first import. Only the exactly-identical case is unobservable, and
+nothing in the toolkit depends on it: every verification path compares
+content, which is correct either way.
+
+---
+
+*Doc rev 210 — 2026-11-08.* **ANSWERED, and it SUPERSEDES rev 192
+rather than just contradicting it. The trigger is not new-vs-
+replacement and it was never `sub_sport`: the device renumbers when
+the INCOMING SLOT ARRANGEMENT differs from the one it already holds.
+One rule accounts for all seven observations.**
+
+### The test
+
+The device's own returned `CyclingGRAVEL.fit`, copied straight back to
+`NewFiles` and restarted. Pulled again:
+
+| | |
+|---|---|
+| md5 in | `6cf74e4078f5` |
+| md5 out | **`6cf74e4078f5`** |
+| | **byte-for-byte identical** |
+
+Same 5307 bytes, same 17 configured slots, same CIQ placements
+`[(0,2),(5,0)]`, same colour, valid CRC.
+
+### ⚠ `sub_sport` was never a candidate, and I should have seen that
+
+Rev 209 named the `sub_sport` rewrite as the variable that "fits
+everything". **It fits nothing, because from the device's point of
+view `sub_sport` never changed.** The 840's existing `GRAVEL` was
+already a real gravel profile carrying 46. We handed it a `GRAVEL`
+carrying 46. The device saw no change to that field at all.
+
+The rewrite was a change relative to our *source* (`ROAD`, 7). It was
+never a change relative to the *target*. Rev 209 compared against the
+wrong reference — **the same substitution error as revs 189, 201 and
+207**, and the fourth time this project has reasoned from the wrong
+baseline. The rule from rev 202 says a comparison needs two genuine
+device pulls; the sharper statement is **name the reference before
+naming the cause.**
+
+### The rule that replaces rev 192's
+
+> **The device reassigns `message_index` when the arrangement it
+> receives differs from the arrangement it holds. Otherwise it changes
+> nothing.**
+
+Every observation follows:
+
+| case | arrangement vs held | renumbered |
+|---|---|---|
+| `ROAD_22`, `ROAD A2` — new profiles | device holds nothing, so always differs | **yes** |
+| rev 179, `ROAD_T1`, `qqtest` — replaced by edited copies of themselves | matches | no |
+| `GRAVEL` carrying `ROAD`'s layout | **differs** | **yes** |
+| `GRAVEL` handed its own file back | matches | **no** |
+
+Rev 192's "new renumbers, replacement does not" is a **consequence**,
+not the mechanism: a new profile has no held arrangement to match, so
+it always differs. Its five observations stay valid and its filename
+conclusion is untouched — the refinement is that "replacement" was
+never the operative property.
+
+### The colour behaves the same way
+
+Last import we sent `ROAD`'s blue `0044f8` and the device replaced it
+with `a800f8`. This time we sent `a800f8` and it stayed. **So the
+device restores what it owns when handed something different**, for
+the colour exactly as for the slot arrangement. Whether `a800f8` is
+the sub_sport-46 default or simply what this profile previously held,
+these two pulls cannot distinguish — but either way, writing f10 is
+futile, which is what rev 203 concluded for other reasons.
+
+### What this means for the toolkit
+
+**A clone will always trigger relocation on import** — it carries the
+source's arrangement, which by definition differs from the target's.
+That is normal, harmless, and invisible to the rider: identities,
+field arrays and display order all survive, and the device repairs
+mesg 170 itself (rev 209).
+
+It also means **pairing by f10 is not an optimisation, it is
+required**. Any comparison keyed on `message_index` will report
+spurious differences after every clone import. #162's decision now has
+a mechanism behind it rather than just a hardware observation.
+
+---
+
+*Doc rev 209 — 2026-11-07.* **⚠ REV 192'S RULE IS INCOMPLETE. A
+replacement CAN be renumbered — this one was, five screens of it. The
+device also reassigned the profile COLOUR and, importantly, UPDATED
+mesg 170 ITSELF to follow the Connect IQ screen it had moved.**
+
+`CyclingGRAVEL.fit` pulled back off the 840 after the restart — test
+plan step 7. This is a sent-versus-returned comparison, which is
+legitimate for "what did the device do to our file": the written file
+is the *input* here, not a baseline for device behaviour over time, so
+rev 202's rule is not in play.
+
+### What survived
+
+| | |
+|---|---|
+| `sub_sport` | **still 46** — the device kept the write |
+| `sport` | 2, untouched |
+| name | `GRAVEL` |
+| size / CRC | 5307 B, valid |
+| screen identities | **all 17 present, none added, none lost** |
+| each screen's field array | unchanged |
+| each screen's display order (f9) | **unchanged** |
+
+So the user-visible result is correct and complete. **Step 7 passes.**
+
+### But 208 bytes differ, and the device moved five screens
+
+| f10 | sent slot | device slot |
+|---|---|---|
+| 2 | 14 | **12** |
+| 3 | 20 | **14** |
+| 4 | 21 | **15** |
+| 5 | 4 | **5** |
+| 38 | 5 | **4** |
+
+The first three are a cascade closing gaps — 12 was free, so f10=2
+moved down into it, f10=3 took the slot f10=2 vacated, f10=4 moved
+into free slot 15. Net: slots 20 and 21 released, 12 and 15 filled.
+The 4↔5 pair is a straight swap. **Display order travelled with each
+screen**, which is why nothing changed for the rider.
+
+**This is a replacement — same display name — and it was renumbered.**
+Rev 192's table had five observations and concluded "new renumbers,
+replacement does not". That rule does not survive this case.
+
+**What is new in this import, and what is not.** The gap-closing
+reading is tempting but `qqtest.fit` (rev 192) had a gap at slot 12
+and came back **byte-identical**, so a gap alone does not trigger
+compaction. The variable this import introduces is the **`sub_sport`
+rewrite** — the first time this project has changed an identity field
+in mesg 12.
+
+| candidate | status |
+|---|---|
+| the `sub_sport` change triggers a rebuild | **fits everything** |
+| the 840 compacts and the 530 does not | not excluded, but rev 192's own 840 replacement did not renumber |
+| closing gaps is routine | **excluded** — `qqtest` kept its gap |
+
+Not settled.
+
+**⚠ And a third candidate, which the table above missed: the INCOMING
+ARRANGEMENT.** Our file carried `ROAD`'s slot layout — gaps at 12 and
+15, content at 20 and 21 — which is not the layout the 840 held for
+`GRAVEL`. The device may rebuild whenever the incoming arrangement
+differs from what it already has for that profile. **That explains
+`qqtest` too**: `ROAD_T1` was replaced by an edited copy of *itself*,
+so its arrangement already matched, and nothing needed moving. This
+candidate accounts for every observation without invoking `sub_sport`
+at all, and it was not on the list because the list started from the
+field we happened to change.
+
+The discriminating test is **re-importing the device's own returned
+`CyclingGRAVEL.fit` unchanged**: byte-identical means arrangement is
+the trigger, not `sub_sport`.
+
+*(An earlier draft of this rev proposed instead a replacement with
+only the display name changed. That is incoherent — matching is BY
+display name, so changing it makes the profile new rather than a
+replacement. Recorded because the flawed test reached a doc and a test
+plan before the contradiction was noticed.)*
+
+### ✅ The device maintains mesg 170 across its own moves
+
+The Connect IQ record's placement went **(4, 0) → (5, 0)** — tracking
+the CIQ screen as it moved from slot 4 to slot 5. The uuid is
+unchanged.
+
+**The device fixed up the CIQ placement itself.** That is a genuinely
+reassuring finding: mesg 170's indices do refer to `message_index`
+(confirmed by the device's own behaviour, not inference), and the
+firmware keeps them consistent when it reorganises.
+
+**And it corrects the test plan's reasoning.** The plan named the
+profile `GRAVEL` specifically to avoid renumbering, because renumbering
+would misalign the CIQ placements. Both halves were wrong: the
+replacement *was* renumbered, and the placements were fine anyway
+because the device repaired them. The outcome is good; the stated
+reason for it was not.
+
+### The device reassigned the profile colour
+
+mesg 12 f10: **`0044f8` → `a800f8`** — the blue inherited from `ROAD`
+became purple. We did not write f10.
+
+So the device **owns** this field and normalises it, presumably to
+something it considers right for the new `sub_sport` or for
+distinguishing profiles. Two consequences: it is strong independent
+support for f10 being the accent colour (rev 203 inferred it from
+shape alone), and it confirms rev 203's decision not to offer colour
+as an editable — a written value would be overwritten.
+
+### Consequence for #171 when it is built
+
+The verification path must **not** treat relocation as failure.
+Pairing by f10 (#162) already handles it, which is the second time
+that decision has paid off. But any check that compares by
+`message_index` would report five spurious differences on every
+sub_sport change.
+
+---
+
+*Doc rev 208 — 2026-11-07.* **Record 0's accumulator behaviour is now
+CONFIRMED ON THE 840 — the first time it has been shown outside the
+530. And rev 207's Connect-sync reading of f12 is already in trouble,
+from evidence that was sitting in the same file.**
+
+A real road ride on the 840, between two genuine device pulls.
+
+### Record 0 accumulates on the 840 too
+
+The ridden profile's record and record 0 moved by **exactly the same
+amount in all four fields** — distance, timer, calories and session
+count. Not approximately; identically. No other record moved.
+
+This is the **fourth** observation of the pattern and the first on the
+840; the previous three (rev 198) were all 530. **It closes the
+biggest caveat in the forum draft**, which says one device, one
+firmware, and explicitly asks whether the 840 behaves the same for
+record 0. It does.
+
+### ⚠ f12: the sync test came back NO, and `ROAD_A1` was the clue
+
+Rev 207 predicted that after a Connect sync, `COMMUTE`, `TOUR` and
+`EMOUNTAIN` would acquire the shared f12 value. **They did not — all
+three are still 0** after a ride that uploaded.
+
+Worse for the hypothesis, the counter-evidence was already in the
+baseline and I missed it: **`ROAD_A1` has a session recorded.** It was
+ridden, that ride reached Connect, and its f12 is 0. A profile Connect
+demonstrably knows about does not have the value. The sync reading
+should have been dead before the test was proposed.
+
+**That is the rev 201 error in miniature** — reaching for the
+explanation that fits the two groups in front of me without checking
+the rest of the same table for a case that refutes it.
+
+What the split actually tracks, as far as the data supports:
+
+| f12 | records | what they have in common |
+|---|---|---|
+| shared non-zero | `GRAVEL`, `INDOOR`, `ROAD` | the device's **original** profiles |
+| 0 | `ROAD_A1`, `COMMUTE`, `TOUR`, `EMOUNTAIN` | **created after** initial setup |
+
+The three with a value are the profiles that existed when the 840 was
+set up. Everything created since — by import *or* by the device's own
+template flow — is 0. So the candidate now is **initial device setup
+or an account-level profile restore**, not profile creation and not
+Connect contact.
+
+**One number supports that and is worth recording.** Read as a Unix
+timestamp the shared value is **2021-07-19**, which predates the 840
+entirely. So it was not generated by this device — it was carried in,
+which is what an account-level restore would do. Read as a FIT
+timestamp it is 2041, i.e. nonsense, so Unix is the better reading.
+Still circumstantial: one value, one device, and no second device to
+compare against now that the 530 is leaving.
+
+**Nothing in the toolkit reads or writes f11 or f12, and this does not
+change that.** The remaining questions are curiosity, not blockers.
+The value itself stays out of this file and out of `README.md`.
+
+---
+
+*Doc rev 207 — 2026-11-07.* **The `totals` record pool is FIXED at 11,
+not dynamic — which means the file structurally encodes a ten-profile
+ceiling. And rev 204's f12 hypothesis is WRONG: three profiles the
+device created itself came out with f12 = 0.**
+
+Two genuine 840 pulls, before and after creating `COMMUTE`, `TOUR` and
+`EMOUNTAIN` from the on-device templates. Both are device pulls, so
+the baseline rule from rev 202 is satisfied.
+
+### The blank records are a pre-allocated pool
+
+| | before | after |
+|---|---|---|
+| records | 11 | **11** |
+| named | 4 | **7** |
+| blank | 6 | 3 |
+| file size | 795 B | **795 B** |
+
+Three new profiles claimed **three existing blank slots**. The file
+did not grow, the record count did not change, and the message
+definition is untouched.
+
+**So the pool is 1 accumulator + 10 named slots.** That is a
+structural ceiling, and it predicts the device permits at most **ten
+activity profiles** — worth confirming against the device's own
+behaviour, because if the prediction holds then the toolkit's profile
+handling has a hard limit it has never had to think about. Unverified:
+nobody has tried to create an eleventh.
+
+**Claiming a slot sets `sport` to 2.** The three new records moved
+from `sport = 255` to `sport = 2`; the three still-blank records
+remain 255. So `sport = 255` is the "unused slot" marker, not a
+missing value.
+
+**Record 0 did not move**, for any of the four fields. Creating a
+profile is not an event record 0 accounts for — consistent with rev
+198's finding that only rides move it.
+
+### ⚠ Rev 204's f12 hypothesis is FALSIFIED
+
+Rev 204 proposed that f12 is "set at on-device profile creation and
+left zero by a `NewFiles` import", from one imported clone against
+three device-native profiles. It hedged that as "a pattern, not a
+finding", and it was right to.
+
+**Three profiles created by the device's own template flow came out
+with f12 = 0.** On-device creation is therefore not what sets it.
+
+What actually splits the records:
+
+| f12 | records |
+|---|---|
+| one shared non-zero value | the device's three original profiles |
+| **0** | the toolkit-imported clone, **and all three created today** |
+
+The surviving reading is that f12 marks profiles **Garmin Connect has
+seen** — the three originals have been synced for a long time; the
+clone and today's three have not been synced since they appeared. That
+also fits the value being *identical* across profiles, which no
+per-profile timestamp would be.
+
+**Cheap test, and it is decisive:** sync the 840 with Connect, then
+pull `Totals.fit` again. If `COMMUTE`, `TOUR` and `EMOUNTAIN` acquire
+the shared value, f12 is a Connect-sync marker. If they stay 0, the
+reading is wrong and f12 needs another explanation.
+
+**Also: f11 is NOT a copy of `sport`.** Rev 204 floated that, since
+both read 2. The blank records disprove it — they carry `sport = 255`
+and `f11 = 2`. f11 is 2 on all eleven records regardless of whether
+the slot is in use.
+
+**The value of f12 is still deliberately kept out of this file** — it
+may be an account identifier and this repo is public.
+
+---
+
+*Doc rev 206 — 2026-11-07.* **Rev 205's three inferences are now
+MEASURED, and the naming rule is settled. But the three fresh pulls
+also show the on-device templates DIFFER BY RIDE TYPE — which puts a
+caveat on #171 that the scope did not anticipate.**
+
+### All six predictions confirmed
+
+Three profiles created from the 840's own templates, default names
+untouched:
+
+| Ride Type | profile name | sub_sport | SDK name | filename |
+|---|---|---|---|---|
+| Commute | `COMMUTE` | 48 | `commuting` | `CyclingCOMMUTE.fit` |
+| Tour | `TOUR` | 49 | `mixed_surface` | `CyclingTOUR.fit` |
+| Emountain | `EMOUNTAIN` | 47 | `e_bike_mountain` | `CyclingEMOUNTAIN.fit` |
+
+**`mixed_surface` is confirmed as Tour.** Rev 205 had it by
+elimination and flagged it as the weak one; it is now measured.
+
+**The default profile name is `UPPER(menu label)`, not
+`UPPER(sdk_name)`.** All three would have been `COMMUTING`,
+`MIXED_SURFACE` and `E_BIKE_MOUNTAIN` under the other rule. With
+`INDOOR` (6, `indoor_cycling`) and `GRAVEL` (46, `gravel_cycling`)
+that is five independent confirmations and no counter-example.
+**The label↔SDK-name mapping must be a lookup table.**
+
+**And the filename label table confirms the age hypothesis.** All
+three produce an **empty middle segment**, as predicted — they are
+late enum additions (47, 48, 49), like 28 and 46. The segment is
+populated only for 6, 7, 8 and 11. Rev 205's guess that the device's
+label table was never extended past the original cycling sub_sports
+now has five supporting cases.
+
+**`EMOUNTAIN` is uppercase**, so the all-caps rule holds without
+exception and the corpus's mixed-case `Ebike` was renamed by hand.
+
+### ⚠ The templates are NOT the same screen set
+
+The three files are all 5214 bytes, which invited the assumption that
+the template is one layout with the type swapped in. **It is not.**
+Four `data_screen` slots differ:
+
+| slot | COMMUTE | TOUR | EMOUNTAIN |
+|---|---|---|---|
+| 0 | …Cadence, **Time of Day** | …**Distance to Next**, Cadence | **Grit, Flow**, HR Graph, Power Graph… |
+| 2 (f10=25) | configured, **empty** | configured, **empty** | **Assist Mode, Smart Travel Range** |
+| 3 | order 2 | **order 3** | order 2 |
+| 4 (f10=35) | **not configured** | **configured, order 2** | not configured |
+
+Each template is tailored: `EMOUNTAIN` leads with Grit and Flow and
+fills the f10=25 screen with the two e-bike fields, `TOUR` carries
+Distance to Next and enables an extra screen, `COMMUTE` carries Time
+of Day. Settings outside the screens differ too — mesg 13 (8 bytes),
+mesg 70 (42 bytes, including 36 in f29), mesg 309 and mesg 12's f9,
+f18, f22 and f24.
+
+**So a clone with a rewritten `sub_sport` is NOT equivalent to a
+native profile of that type.** It carries the source's screens and
+the source's settings, and gets none of the destination type's
+template content.
+
+**For Doug's use case that is exactly right** — the whole point is to
+keep `ROAD`'s screens. But it is a real difference, and someone
+cloning `ROAD` to make an e-bike profile would silently not get
+Assist Mode or Smart Travel Range. **The picker has to say so.**
+
+### Three more colours for the mesg 12 f10 table
+
+| hex | R,G,B | type |
+|---|---|---|
+| `f804d0` | 248,4,208 | magenta — `COMMUTE` |
+| `55aaaa` | 85,170,170 | teal — `TOUR` |
+| `aa5500` | 170,85,0 | brown — `EMOUNTAIN` |
+
+Each fresh profile got a distinct colour, which is further support
+for f10 being the accent colour (rev 203). Still never confirmed
+against a device label.
+
+---
+
+*Doc rev 205 — 2026-11-06.* **The 840's on-device "Ride Type" menu
+offers NINE types, and that menu — not the SDK enum — is the vetted
+list #171 needs. The naming is not systematic: only 2 of the 9
+sub_sport names end in `_cycling`.**
+
+### The menu, as read off the device
+
+Doug read these from the 840's new-profile flow, where the setting is
+called **"Ride Type"**:
+
+| Ride Type | sub_sport | SDK name | evidence |
+|---|---|---|---|
+| Road | 7 | `road` | measured |
+| Mountain | 8 | `mountain` | measured |
+| Indoor | 6 | `indoor_cycling` | measured |
+| Gravel | 46 | `gravel_cycling` | measured |
+| Cyclocross | 11 | `cyclocross` | measured |
+| Ebike | 28 | `e_bike_fitness` | measured |
+| Commute | 48 | `commuting` | **inferred** |
+| Tour | 49 | `mixed_surface` | **inferred** |
+| Emountain | 47 | `e_bike_mountain` | **inferred** |
+
+Six are measured in the corpus. The last three are not, and **"Tour"
+→ `mixed_surface` is the weak one** — it is the only unclaimed
+cycling sub_sport left once the other eight are assigned, so it rests
+on elimination rather than evidence, and the two words do not
+obviously mean the same thing. A single `Tour` profile pulled off a
+device settles it.
+
+### ⚠ The names are NOT `<ride_type>_cycling`
+
+The natural assumption is that each menu entry becomes
+`<ride_type>_cycling`. It does not. **Two of nine** carry the suffix —
+`indoor_cycling` and `gravel_cycling`. Three are bare nouns (`road`,
+`mountain`, `cyclocross`) and four are different words altogether
+(`commuting`, `mixed_surface`, `e_bike_fitness`, `e_bike_mountain`).
+
+**Consequence for the toolkit: never derive the SDK name from the
+menu label.** The mapping is a lookup table and has to be one. This
+is exactly the shape of the field-ID batch error (revs 83–84) — a
+plausible systematic rule over data that is only mostly systematic.
+
+### The menu is NARROWER than the enum
+
+Nine of the cycling-tagged sub_sports are offered. **Nine more are
+not**: `spin` (5), `downhill` (9), `recumbent` (10), `hand_cycling`
+(12), `track_cycling` (13), `bmx` (29), `esport` (77), `enduro` (123),
+`e_bike_enduro` (127).
+
+So the vetted list in the scope should be **the device's nine**, not
+the SDK's cycling-tagged eighteen. Writing `hand_cycling` would
+produce a profile whose type the device's own UI cannot express, and
+whose Connect categorisation is unknown — the inverse of the problem
+#171 exists to fix.
+
+Whether the device would *accept* one of the nine it does not offer is
+a real question, since rev 204 proved it accepts a written sub_sport.
+Not worth asking until the nine work.
+
+### This probably explains the empty filename segment
+
+Rev 187's `Cycling<SubSport><DisplayName>.fit` has a label for
+sub_sports **6, 7, 8, 11** and an empty segment for **28 and 46**.
+Those two groups split cleanly by enum value — the labelled ones are
+all ≤ 11, the unlabelled ones are later additions.
+
+**Hypothesis: the device's filename-label table only covers the
+original cycling sub_sports and was never extended.** It predicts
+that `Commute`, `Tour` and `Emountain` (48, 49, 47) also produce an
+empty middle segment. Cheap to test, and nothing depends on the
+answer — #170 removed the last thing that predicted a filename.
+
+---
+
+*Doc rev 204 — 2026-11-06.* **#171's gate is PASSED on the 840: a
+written `sub_sport` is accepted, the screens and the Connect IQ fields
+survive, and the totals record is untouched. Plus a structural find —
+the 840's `totals` record carries two fields the 530's does not.**
+
+### The hand-patched GRAVEL profile imported cleanly
+
+`CyclingGRAVEL.fit` was built from an 840 `ROAD` pull by patching two
+fields in mesg 12 and nothing else — verified before handover as
+**exactly 8 changed bytes**: 5 in the 32-byte name field, 1 at
+`sub_sport` (7 → 46, `gravel_cycling`), 2 in the trailing CRC. All 31
+`data_screen` records byte-identical including `message_index`;
+mesg 170 identical, same uuid and same `placements`.
+
+Doug's result on the device:
+
+| | |
+|---|---|
+| import | accepted |
+| both Connect IQ data fields | **render their app**, no Timer fallback |
+| the profile's totals record | all four fields still zero, confirmed by `fit_dump` |
+
+**So `sub_sport` is writable.** That was the one genuine unknown in
+the scope — mesg 12 field 1 had never been written by this project,
+and the worry was that the device would treat an identity field as
+its own, the posture it takes with `message_index`. It does not.
+
+Steps 3 and 9 of `TEST_PLAN_171_sub_sport.md` are still open, and 9
+is the one that matters: whether **Garmin Connect** files the ride
+under Gravel Cycling. The device accepting the write and Connect
+honouring it are different claims.
+
+### ⚠ Correction: "CIQ fields historically break on a clone" is STALE
+
+The test plan was written around that risk. Doug's correction: the CIQ
+failure was **early-project**, before mesg 170 was understood, and
+cloning has worked for toolkit users since. The maintenance path
+built in #123–#128 is what fixed it.
+
+Replacing rather than creating a profile was still the right call
+here — it sidesteps renumbering (rev 192) for free — but it was not
+rescuing a known-fragile path, and the plan overstated the danger.
+**Recording this because stale risk framing makes a passing test look
+like a narrow escape, which distorts what to do next.**
+
+### The 840's `totals` record has two fields the 530's lacks
+
+Same mesg 33, different field set:
+
+| device | field numbers |
+|---|---|
+| 530 | 0, 1, 2, 3, 5, 9, 10, 254 |
+| **840** | 0, 1, 2, 3, 5, 9, 10, **11, 12**, 254 |
+
+Both new fields are 4 bytes. **f11 is 2 on all 11 records** — the same
+value as `sport`, so plausibly a second sport-ish field, though
+constant data cannot distinguish a copy from a coincidence.
+
+**f12 is the interesting one.** One non-zero 32-bit value, *identical*
+on the three profiles the device created itself, and **0** on the
+toolkit-imported clone and on all six blank records. If that pattern
+holds it means f12 is set at on-device profile creation and left zero
+by a `NewFiles` import — but it is one clone against three natives,
+which is a pattern, not a finding.
+
+Neither field is read or written by anything in the toolkit, and
+neither should be until it is understood. **The value itself is kept
+out of this file** — it may be an account or device identifier, and
+this repo is public.
+
+**This belongs in the forum post.** It currently lists the 530 field
+set as *the* layout; it is per-model.
+
+---
+
+*Doc rev 203 — 2026-11-06.* **Two findings from scoping #171, neither
+of which required building anything: a profile's SPORT is always 2 and
+`sub_sport` is the field that varies, and mesg 12 field 10 is the
+profile's accent COLOUR.**
+
+### `sport` never varies; `sub_sport` does
+
+Across every profile in the corpus, mesg 12 field 0 is **2**. The
+distinguishing field is **field 1, `sub_sport`**:
+
+| sub_sport | SDK name | device filename prefix |
+|---|---|---|
+| 6 | `indoor_cycling` | `CyclingIndoor_Cycle…` |
+| 7 | `road` | `CyclingRoad…` |
+| 8 | `mountain` | `CyclingMountain…` |
+| 11 | `cyclocross` | `CyclingCyclocross…` |
+| 28 | `e_bike_fitness` | `Cycling…` — **empty segment** |
+
+**This refines rev 187**, which recorded the generated filename as
+`Cycling<Sport><DisplayName>.fit`. The middle segment is the
+**sub_sport** label; `sport` supplies the constant `Cycling`. The rule
+is otherwise unchanged and still holds against the corpus.
+
+`gravel_cycling` is **46**, and Doug's own 530 `GRAVEL` profile
+carries it — so the device creates and uses it natively. It is absent
+from this session's corpus only because that file was never uploaded;
+an earlier draft of SCOPE_171 wrongly read that absence as the
+profile never having been pulled.
+
+**⚠ And the filename rule has holes.** That profile's file is
+`CyclingGRAVEL.fit` — the middle segment is **empty** for sub_sport
+46, exactly as it is for 28. So rev 187's
+`Cycling<SubSport><DisplayName>.fit` holds only for sub_sports the
+device has a label for (6, 7, 8, 11 observed). Nothing depends on
+predicting the name — #170 removed the last thing that did — but the
+rule reads as universal and is not.
+
+**Connect's Goals page filters on sport PLUS sub_sport** (Doug, who
+uses it to track derailleur battery life per bike). So sub_sport is
+load-bearing: a profile carrying the wrong one files its rides
+against the wrong goal, silently.
+
+### mesg 12 field 10 is the profile colour
+
+Three bytes, one value per profile, **inherited by clones** — which
+is what makes it legible: eighteen 530 `ROAD` descendants all carry
+`0076be`, and `MOUNTAIN` carries `f16125`, which is orange.
+
+| hex | R,G,B | profile |
+|---|---|---|
+| `0076be` | 0,118,190 | the 530 `ROAD` family |
+| `0044f8` | 0,68,248 | the 840 `ROAD` family |
+| `f16125` | 241,97,37 | `MOUNTAIN` |
+| `00c8a0` | 0,200,160 | a cyclocross profile |
+| `00dcff` | 0,220,255 | an e-bike profile |
+| `00b700` | 0,183,0 | `INDOOR` |
+
+**Inferred from shape and inheritance, not confirmed against a device
+label** — nobody has changed a colour on-device and re-pulled, which
+is the one-step confirmation if it ever matters. Logged at that
+confidence.
+
+**Also checked and worth recording as a negative: nothing in mesg 12
+references a bike or item of gear.** Garmin Connect's gear tracking —
+which Doug uses for derailleur battery life per bike — is configured
+on Connect's side and is not represented in the profile file.
+
+---
+
+*Doc rev 202 — 2026-11-01. **Rev 201 over-corrected. Record 0 IS an
+accumulator; the "decrease" was correct bookkeeping measured against
+the wrong baseline — a file this project WROTE rather than a genuine
+device pull. Third baseline error of the same shape (revs 189, 201,
+this). And the 530's 68 m test ride was found in the 840's record 0,
+with no matching profile: the sync is BIDIRECTIONAL.**
+
+### Tier 1 — established, clean comparisons, one variable
+
+**A ride moves record 0 by exactly the ride.** Today's 840 ride, two
+genuine pulls either side: `ROAD +17,387 m / +3,406 s / +469 kcal /
++1`, record 0 identical. Same as every 530 observation.
+
+**Toolkit writes do not move it at write time.** A
+`fit_odometer.py` write of 111,045 m into `ROAD_A1` between two pulls
+moved record 0 by zero.
+
+**The sync is BIDIRECTIONAL, and a ride can land in record 0 with no
+profile to hold it.** Reconciling the 840's two genuine pulls, record
+0 exceeds the sum of its profiles by:
+
+| | |
+|---|---|
+| time | **+94 s** |
+| calories | **+1** |
+| rides | **+1** |
+
+Those are the 530's test-D ride exactly. **They are computed from two
+device pulls with no assumption in them**, and the 840 has no profile
+named `ROAD A2` for that ride to land in. So it went into record 0
+alone.
+
+The distance residual is `-199,932 m`, which is `-200,000 + 68` — the
+68 m completing the same ride. That one *does* rest on an assumption;
+see tier 2.
+
+### Tier 2 — fits to the metre, NOT established
+
+**Deleting a profile appears to deduct its total from record 0.**
+`ROAD 2` held exactly 200,000 m — a round number this project wrote,
+no ride produces it — and was deleted. Record 0 is short by exactly
+that, with **no matching time, calorie or ride deduction**, which is
+consistent because only distance was ever written into it.
+
+**Why it is not established:** `ROAD 3` held 100,000 m from the same
+write and was also deleted, yet only 200,000 came off. That resolves
+cleanly *if* the written file reached the device holding one value
+and not the other — and Doug cannot confirm the deployment history
+from that week. Two readings fit; nothing available distinguishes
+them.
+
+**If it is real it has a practical edge**: a large value written into
+a profile is deducted from record 0 when that profile is later
+deleted, even though writing it never added to record 0 in the first
+place. Not a reason to change the tool, which touches neither.
+
+### Tier 3 — unknown
+
+The **mechanism**. Physio TrueUp is a documented Connect pathway, but
+Garmin's own list of what it syncs excludes per-profile totals, and
+no activity file appeared on the receiving device. Three facts, no
+theory holding all three. Not pursued: the 530 is leaving the Garmin
+Connect account.
+
+### ⚠ The method failure, which is the durable part
+
+Rev 201 declared record 0 "not an accumulator" on the strength of a
+decrease measured against `TotalsSportTest/Totals.fit` — **a file
+this project wrote, not a device pull.** Against the genuine Oct 21
+pull beside it, the picture reconciles.
+
+That is the **third** time: rev 189 substituted an older profile for
+the staging file; rev 201 substituted a written file for a pull. Both
+times the substitute's drift was the same size as the signal.
+
+**The rule this earns:** when a corpus contains files the toolkit
+wrote, a comparison may only use **two genuine device pulls**. A
+written file is not a baseline. It is an input whose effect is what
+you are trying to measure.
+
+### Retractions, in order, for the record
+
+| rev | claim | fate |
+|---|---|---|
+| 198 | record 0 is "the device's own ledger" | wrong — not device-scoped |
+| 200 | "a running total of rides reported to it" | right in substance, retracted too hastily |
+| 201 | "not an accumulator; it can decrease" | **wrong — wrong baseline** |
+| 202 | accumulator; bidirectional; deletion-deduction unproven | three tiers, by confidence |
+
+Four revisions of one claim in two days. Each was driven by new
+hardware evidence and each was recorded, which is the system working
+— but revs 200 and 201 were both written faster than the evidence
+justified.
+
+---
+
+*Doc rev 201 — 2026-11-01. **Its central claim is WRONG — see rev 202,
+which identifies the baseline error.** SUPERSEDES rev 200, which replaced one
+over-confident reading with another.*** **Record 0 can DECREASE. It
+is not an accumulator of any kind, and this rev makes no claim about
+what it is. Rev 198 said "the device's own ledger", rev 200 said "a
+total of rides reported to it" — both were interpretations built on
+observations that only ever went up.**
+
+### The observation that broke it
+
+The 840's `Totals.fit`, Oct 21 vs 2026-11-01:
+
+| | |
+|---|---|
+| distance | **DOWN** 282.7 → 271.4 mi |
+| time | up |
+| calories | up |
+| rides | up |
+
+**An accumulator cannot lose distance.** Whatever record 0 is, it is
+not "the running total of rides this device knows about."
+
+### ⚠ That 840 comparison is badly confounded, and is NOT evidence for anything else
+
+Four things changed between those two pulls:
+
+- `ROAD 2` was **renamed** to `ROAD_A1`, and its `sport` changed 255 → 2
+- `ROAD 3` was **deleted** — its name is now blank
+- **this project wrote values into that device's totals** on Oct 21
+- several real rides happened
+
+The profile increments sum to ~182 mi while record 0 fell by 11. No
+mechanism can be inferred from that, and none is. The only safe
+reading is the negative one: **a decrease happened, so the
+accumulator model is false.** This is rev 189's mistake in a new
+costume — a baseline with more moving parts than the signal — and it
+is recorded here so the next person does not try to mine it.
+
+### ⚠ A provenance correction: rev 198 had one local ride, not two
+
+Rev 198 listed "a real ride on a profile" moving record 0 exactly.
+**Doug has confirmed that ride was performed on the 840**, not the
+530 whose file was measured. It reached the 530 by sync.
+
+So the record contains **exactly one confirmed local ride** — the
+68 m / 94 s test-D ride. That is the one quoted in full and called
+the better evidence at the time, so the conclusion stands on it. But
+it is one observation, and rev 198 implied two.
+
+### What is actually known, and nothing more
+
+| | status | evidence |
+|---|---|---|
+| a ride lands in its profile record **and** record 0 together, identical field for field | **solid** | 3 events on the 530 |
+| **nothing this toolkit writes ever moves record 0** | **solid** | 3 separate writes |
+| rides recorded on **another device** arrive the same way, matched by **profile name** | **solid** | confirmed by Doug for the 10.8 mi and 27.2 mi rides |
+| arrivals are **additive, never authoritative** | **solid** | a prior reset survived untouched |
+| the *forum sum rule* is false | **solid** | 5 working states |
+| **what record 0 represents** | **NOT CHARACTERISED** | it can decrease |
+| **the sync mechanism** | **UNKNOWN** | see below |
+
+### Why the mechanism is still unknown, despite two good leads
+
+- Garmin's 530 manual documents **Physio TrueUp** bringing activities
+  from other devices via Connect — a real pathway, officially
+  described.
+- But Garmin's support page lists what TrueUp syncs, and **per-profile
+  lifetime totals are not on it.** "Weekly and Monthly Totals" is, and
+  is a different thing.
+- And **no activity file appeared** in the 530's `Activities` folder
+  for the synced ride. So the device did not ingest an activity and
+  accumulate it locally — which was the hypothesis that fit everything
+  else.
+
+Three facts, no theory that holds all of them. Recorded as such.
+
+### What would settle it, if anyone ever wants to
+
+Rides, on two registered devices, changing one variable at a time:
+
+1. ride device A, power up device B, pull B's totals — the baseline
+2. disable Physio TrueUp on B, repeat — names the feature or clears it
+3. ride device B only, check A — establishes direction
+4. a month boundary with no riding — tests the rollover idea
+
+**Not going to happen here.** Doug is removing the 530 from Garmin
+Connect ahead of possibly selling it, which also avoids the two units
+fighting over FTP and VO2 max. Once it leaves the account the
+experiment is not repeatable, and that is a reasonable trade for a
+curiosity that changes nothing about the tool.
+
+### What this changes about `fit_odometer.py`
+
+**Nothing.** It never writes record 0, never writes a name or sport,
+and verifies that only the records it was asked for moved. Every one
+of those guards holds regardless of what record 0 turns out to be.
+The tool was built not to depend on understanding this, which is the
+one design decision this whole episode vindicates.
+
+---
+
+*Doc rev 200 — 2026-11-01. **SUPERSEDED by rev 201: its correction
+was itself too strong.** CORRECTS rev 198's interpretation.
+The measurement was right; the reading of it was wrong.*** **Record 0
+is NOT "the device's own ledger". A ride performed on the 840 appeared
+in the 530's `ROAD` record AND its record 0, identical field for
+field. It accumulates rides REPORTED to it, not rides PERFORMED on
+it.**
+
+### What happened
+
+Doug rode ~10.8 miles on the **840**. The **530** had been powered
+off since 2026-10-30 and was switched on afterwards for unrelated
+cleanup. Its `Totals.fit`, pulled immediately after:
+
+| | distance | time | calories | rides |
+|---|---|---|---|---|
+| `ROAD` | +17,387 m | +3,406 s | +469 | +1 |
+| record 0 | +17,387 m | +3,406 s | +469 | +1 |
+
+Identical. The **same signature** rev 198 recorded for a local ride —
+which is exactly why the earlier reading was plausible and wrong: two
+different causes produce an indistinguishable effect, and every
+observation until now had only one of them available.
+
+### What still stands from rev 198
+
+- a ride moves record 0 **exactly**, field for field, in stored units
+- **nothing the toolkit writes ever moves it** — three writes, still
+  true
+- the forum "first row = sum of the rest" rule is still **false**
+
+### What is corrected
+
+> ~~Record 0 is the device's own ledger — what THIS unit actually
+> rode.~~
+
+It is a total over rides the device has been **told about**, by
+whatever means, regardless of which unit recorded them. The
+device-scoped reading came from a corpus where no cross-device case
+existed.
+
+### Two further things this run establishes
+
+**It is ADDITIVE, not authoritative.** The 68 m `ROAD A2` ride from
+rev 199 is untouched at `68 m / 94 s / 1 ride`. The incoming data was
+added; nothing was overwritten. **This is the reassuring half** — a
+reset is not silently undone by a later sync, it simply starts
+accumulating again, which is what a year-to-date reset wants.
+
+**Matching is by profile NAME, across devices.** Both units have a
+profile called `ROAD`, and that is where it landed. `INDOOR`,
+`GRAVEL` and every test profile were untouched. Consistent with name
+being the only reliable key — the same conclusion #168 reached for
+profile files and rev 198 reached for `sport`.
+
+### The mechanism is NOT established
+
+Garmin Connect syncing on power-up is the obvious candidate and fits
+the timeline — the 530 was off, so the file could only have changed
+while it was on today. **But that is inference.** This project's
+record on inferring `Totals.fit` behaviour is poor enough to label it
+as such, and the file cannot distinguish Connect from anything else.
+
+**And one observation cuts against the simplest version of it.** The
+840's record 0 holds far less than the 530's. If a shared account
+back-filled every device with every ride, they would converge. They
+have not. So any sync is at least forward-only, or from a join date,
+or not account-wide at all. Doug is searching the forums; this is
+where that would land.
+
+### Propagated
+
+The wrong reading had reached four places, including a user-facing
+string:
+
+| | |
+|---|---|
+| `fit_odometer.py list` output | **corrected, 1.0.2** — it told users record 0 was "the DEVICE's own ledger" |
+| `README.md` | corrected |
+| rev 198, v1.7.7 and v1.7.8 release notes | **superseded, not rewritten** — committed and tagged |
+| `FORUM_POST_DRAFT_totals.md` | corrected before posting |
+
+**The draft was the near miss.** It led on the device-ledger framing
+and was days from being posted to a developer forum as a finding.
+Caught only because Doug owns two devices and happened to look at the
+second one after riding the first.
 
 ---
 
@@ -8816,8 +10483,9 @@ for whenever it's revisited. Prior rev (86, 2026-08-28) follows.*
 *Doc rev 86 — refreshed 2026-08-28.* **Odometer/mileage investigation
 resolved -- located and confirmed against real on-device data, plus a
 new toolkit feature idea scoped and then explicitly shelved.** Doug
-asked whether a per-profile mileage/odometer total (~5,804 mi, his own
-rough recollection) was stored anywhere in an Activity Profile `.fit`
+asked whether a per-profile mileage/odometer total (a figure from his
+own rough recollection — *redacted 2026-11-09, rev 213; public repo*)
+was stored anywhere in an Activity Profile `.fit`
 file. Checked exhaustively -- every message type in
 `CyclingRoadROAD.fit`/`CyclingRoadSerialTest.fit` field-by-field, plus a
 raw byte-level brute-force scan of the whole file against ~10 plausible
@@ -8836,12 +10504,15 @@ garbled string fragments), `message_index` (def_num 254, positional
 slot index), `sessions` (def_num 5, uint16), and a `sport` enum (def_num
 3, 255 = unset). CONFIRMED against real-world ground truth, not just
 internally consistent: the entry matching Doug's `ROAD` profile
-(`message_index` 3) has `distance = 9377167`, which as plain meters
-converts to 5,826.70 mi -- an exact match (to the device's own 0.1 mi
-display rounding) to what Doug's odometer showed after a ride that same
-day. This also explains the earlier "not found" result: the ~5,804
-figure was Doug's own rough memory, not the precise figure, which is
-why the earlier byte-scan (looking for ~5,804 specifically) never
+(`message_index` 3) holds a `distance` value which, read as plain
+meters, converts to **an exact match** (to the device's own 0.1 mi
+display rounding) for what his odometer showed after a ride that same
+day. *Raw value and mileage redacted 2026-11-09, rev 213; public
+repo. The finding is the unit and the exactness, neither of which
+needs the number.* This also explains the earlier "not found" result:
+the remembered figure was a rough recollection, not the precise
+value, which is why the earlier byte-scan (looking for the remembered
+figure specifically) never
 should have found anything in the Activity Profile file anyway --
 correct file, correct field, confirmed. NOTE: the profiles Doug
 currently has active on his Edge 530 are MOUNTAIN, INDOOR, ROAD, and
@@ -12719,8 +14390,11 @@ Kept deliberately, for pattern-recognition on future work:
   session (see Doc rev 86 above for the full writeup): `Garmin/Totals/
   Totals.fit`, FIT mesg_num 33 (`totals_mesgs`), one message per profile
   slot, `distance` at def_num 1 (uint32, plain meters, no scale factor)
-  -- confirmed exact against Doug's real odometer reading (9377167 raw =
-  5,826.70 mi). Patch mechanics would be straightforward, reusing this
+  -- confirmed exact against Doug's real odometer reading, the raw
+  metre value converting to his displayed mileage with no discrepancy
+  beyond the device's own 0.1 mi rounding. *Figures redacted
+  2026-11-09, rev 213; public repo.* Patch mechanics would be
+  straightforward, reusing this
   toolkit's existing byte-patch-plus-CRC pattern
   (`fit_clone_profile.py`'s approach) and the existing `NewFiles/`
   deploy mechanism unchanged. NOT SCOPED FURTHER, BY DESIGN -- two real

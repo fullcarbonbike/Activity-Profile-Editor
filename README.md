@@ -416,12 +416,23 @@ restore, and the tool does not imply one.
 
 ### Two things worth knowing before you edit it
 
-**The first record is the device's own, and is not editable here.**
-It is unnamed, holds the largest numbers, and tracks your riding
-exactly — it grew by precisely the distance, time, calories and ride
-count of a measured ride, twice, while ignoring every value written
-into a profile record. It appears to be the unit's own lifetime
-ledger. This tool shows it and refuses to touch it.
+**The first record is a running total the device maintains across
+all profiles, and is not editable here.** A ride moves it by exactly
+that ride — distance, time, calories and session count — and nothing
+this tool writes has ever moved it. It is shown, and refused.
+
+**Rides sync both ways between two Edges on one Garmin Connect
+account.** A ride recorded on either unit turns up on the other, in
+its matching profile record *and* the first record, identical field
+for field. Matching is by **profile name**, and arrivals are
+**added, never overwritten** — so an odometer reset is not silently
+undone by a later sync. A ride whose profile does not exist on the
+receiving unit lands in the first record alone.
+
+The mechanism is unknown. Garmin's manual documents Physio TrueUp
+bringing activities between devices via Connect, but Garmin's own
+list of what TrueUp syncs excludes per-profile totals, and no
+activity file appeared on the receiving device.
 
 **A widely-repeated forum rule is wrong.** You will find advice that
 the first record must equal the sum of the rest. Five consecutive
@@ -666,6 +677,102 @@ link is missing; restore from a backup, or set it again on the device.
 Detailed, chronological doc-revision notes -- every fix, feature, and
 correction to this project, newest first. Most readers won't need
 this; it's kept for the full history.
+
+*Doc rev 95 — refreshed 2026-11-01.* **Rev 94 over-corrected: the
+first record IS a running total.** Its apparent decrease was measured
+against a file this project had written rather than a genuine device
+pull — against the real pull beside it, the figures reconcile, with a
+deleted profile accounting for the shortfall.
+
+**New and solid: the cross-device sync runs both ways**, and a ride
+whose profile does not exist on the receiving unit lands in the first
+record alone. A 68-metre test ride from one Edge was found in the
+other's first record, confirmed by time, calorie and session
+residuals that depend on no assumptions.
+
+This is the fourth description of that record in two days. The README
+and `fit_odometer.py` (1.0.4) now state only what two genuine device
+pulls support, and the mechanism is still unknown.
+
+*Doc rev 94 — refreshed 2026-11-01.* **⚠ Retracts rev 93 as well:
+the first record in `Totals.fit` can DECREASE, so it is not a running
+total either.** An Edge 840 pull showed it down 282.7 → 271.4 miles
+while its time, calories and ride count all rose.
+
+Two descriptions have now been retracted — "the device's own ledger"
+(rev 91) and "a total of rides reported to it" (rev 93). The project
+is no longer offering a third. The README and `fit_odometer.py`
+(1.0.3) now state only what has been measured and say plainly that
+what the record represents is unknown.
+
+Unchanged and still solid: a ride lands in its profile record and the
+first record together, field for field; that includes rides from a
+second device, matched by profile name and added rather than
+overwritten; and nothing this toolkit writes has ever moved it. The
+tool never depended on the answer.
+
+*Doc rev 93 — refreshed 2026-11-01.* **⚠ Correction to rev 91: the
+first record in `Totals.fit` is NOT "the device's own ledger".**
+
+A ride of ~10.8 miles performed on an Edge **840** appeared in a
+**530**'s `ROAD` record *and* its first record — identical in
+distance, time, calories and session count — the next time the 530
+was switched on, having been off for two days. That is the same
+signature a local ride produces, which is why the original reading
+was plausible and wrong. The measurement in rev 91 was correct; the
+interpretation was not.
+
+Record 0 accumulates rides **reported** to it, not rides **performed
+on** it. Two things the same run settled: the addition is
+**additive, not authoritative** — an earlier reset on another profile
+survived untouched, so a sync does not silently undo one — and
+matching is by **profile name** across devices.
+
+The mechanism is not established and is not claimed. A cloud sync on
+power-up fits the timeline; the file cannot distinguish it, and the
+two devices have not converged, which argues against a simple
+account-wide back-fill.
+
+Corrected in `fit_odometer.py`'s own `list` output (1.0.2), which had
+been telling users the wrong thing, and above in this README. Revs 91
+and 92 and the v1.7.7/v1.7.8 release notes are left as published.
+
+*Doc rev 93 — refreshed 2026-11-09.* **v1.8.0: a clone can now be a
+different kind of bike.** See `RELEASE_NOTES_v1.8.0.md`.
+
+Clone Profile takes a **Ride type** as well as a name, offering the
+nine types the Edge's own menu offers. Clone your road setup, call it
+`GRAVEL`, set the type to Gravel, and its rides count under Gravel in
+Garmin Connect — separate reports and goals, per-bike tracking — while
+keeping every data screen you had already built. On the command line
+that is `--sub-sport gravel_cycling` on `fit_clone_profile.py`.
+
+The picker defaults to **Unchanged** and writes nothing in that state,
+so a clone made without touching it is byte-identical to one from any
+earlier version. Changing the type is never a side effect of renaming:
+the wrong ride type silently reroutes which Connect goal a year of
+riding counts against.
+
+**Proven on hardware before it was built.** A hand-patched profile was
+imported to an Edge 840 and taken through ten test steps: the device
+accepted the written `sub_sport`, kept it across a restart, labelled
+the ride it recorded with it, and Garmin Connect filed that ride under
+Gravel in both Reports and Goals. The file this release generates is
+byte-identical to the one that passed.
+
+Two things learned along the way are worth knowing if you build on
+this. The device reassigns `message_index` on import whenever the
+arrangement it receives differs from the one it holds — which a
+clone's always does — so **compare profiles by their f10 screen
+identity, never by `message_index`**; screen order survives, and the
+device repairs the Connect IQ placements itself. And the device's own
+templates differ by ride type, so a clone is the source's screens
+wearing a new type, not what the device would have built for that
+type. The GUI says so when the type changes.
+
+Also in this release: `fit_odometer.py`'s `list` output no longer
+calls record 0 "the device's own ledger", and a new `release_check.py`
+runs the pre-tag checks that were previously redone by hand.
 
 *Doc rev 92 — refreshed 2026-10-31.* **v1.7.8: the odometer tool is
 confirmed on the Edge 840 and on Windows 10, and profile names with
