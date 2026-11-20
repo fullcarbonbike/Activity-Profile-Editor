@@ -9,8 +9,8 @@
 > committed. If this block and a Doc rev disagree, the newest Doc rev
 > wins and this block is stale; fix it.
 >
-> *Rewritten 2026-10-23 at Doc rev 180; refreshed 2026-10-27 at rev
-> 188 and **2026-10-28 at rev 195**, after v1.7.5 shipped.*
+> *Rewritten 2026-10-23 at Doc rev 180; refreshed at revs 188, 195,
+> 221, and **2026-11-20 at rev 226**, entering maintenance.*
 >
 > **⚠ If you are a new session picking this up: read
 > `MEMORY_LOG.md` too.** It is the reconstruction of the project's
@@ -19,88 +19,131 @@
 > file curates out, and it is not in the obvious search path. Doc revs
 > 193–195 are what happens when you skip it.
 
-**Shipped:** `v1.7.8` (2026-10-31) — the odometer tool confirmed on
-the 840 and on Windows 10, plus quoting hints. Preceded by
-`v1.7.7` `fit_odometer.py` (#106) and `Totals.fit`'s first record
-characterised as the device's own ledger, and `v1.7.6` the filename warning deleted as false (#170),
-`fit_profile_diff.py`, the GUI flow chart and #151. Before that, `v1.7.5` the toolkit stops trusting handles the device
+**Shipped:** `v1.8.0` (2026-11-17) — **a clone can be a different kind
+of bike.** A Ride Type picker in the GUI's Clone Profile panel and
+`--sub-sport` on `fit_clone_profile.py`, so a clone's rides count under
+the chosen category in Garmin Connect. Also `fit_dump screens` naming
+the profile and its ride type, and `release_check.py` as a new pre-tag
+tool. Preceded by `v1.7.8` the odometer confirmed on the 840 and
+Windows 10, `v1.7.7` `fit_odometer.py` (#106), `v1.7.6` the filename
+warning deleted as false (#170) plus `fit_profile_diff.py` and the GUI
+flow chart, `v1.7.5` the toolkit stops trusting handles the device
 rewrites (#162, #168, #169) — **note: the v1.7.5 tag landed one commit
-early**, so it carries neither #170 nor its own release notes; it was
-left in place rather than moved and v1.7.6 carries both. Before that,
-`v1.7.4` Windows launches again and the offline deploy dead end is
-gone, `v1.7.3` three new field ids and the ten-screen cap,
-`v1.7.2` one layout picker for both kinds of screen, `v1.7.1` layout changes stopped
-destroying fields, `v1.7.0` row heights drawn to scale and per-model
-slot warnings, `v1.6.1`, `v1.6.0`, `v1.5.0` offline mode. Every release
-is tagged on `main`, tag on the release-notes commit.
+early** and carries neither #170 nor its own release notes; left in
+place, v1.7.6 carries both. Before that `v1.7.4`, `v1.7.3`, `v1.7.2`,
+`v1.7.1`, `v1.7.0`, `v1.6.1`, `v1.6.0`, `v1.5.0` offline mode.
 
-**Current versions:** `fit_dump.py` **2.30.0** · `fit_patch.py` 1.20.0 ·
-`gui_app.py` **0.33.0** · `fit_clone_profile.py` 1.0.2 ·
+**Current versions:** `fit_dump.py` **2.31.0** · `fit_patch.py` 1.20.0 ·
+`gui_app.py` **0.34.2** · `fit_clone_profile.py` **1.1.2** ·
 `garmin_device.py` 0.13.1 · `fit_profile_diff.py` 1.0.0 ·
-`fit_odometer.py` **1.0.1** · `fit_census.py` 1.1.0 ·
-`fit_sdk_check.py` 1.0.0 · `install.sh` 1.0.4
+`fit_odometer.py` **1.0.4** · `fit_census.py` 1.1.0 ·
+`fit_sdk_check.py` 1.0.0 · `install.sh` 1.0.4 ·
+`make_flowchart.py` **2.0.1** · `release_check.py` **1.2.3**
+*(1.2.3 is post-v1.8.0 and unreleased — see the maintenance note below)*
 
-**All verified and released.** Everything in v1.7.5 and v1.7.6 was
-confirmed on the Edge 530 in device mode —
-`TEST_PLAN_162_168_169.md` sections A–E and
-`TEST_PLAN_170_filename_note.md` A′/B′, all passing. #151 is a
-refactor, verified headlessly across 6,864 states. The 840 cannot
-enter device mode at all (MTP-only, never mounts), so none of the
-device-mode work is testable there.
+**All verified and released.** v1.8.0 passed every section of
+`TEST_PLAN_v1.8.0.md` (A–G) on real hardware: the picker and its
+filename behaviour, a clone that keeps its type, a clone that changes
+it, the 530, the CLI, the release tool and the `fit_dump` header. The
+feature was **proven on an Edge 840 before it was built** — ten
+hardware steps with a hand-patched file — and the shipped tool
+generates a byte-identical file. Earlier releases: v1.7.5/v1.7.6
+confirmed on the 530 in device mode; #151 verified headlessly across
+6,864 states. The 840 is MTP-only and never enters device mode, so
+device-mode work is not testable there.
 
 **⚠ Tagging, read this before the next release.** `v1.7.5` was tagged
-on the commit that was already `HEAD`, which predated its own release
-notes — so it carries #162/#168/#169 but not #170, and
-`RELEASE_NOTES_v1.7.5.md` was never in it. Left in place rather than
-moved, because rewriting a published tag is worse than explaining one;
-v1.7.6 carries both. **The rule that failed was not "tag the
-release-notes commit" — it was that nobody checked `git status` before
-tagging.** Commit first, confirm the tree is clean, then tag.
+on a commit that predated its own release notes, because nobody ran
+`git status` first. **The rule that failed was not "tag the
+release-notes commit" — it was that nobody checked the tree.** Commit,
+push, confirm, then tag.
 
-**COMPLETE AND PARKED, 2026-10-31, at `v1.7.8`.** Doug's own
-assessment, and the right one: the toolkit does what he set out to
-build. Nothing is owed, nothing is half-finished, no test plan is
-mid-run, and no open question blocks anything. **A session opening
-this file is not inheriting a task list.**
+`v1.8.0` did it right and is worth copying: commit → push →
+`release_check.py` → tag → `git rev-parse HEAD v1.8.0^{commit}`. Note
+that its tag sits on the **tip**, not on the release-notes commit,
+because `release_check` found two of its own bugs after the first push
+and a follow-up commit was needed. **Tag the tip, not a particular
+commit** — the tip is what people get.
 
-Three items remain available if ever wanted, none of them a gap:
+**STATUS: shipped and quiet.** The toolkit was marked complete and
+parked at `v1.7.8` on 2026-10-31. One idea reopened it — #171, which
+Doug proposed, scoped, hardware-proved and bench-tested — and that
+shipped as v1.8.0. Nothing is owed, nothing is half-finished, no test
+plan is mid-run. **A session opening this file is not inheriting a task
+list**, and the five open items below are curiosities and backlog, not
+gaps.
 
 | | status | needs |
 |---|---|---|
-| **#165** per-model field availability | on hold, explicitly not a blocker | both models |
-| **#163** id 111 + the 101–145 block | on hold — the reporter never answered | someone else |
+| **#163** field 331, and the 101–145 block | open curiosity — **eight** candidates eliminated for 331, one weak lead (~25% of the workout). **id 111 is CLOSED** (rev 222): it was stale residue in the f7 tail, never a field | a workout of very different length, prediction written first |
+| **#165** per-model field availability | on hold, explicitly not a blocker | both models — **and see the device note below** |
+| **#172** the 840's `totals` f11/f12 | characterised, unexplained; nothing reads or writes them | a second 840, or Garmin |
+| **#173** 28 unwrapped dynamic wx labels | **ratcheted** — `release_check` fails if the count grows | a quiet afternoon |
+| **#174** `make_flowchart.py` / `fit_profile_diff.py` run work on import | worked around in `release_check` 1.2.2 | a `__main__` guard each |
 
-*#106 was on this list and is now shipped (v1.7.7, rev 198). Two
-items remain, neither a gap.*
+### 🔧 Maintenance mode, entered 2026-11-20
 
-### 📌 Conditional, not a task: `release_check.py`
+Doug's call, and the right one: no features or to-do items remain.
+What that means in practice:
 
-**Raise this ONLY if a release with real complexity comes up** — a
-change touching the CLI or the GUI, not a typo fix. Doug's explicit
-instruction, 2026-10-31: remind him then, otherwise leave it alone.
+**Uncommitted at the moment of entering it:** `PROJECT_NOTES.md` (revs
+222–226), `KNOWN_FIELD_NAMES.md` (regenerated, 213 names) and
+`release_check.py` 1.2.3. All post-v1.8.0, none user-facing, so they
+belong in a commit **without a tag** rather than forcing a release.
 
-Before each of the last three tags the same checks were run by hand,
-rewritten from scratch each time:
+**⚠ `release_check.py 1.8.0` will fail from now on, correctly.** It
+compares the tree against a target version's release notes, and the
+tree has moved past v1.8.0 — `release_check` itself is 1.2.3 while the
+v1.8.0 notes say 1.2.2, which is accurate for what was tagged. It is a
+**pre-tag gate for the next version**, not a health check for the
+current one. Run it with the version you are about to tag, never with
+one already shipped.
 
-- working tree clean; `HEAD == origin/main`
-- every `X.Y.Z` in the release notes matches that file's `__version__`
-- no personal ride figures anywhere in `*.py` / `*.md` (public repo)
-- every module compiles and imports
-- the release-notes file for this version exists and is tracked
+**⚠ THE TEST RIG IS ABOUT TO SHRINK.** Doug is selling the Edge 530
+and has already removed it from Garmin Connect. Once it goes:
 
-**Two of those caught real problems.** The missing `git status` is how
-`v1.7.5` got tagged one commit early, carrying neither #170 nor its
-own release notes. The personal-figure sweep caught two violations in
-two days, both headed for the public repo — once in a source
-docstring, once in a Doc rev table.
+| | |
+|---|---|
+| **#165** per-model field availability | becomes **permanently unanswerable** — it needs both models |
+| any future 530 confirmation | gone, including device-mode work the 840 cannot do at all (MTP-only) |
+| the 530-derived layout tables | frozen as they are, with no way to extend or re-verify them |
 
-~100 lines, stdlib, exit non-zero on failure.
+Most of this project's hardware knowledge came from the 530. Nothing
+breaks, but the ability to *add* 530 knowledge ends with the sale, and
+#165 should be read as closed-by-circumstance rather than pending.
 
-**Why it is not built:** the project is complete and parked. A release
-tool for a project that may never release again is ceremony, and "I
-will need it eventually" is how unused code gets written. The trigger
-above is the whole point — build it when there is a release to use it
-on, not before.
+**What maintenance actually looks like here:** fix something if it
+breaks, run `release_check` before any tag, and keep
+`KNOWN_FIELD_NAMES.md` in step with `fit_dump.py` by hand — nothing
+checks that, which is how it went 41 names stale for seven weeks
+(rev 225).
+
+### ✅ `release_check.py` — built 2026-11-13, now 1.2.3
+
+It was a conditional item here for two weeks: *raise it only if a
+release with real complexity comes up*. #171 touched the CLI and the
+GUI, so the trigger fired and it was built. Seven checks: clean tree
+(tracked files), `HEAD == origin/main`, release notes present and
+tracked, every version claimed in the notes matching the module,
+every module compiling and importing, no undefined names, and a
+ratchet on unwrapped wx labels.
+
+**It earned its place immediately** — three rider-attributed mileage
+figures in a public file, a `NameError` four other layers missed, and
+a bug class with 28 instances.
+
+**And it got its own judgement wrong three times**, each time by
+reporting something that was not actually a problem: the
+personal-figure sweep (24 hits, 21 false), the version-claim check
+(reading a usage example as a claim), and the clean-tree check
+(counting deliberately-untracked drafts, which would have blocked
+every future tag). It also *modified the repo it was checking*, by
+importing a module that draws a PDF on import.
+
+**The lesson, recorded because it kept recurring:** detecting a
+condition is easy; judging whether it is a problem is where this went
+wrong every time. A gate nobody can satisfy gets deleted — which is
+why #173 is a ratchet and untracked files are a note.
 
 ### Why the project ends here, which is worth recording
 
@@ -279,6 +322,376 @@ Conventions that are load-bearing rather than stylistic:
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
 
 ---
+
+*Doc rev 226 — 2026-11-20.* **MAINTENANCE MODE. An audit before
+agreeing to it: no features or to-do items remain, no TODO/FIXME
+markers exist anywhere in the tracked code, and the one dependency
+concern turned out to be already documented. Three tidy-ups were
+needed and are done.**
+
+### The audit, because "anything I missed?" deserves looking rather than agreeing
+
+| checked | result |
+|---|---|
+| `TODO` / `FIXME` / `XXX` / `HACK` in tracked code | **none** |
+| `reportlab` documented as needed by `make_flowchart.py` | **yes**, README line 489 — the concern was unfounded |
+| uncommitted work | two doc files, plus `release_check.py` 1.2.3 |
+| `release_check.py`'s own closing advice | **stale** — fixed, see below |
+| open items | four, none a gap |
+
+### The one real fix: stale advice printed by a passing check
+
+`release_check.py` ended a successful run with *"Remember the tag goes
+on the release-notes commit"* — which is what this very file said until
+v1.8.0 disproved it. That release needed a follow-up commit **after**
+the notes, because the tool found two of its own bugs on first use, so
+the notes commit was no longer the tip. **A tag points at what people
+check out, so it belongs on the tip.**
+
+Left alone at the time deliberately — a cosmetic string was not worth
+a commit between a push and a tag. Fixed now, because **stale advice
+printed by a check that just passed is exactly what the next release
+would follow.** `release_check.py` 1.2.3.
+
+### ⚠ `release_check.py 1.8.0` now fails, and that is correct
+
+It compares the tree against a target version's notes. The tree has
+moved past v1.8.0 — the tool is 1.2.3 while the v1.8.0 notes say
+1.2.2, which is accurate for what was tagged. **It is a pre-tag gate
+for the NEXT version, not a health check for the current one.** Run it
+with the version about to be tagged, never one already shipped.
+Recorded because a failing check on a finished release looks like a
+problem and is not.
+
+### ⚠ The test rig is about to shrink, and that closes an item
+
+Doug is selling the Edge 530 and has already removed it from Garmin
+Connect. Once it is gone:
+
+- **#165 per-model field availability becomes permanently
+  unanswerable.** It needs both models. It should be read as
+  closed-by-circumstance, not pending.
+- Any future 530 confirmation ends — including all device-mode work,
+  which the 840 cannot do at all, being MTP-only.
+- The 530-derived layout tables freeze as they are, with no way to
+  extend or re-verify them.
+
+**Most of this project's hardware knowledge came from the 530.**
+Nothing breaks and nothing shipped depends on having it, but the
+ability to *add* 530 knowledge ends with the sale. Worth stating
+plainly rather than discovering later that an item was quietly
+impossible.
+
+### What maintenance means here
+
+Fix something if it breaks. Run `release_check` before any tag, with
+the new version number. And keep `KNOWN_FIELD_NAMES.md` in step with
+`fit_dump.py` by hand — **nothing checks that**, which is how it went
+41 names stale for seven weeks (rev 225) without anyone noticing.
+
+*Doc rev 225 — 2026-11-18.* **Garmin Connect's phone app has no
+description for any of the four either — so the label gap is
+PER-SURFACE, not just per-device. And chasing it found that
+`KNOWN_FIELD_NAMES.md` had been 41 names stale for seven weeks.**
+
+### Three surfaces, three different answers
+
+| surface | 331 | 358 / 371 / 395 |
+|---|---|---|
+| **Edge 840** field editor | blank | **named** (Elevation Asc/Desc, Speed Over Ground, Battery Hours) |
+| **Garmin Connect** phone app | field number, description **blank** | field number, description **blank** |
+| **Edge 530** | unsupported — renders Speed | unsupported — renders Speed |
+
+The 840 names three of the four. **Connect names none of them**, while
+still showing the raw field number — so its editor falls back to the
+id when its own table has no entry, which is how Doug could see the
+numbers at all.
+
+**Garmin's string tables disagree with each other across surfaces**,
+not merely across device generations. The 840 has strings Connect
+lacks. That is a sharper statement than rev 223's, and it means "the
+device has no name for it" was never the whole question — the right
+question is *which* surface, and the answer differs.
+
+### Doug's hypothesis, recorded as speculation
+
+*"The ones that do at least have on-device labels, like the Battery
+'hrs' and the SOG, they may be for aviation or water sport devices."*
+
+Well motivated. **Speed Over Ground** is specifically a marine and
+aviation term — it exists to be distinguished from airspeed or
+through-water speed, a distinction a bicycle has no use for. **Battery
+Hours** as a remaining-endurance readout is standard instrument-panel
+fare. A group of fields borrowed from another Garmin product line
+would explain partial coverage in the Edge's strings and none in
+Connect's cycling tables.
+
+**Flagged as speculation and nothing here tests it.** Confirming it
+needs a Garmin marine or aviation device, or Garmin documentation for
+one, neither of which this project has. It is recorded because it is
+the first explanation offered for *why* the group exists, not because
+it is established.
+
+### ⚠ And the field-name reference had rotted
+
+`KNOWN_FIELD_NAMES.md` claimed **172 names** and listed `520, 578,
+579` as unresolved. The module had **213**, and all three of those ids
+have long since been named — Primary Target, Secondary Target, Smart
+Travel Range. **Seven weeks stale, and nothing noticed**, because
+nothing checks it: `release_check` verifies module versions against
+release notes, not documentation against code.
+
+Regenerated from `fit_dump.FIELD_ID_NAMES` with the module stated as
+the source of truth, plus two things it was missing:
+
+- **a warning not to read the corpus's unnamed ids as a to-do list.**
+  Most are census probe residue — #146's method was to fill a screen
+  with ten consecutive candidate ids and read the labels off the
+  device, so `ROAD 4` carries `330, 331, 332 … 338` that the device may
+  not support at all. Treating that as a gap list would waste real
+  effort.
+- **331 recorded as confirmed-unnamed rather than unidentified**, with
+  the three-surface table above, so nobody repeats the label hunt.
+
+That distinction is the useful part. "We have not identified this yet"
+and "two surfaces have been checked and neither has a string for it"
+look identical in a list of unknowns and mean completely different
+things about what to do next.
+
+*Doc rev 224 — 2026-11-18.* **✅ 331, 358, 371 and 395 are CONFIRMED
+UNSUPPORTED ON THE 530 — on hardware, not inferred from the corpus.
+And the 530's fallback for an unsupported plain field id is SPEED,
+which is a different fallback from the one this project already knew.**
+
+### The test
+
+Doug deployed the 840 `GRVLROAD` clone to the 530 and restarted. All
+four fields on that screen came up as **Speed**.
+
+| | |
+|---|---|
+| sent | `[331, 358, 371, 395]` |
+| the 530 displays | Speed, Speed, Speed, Speed |
+
+So none of the four exists on the 530, and rev 223's conclusion moves
+from *"absent from 34 corpus profiles"* to **confirmed on the
+device**. The corpus could only ever say what Doug's profiles used;
+this says what the hardware supports.
+
+### ⚠ TWO DIFFERENT FALLBACKS, and the project only knew one
+
+| unsupported thing | what the device shows |
+|---|---|
+| a **Connect IQ** field (216) with no app installed | **Timer** |
+| an **unsupported plain field id** | **Speed** |
+
+The Timer fallback is long-established here — it drove #108, #110, the
+CIQ guards in #114/#115, and was independently corroborated by a
+forum poster (rev 121). **The Speed fallback is new.** Nothing in the
+project predicted it, and nothing would have: every previous
+unsupported-field observation was about CIQ.
+
+Two distinct substitutions mean the device is not applying one generic
+"unknown field" rule. Worth stating plainly because the CIQ finding is
+cited often enough that it could easily have been over-generalised
+into "unsupported fields show Timer", which is now known to be wrong
+for the ordinary case.
+
+### ✅ ANSWERED: the stored ids SURVIVE — Speed is display-only
+
+Doug's recollection was right, and he said so before sending the file:
+the profile is preserved and the older device simply cannot render the
+ids. Pulled back off the 530 after the restart:
+
+```
+slot 9 (f10=6), count=4: [331, 358, 371, 395]
+```
+
+**Byte-for-byte the ids that were sent.** So Speed is a
+**display-time substitution**, not a rewrite. A cross-model transfer
+of unsupported FIELDS is lossless, and the profile remains portable
+back to an 840 with its original fields intact.
+
+**This extends an existing finding rather than making a new one.** The
+cross-model section already recorded that surviving screens' field
+arrays came back identical — but that was about screens the 530
+*supports*. This is the stronger case: fields the 530 cannot render at
+all, and they still survive. Worth checking rather than assuming,
+because "the screen survives" and "a field the device has no code for
+survives" are different claims.
+
+**The screen moved slot 11 → slot 9**, exactly as the cross-model
+renumbering finding predicts: the 530 drops the screen types it does
+not support and moves the survivors up. So on import the 530 *drops
+whole screen types* but *preserves unknown fields inside screens it
+keeps* — two different behaviours, and the distinction is now
+measured.
+
+**Bonus confirmation for #171:** `sub_sport 46` survived the
+cross-model transfer. The pulled 530 file still reads
+`ride type Gravel (gravel_cycling, sub_sport 46)`, so the ride type is
+not something the importing device rewrites either.
+
+### What it does not resolve
+
+Nothing about what 331 *is*. It is unsupported on the 530 and
+unnamed on the 840 — which locates it as a newer-generation field but
+says nothing about its meaning. The seven eliminations and the ~25%
+lead in rev 220 stand untouched.
+
+*Doc rev 223 — 2026-11-18.* **Field 331 is part of a FOUR-FIELD GROUP
+that appears on the 840 and never on the 530 — across 74 profiles.
+Doug's instinct that it postdates the 530 generation is supported, and
+331 is the only one of the four the device will not name.**
+
+### The measurement
+
+Every `Cycling*.fit` in the corpus, both models, configured fields
+only (the stale tail excluded after rev 222):
+
+| field | Edge 530 (34 profiles) | Edge 840 (40 profiles) |
+|---|---|---|
+| **331** (unnamed) | **0** | 5 |
+| 358 Elevation (Asc/Desc) | **0** | 5 |
+| 371 Speed Over Ground | **0** | 5 |
+| 395 Battery Hours | **0** | 5 |
+
+**Not one of the four appears anywhere in any 530 profile**, on any
+screen — and all four appear together, in the same five 840 profiles,
+on the same screen.
+
+### The screen exists on both models; its CONTENT does not
+
+Screen type `f10=6` is present on both, holding entirely different
+things:
+
+| | configured content of f10=6 |
+|---|---|
+| 530 | Distance, Speed, CIQ Data Field, Heart Rate, Cadence, Timer, 10s Power |
+| 840 | **331, Elevation (Asc/Desc), Speed Over Ground, Battery Hours** |
+
+So this is not one orphan id — it is a **group of newer fields** that
+the 530 generation does not carry, sitting on a screen type both
+models have.
+
+### Why 331 alone is unnamed
+
+The 840 census (#146) named 358, 371 and 395 by reading their labels
+off the device. It did not name 331, and rev 163 recorded why: **the
+840's own editor shows no label for it.** Three of four got names from
+the same sweep; the fourth has nothing to read.
+
+A field the firmware can render but cannot name is the same shape as
+the filename-label gap in revs 205–206, where the device has no
+filename segment for the later `sub_sport` enum values. **Garmin's
+string tables have holes at the newest identifiers**, and 331 sits in
+one.
+
+### ✅ Resolved: the 530 does NOT render it
+
+Doug confirmed the contradiction was a typo — he meant *"did not
+render"* on the 530. So his on-device observation and the corpus agree,
+and the finding is clean rather than hedged:
+
+**331 and its three companions are 840-only. The 530 does not show
+it.**
+
+Amended in place rather than written as a new rev, because this rev
+was not yet committed and the question it raised was answered within
+the hour. (Committed revs are still never rewritten — rule unchanged.)
+
+One nuance left unresolved and not worth chasing: "did not render"
+could mean the field is unavailable on the 530 altogether, or present
+but blank. The corpus cannot tell those apart, since no 530 profile
+carries 331 to begin with, and nothing depends on which it is.
+
+**The `fit_patch.py --fields` test is therefore no longer needed for
+this question.** It would answer a narrower one — whether the 530
+*can* render 331 when a profile is forced to carry it — which is
+curiosity about firmware rather than anything the toolkit needs.
+
+*Speculation, flagged as such:* Speed Over Ground and Battery Hours
+have a multisport flavour, so the group may have arrived with a shared
+newer firmware platform. Nothing here tests that.
+
+*Doc rev 222 — 2026-11-18.* **✅ id 111 IS CLOSED, and it was never a
+field at all. It is STALE RESIDUE in the never-cleared tail of the f7
+array, surfaced by a viewer that prints all ten entries regardless of
+the field count. #150 already described the mechanism; nobody connected
+it to this question.**
+
+### Where the question came from
+
+The `fitfileviewer` author finally replied to Doug: his id-111 query
+came from his viewer processing Activity Profiles. Doug submitted the
+840's returned `CyclingGRAVEL.fit` and the viewer showed `111` in its
+Data Screen table.
+
+**His own table contains the answer.** Two rows read:
+
+| message index | nr fields | data fields |
+|---|---|---|
+| 1 | **2** | speed, distance, heart rate, cadence, lap cadence, vert spd, timer, speed, distance, **111** |
+| 6 | **2** | 272, 266, heart rate, cadence, lap cadence, vert spd, timer, speed, distance, **111** |
+
+**Two configured fields, ten printed.** f7 is always 20 bytes — ten
+uint16 — and the device reads only the first `count` of them. The rest
+is whatever was in those bytes before.
+
+### Measured on that exact file
+
+| slot | count | the tail beyond the count |
+|---|---|---|
+| 1 | 2 | `13, 3, 5, 77, 56, 48, 6, 111` |
+| 6 | 2 | `13, 3, 5, 77, 56, 48, 6, 111` |
+| 4 | 6 | `500, 11176, 256, 0` |
+| 5 | 3 | `56, 56, 56, 56, 56, 56, 56` |
+
+**`111` occurs twice, both times at array position 9, never inside a
+configured count.** And the tails are self-evidently residue: slot 4
+holds **11176**, which is not a plausible field id at all, and slot 5
+holds `Timer` repeated seven times — the footprint of a screen that
+once had more fields.
+
+Slots 1 and 6 carry the *identical* tail, which is its own small
+finding: both were once configured the same way, or the device seeded
+them from one template.
+
+### This is #150, arriving from the other direction
+
+#150 is titled *"Stop erasing the f7 tail — the device never deletes
+fields, the toolkit does."* The project established years-equivalent
+ago that the tail is historical residue the device ignores. **The
+id-111 mystery was that residue being read as data, and the connection
+was never made** — it sat on the parked list for weeks as "an
+unidentified field id" while the file holding the explanation was in
+the corpus.
+
+**The toolkit was never wrong about it.** `fit_dump` renders
+`active_field_ids(m, field_count)` and has always stopped at the
+count. The viewer's choice to print all ten is defensible for a
+general-purpose tool — but it manufactures field ids that do not
+exist.
+
+### What is and is not settled
+
+**Settled:** the provenance of the id-111 question. There is no
+evidence from this source that 111 is a Garmin field id, because every
+occurrence is in bytes the device does not read.
+
+**Not settled, and not worth chasing:** whether 111 means something
+elsewhere in Garmin's field table. Nothing in this project needs it.
+
+**Worth passing back to the author:** respecting `nr fields` would stop
+his viewer inventing ids. The 11176 in slot 4 is the cleanest
+demonstration — no field table contains it.
+
+### ⚠ And it does NOT explain field 331
+
+331 sits at **position 1 of a screen with a count of 4** in the 840
+`ROAD` profile — inside the count, a real configured field, and it
+displays a real value on the device. Different thing entirely. #163
+keeps that half.
 
 *Doc rev 221 — 2026-11-17.* **v1.8.0 is COMMITTED AND PUSHED. Then
 `release_check.py` failed its own first real use — twice, for two
