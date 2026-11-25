@@ -189,12 +189,25 @@ ends any further 530 verification; see the maintenance note above.
 Edge **840** (**MTP**, no mass-storage mode), acquired 2026-09-22 on
 firmware 29.22.
 
-**⚠ FIRMWARE PROVENANCE — pin this, do not write "current".** Every
-840 finding in this file was measured on **840 firmware 31.33**.
-Confirmed from the files themselves, not from recollection:
-`device_info` (mesg 23) carries `software_version = 3133` in the
-2026-11-17 activity. The same activity records the paired sensors at
-16.01 and 2.10.
+**⚠ FIRMWARE PROVENANCE — pin this, do not write "current".**
+
+| device | firmware every finding here was measured on |
+|---|---|
+| Edge 840 | **31.33** |
+| Edge 530 | **9.81** — a public BETA that was never promoted to live; the 530's general release is 9.75. See rev 229. |
+
+**Read it out of any file, with the toolkit's own walker:** `file_creator`
+(**mesg 49**), field **0** `software_version`, an integer scaled by 100
+— so 3133 is 31.33 and 981 is 9.81. **Every FIT file carries it**:
+profile files, `Totals.fit` and activities alike. `file_id` (mesg 0)
+field 2 `product` identifies the model in the same breath: **3121 =
+530, 4062 = 840**.
+
+Do **not** reach for `device_info` (mesg 23) for this. It carries the
+same number plus the paired sensors' versions, but it exists **only in
+activity files** — neither a profile nor `Totals.fit` has one, so for
+this project's own file types it is the wrong message. That mistake is
+rev 229.
 
 Doug is **deliberately holding 31.33** as of 2026-11-24: a newer
 release landed within days and the forums carry bug reports for things
@@ -360,6 +373,103 @@ Conventions that are load-bearing rather than stylistic:
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
 
 ---
+
+*Doc rev 229 — 2026-11-25.* **✅ THE FIRMWARE VERSION WAS IN EVERY FILE
+ALL ALONG — `file_creator` (mesg 49) field 0, scaled by 100. Doug was
+right and I was wrong, and I had nearly talked him into a needless
+errand before a factory reset. Also: 530 firmware 9.81 is a public BETA
+that never went live, which is a sharper caveat than anything this file
+previously carried.**
+
+### The correction
+
+I claimed the 530's firmware had never been recorded and urged Doug to
+pull it off the device before selling it, calling it irreversible.
+Doug's reply was that he thought it *was* documented, and that it
+should be in the profiles and `Totals.fit` we had already analysed.
+
+He was right. Measured across the corpus:
+
+| file | `file_id.product` | `file_creator.software_version` |
+|---|---|---|
+| 530 profile | 3121 | 981 → **9.81** |
+| 530 `Totals.fit` (693 B) | 3121 | 981 → **9.81** |
+| 840 profiles | 4062 | 3133 → **31.33** |
+| 840 `Totals.fit` (795 B) | 4062 | 3133 → **31.33** |
+| 840 activity | 4062 | 3133 → **31.33** |
+
+**Every FIT file carries it.** Nothing needed pulling off the 530, and
+the errand I proposed was unnecessary. The Hardware section now states
+both numbers and where to read them.
+
+### But there IS a gap, and it is the one that matters
+
+`9.81` appeared **nowhere** in `PROJECT_NOTES.md`, `MEMORY_LOG.md`,
+`README.md` or `KNOWN_FIELD_NAMES.md` — grepped, zero hits. So the
+number was *recoverable* but not *recorded*, which are not the same
+state. "It's in the data" only helps a reader who knows which message
+to open. **Recoverable is not recorded.** That distinction is the point
+of this rev.
+
+### ⚠ The forum reply was wrong in the same way
+
+`FORUM_REPLY_firmware_version.txt`, unposted, told readers to use
+`device_info` (mesg 23) from an activity file. True as far as it goes,
+but **profile files and `Totals.fit` contain no `device_info` at all** —
+confirmed by message census: a 530 profile carries mesgs 0, 7, 8, 9,
+10, 12, 13, 14, 16, 17, 49, 53, 70, 71, 170, 280, 309, 324 and a
+`Totals.fit` carries only 0, 33, 49. No 23 in either. For a thread
+about *settings* files that is the wrong message to name. Corrected
+before posting.
+
+### 530 firmware 9.81 is a BETA that was never promoted
+
+Public beta, still not live after two years — there is a Garmin forum
+thread asking why. **The 530's general release is 9.75**, unchanged for
+over two years. So every 530 measurement in this project sits on a
+build that essentially no ordinary 530 owner is running. Anyone
+reproducing the 530 results will be on 9.75.
+
+**And one of 9.81's reported fixes is inside this toolkit's territory:**
+eMTB rides uploading to Connect as eBike rides. That is `sub_sport`
+categorisation — `e_bike_mountain` (47) versus `e_bike_fitness` (28) —
+which is exactly what #171 writes. Two consequences, neither a bug:
+
+- The RIDE_TYPES mapping is recorded as "confirmed identical on 530 and
+  840, not per-model." That stands as written, because it was
+  established by reading the **stored** `sub_sport` out of profile
+  files, which the fix does not touch. But it was confirmed on a 530
+  running a beta that specifically repairs e-bike categorisation, and
+  that qualification was missing.
+- v1.8.0's user-facing promise is that a clone's rides land in the
+  chosen Connect category. **Gravel is verified end to end. Emountain's
+  upload behaviour is untested on either device**, and on live 530
+  firmware there is public evidence it was broken. The stored value is
+  right either way; the categorisation on older firmware may not be.
+
+### Factory reset does not revert firmware — and the reset is now done
+
+Searched for an official statement and found none. Garmin's reset
+documentation covers settings and user data and never mentions the
+firmware version, and the downgrade threads treat rolling back as a
+separate and difficult process. So: inferred from absence, not
+confirmed. Doug holds a ~29 MB GCD backup, which is the size of a full
+image rather than the patch-style files newer models now ship, so his
+fallback is probably real.
+
+**The reset has since been done, and it produced a finding:** profiles
+and activities were erased, **but `startup.txt` survived** — Doug had
+to edit it by hand to remove his own information. That is worth knowing
+twice over. It is in the toolkit's domain (#49, #79, #87), and it is a
+**privacy trap for anyone selling an Edge**: a factory reset does not
+clear the custom boot message, so personal text can leave with the
+device.
+
+**One cheap check is now available and settles the inference above:**
+the reset device has no activities, but the moment it has a profile or
+a `Totals.fit`, `file_creator` will state the post-reset firmware. If it
+still reads 981, "a reset does not revert firmware" stops being an
+inference.
 
 *Doc rev 228 — 2026-11-25.* **✅ FIELD 331 IS IDENTIFIED: it shows the
 DURATION OF THE MOST RECENTLY COMPLETED LAP — the workout step, inside
