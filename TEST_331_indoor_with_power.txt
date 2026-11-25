@@ -1,0 +1,108 @@
+FIELD 331 -- INDOOR TEST WITH POWER PEDALS FITTED
+Written 2026-11-25, before the ride, so the predictions are predictions.
+
+WORKOUT: 7 x 2:00 @ 185 W, 50 minutes total including warm-up and
+cool-down. Indoor trainer. ROAD profile (NOT Indoor -- 331 is not on
+any Indoor screen).
+
+PREVIOUS INDOOR RIDE: same bike, no power meter, 331 stayed 00:00.
+The only thing changing today is that power is being measured.
+
+---------------------------------------------------------------------
+PREDICTIONS, recorded in advance
+---------------------------------------------------------------------
+
+  ratio reading  (~25% of workout)        12:30   (750 s)
+  constant reading (~820-860 s, 2 rides)  14:00   (840 s)
+  work-interval total (7 x 2:00)          14:00   (840 s)
+  work + recoveries                       28:00   (1680 s)
+
+⚠ "constant ~840" and "work-interval total = 840" PREDICT THE SAME
+NUMBER on this workout. Today cannot separate those two. Only the
+ratio reading is separable, and only by 90 seconds.
+
+SO: today is a STRONG test of the POWER question and a WEAK test of
+the length question. That is fine -- power is the open variable and
+the one worth spending a ride on.
+
+---------------------------------------------------------------------
+THE ONE THING THAT MATTERS: does it register at all?
+---------------------------------------------------------------------
+
+  ANY non-zero value  -> power is the variable. Target-dependence
+                         established, GPS and elevation excluded as
+                         necessary conditions, and Time in Target
+                         becomes the leading candidate rather than one
+                         survivor among several.
+
+  stays 00:00         -> power is NOT sufficient. Something the
+                         outdoor rides had and the trainer lacks is
+                         required -- GPS or elevation -- or 331 is not
+                         target-related at all. Also a real result.
+
+---------------------------------------------------------------------
+WHAT TO NOTE DURING THE RIDE
+---------------------------------------------------------------------
+
+The UPDATE PATTERN is as unexplained as the value. On both outdoor
+rides it showed a small value early, then sat still for the whole
+workout, then jumped at the completion signal. Checking it at these
+points is the most informative thing you can collect:
+
+  [ ] 0. BEFORE starting -- confirm it reads 00:00
+  [ ] 1. power is actually being read -- the target gauge responding
+         confirms the pedals are paired. If power is not live, the
+         test is void and worth aborting early.
+  [ ] 2. end of the warm-up, before interval 1
+  [ ] 3. immediately after interval 1
+  [ ] 4. immediately after interval 2   <- does it tick per interval?
+  [ ] 5. after interval 4 (halfway)
+  [ ] 6. after interval 7, before the cool-down
+  [ ] 7. the moment the workout signals COMPLETE   <- the jump point
+  [ ] 8. a few minutes into the cool-down
+  [ ] 9. the final value when you stop
+
+Steps 3 and 4 together answer a question nothing has: whether it
+updates per interval or only once at the end. If it moves after
+interval 1 and again after interval 2, it is accumulating and the
+outdoor "it never changed" was an artefact of 10-second sprints being
+too small to see.
+
+---------------------------------------------------------------------
+CONDITIONS FOR THE RESULT TO COUNT
+---------------------------------------------------------------------
+
+  [ ] ROAD profile, not Indoor
+  [ ] power live before the workout starts
+  [ ] run the workout TO COMPLETION -- the value only ever appeared at
+      the completion signal, so an abandoned workout gives a 00:00
+      that means nothing
+  [ ] firmware still 31.33 (do not take the new release first)
+
+---------------------------------------------------------------------
+AFTERWARDS
+---------------------------------------------------------------------
+
+  [ ] send the activity .fit file
+  [ ] send Totals.fit
+  [ ] note the final 331 value and the timeline above
+
+The activity file will give the exact workout structure from its step
+label and the per-interval power, so the predictions can be checked
+against what actually happened rather than what was prescribed -- on
+both outdoor rides the prescribed target was never reached on average,
+which may matter if 331 is target-related.
+
+---------------------------------------------------------------------
+NEXT TIME, IF TODAY REGISTERS
+---------------------------------------------------------------------
+
+Pick a workout of very different total length and predict first. The
+ratio and constant readings separate cleanly at the extremes:
+
+  25 min workout -> ratio says  6:15, constant says ~14:00
+  30 min workout -> ratio says  7:30, constant says ~14:00
+  75 min workout -> ratio says 18:45, constant says ~14:00
+  90 min workout -> ratio says 22:30, constant says ~14:00
+
+A 30-minute workout is the cheapest decisive one.

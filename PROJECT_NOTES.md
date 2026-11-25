@@ -184,10 +184,48 @@ practice regardless.*
 ### Hardware
 
 Edge **530** (USB mass storage) — the regression baseline every
-confirmed 530 finding rests on, deliberately kept. Edge **840**
-(firmware 29.22, **MTP**, no mass-storage mode), acquired 2026-09-22.
+confirmed 530 finding rests on. **Being sold**, which closes #165 and
+ends any further 530 verification; see the maintenance note above.
+Edge **840** (**MTP**, no mass-storage mode), acquired 2026-09-22 on
+firmware 29.22.
 
-Offline mode exists mainly because of the second one: without it every
+**⚠ FIRMWARE PROVENANCE — pin this, do not write "current".** Every
+840 finding in this file was measured on **840 firmware 31.33**.
+Confirmed from the files themselves, not from recollection:
+`device_info` (mesg 23) carries `software_version = 3133` in the
+2026-11-17 activity. The same activity records the paired sensors at
+16.01 and 2.10.
+
+Doug is **deliberately holding 31.33** as of 2026-11-24: a newer
+release landed within days and the forums carry bug reports for things
+he is not seeing on 31.33. That is also the right call for the open
+field-331 experiment — updating mid-investigation would make a changed
+value indistinguishable from the variable being tested.
+
+**HOW 31.33 IS BEING HELD — confirmed on this 840, 2026-11-25.**
+Garmin staged 31.74 as `/Garmin/GUPDATE.GSP`. Deleting that file over
+MTP *before* safely ejecting prevented the install: the 840 restarted
+on 31.33. Forum reports said this works but vary by model, so this is
+now a measured fact for the 840 rather than hearsay.
+
+It is a chore, not a fix — the file returns on the next Connect sync,
+so it has to be repeated. The durable route is the Garmin Connect
+setting that prevents automatic *installation* (the download cannot be
+stopped); Doug is looking for it. There is reportedly no equivalent in
+Garmin Express.
+
+**Why it matters here, not just to the rider:** holding firmware
+constant is what keeps the open field-331 experiment interpretable. If
+the version changes mid-investigation, a changed value becomes
+indistinguishable from the variable being tested. Once 331 is settled,
+an update becomes *useful* — 31.74 might give 331 a label, which would
+answer something this project cannot reach on its own.
+
+Earlier revs say "current firmware" in places. Read that as 31.33 for
+anything dated after the 840 arrived, and **write the number from now
+on** — "current" ages into meaninglessness the moment it is not.
+
+Offline mode exists mainly because of the 840: without it every
 840 profile went OpenMTP → CLI by hand, and the GUI was unavailable on
 exactly the device generating the findings.
 
@@ -322,6 +360,222 @@ Conventions that are load-bearing rather than stylistic:
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
 
 ---
+
+*Doc rev 228 — 2026-11-25.* **✅ FIELD 331 IS IDENTIFIED: it shows the
+DURATION OF THE MOST RECENTLY COMPLETED LAP — the workout step, inside
+a workout. First positive identification in the whole investigation,
+and it overturns rev 227's reading as well as every prediction I
+recorded for the test.**
+
+Full working, tables and the two follow-up tests are in
+`TEST_331_RESULT_2026-11-25.md`. What belongs in the rev stack:
+
+### What established it
+
+Seventeen readings taken **at each change** during a `7x2:00@185W`
+indoor workout on the ROAD profile, power pedals fitted. Placed against
+the activity file's lap messages, **15 of 16 non-trivial readings sit
+within 4 seconds of the length of the lap that had just closed**, and
+the two 00:00 readings both precede the first lap closing. The
+signature is 14:59, then 2:00 / 1:00 alternating in step with the
+intervals, then 14:57 — a sequence that goes DOWN as well as up.
+
+### Which kills a whole family at once
+
+**Nothing that accumulates can decrease.** Every accumulating candidate
+dies on that one property, including **Time in Target**, which had been
+the leading survivor. The rider's average power fell well short of the
+step's target band in **every** work interval — in the worst case
+roughly half of it — so time actually spent in target was nowhere near
+the full two minutes, yet 331 read exactly 2:00 after every one. The
+field is indifferent to whether the target was met.
+
+### ⚠ Power was never the variable — rev 227 is SUPERSEDED on that point
+
+Rev 227 framed the no-power indoor ride as the first evidence of
+target-dependence, and I built `TEST_331_indoor_with_power.txt` around
+varying power alone. Power turns out to matter only in so far as it was
+needed to run the session. The eliminations rev 227 made on the speed
+and cadence side stand; its positive reading does not.
+
+### Two things that do NOT reconcile, both mine
+
+1. **The outdoor finals, 14:20 and 13:41.** Both of those workouts end
+   with a 900 s cool-down step, so both should have read exactly 15:00.
+   They are 40 s and 79 s short; today's equivalent was 3 s short.
+   Always short, never over, across all three rides — the direction is
+   consistent, the magnitude is not. Those were single glances recorded
+   afterwards against today's 17-point series, so the series wins, but
+   40 and 79 seconds is too much to wave away.
+2. ~~**Rev 227's 00:00 itself.**~~ **✅ RESOLVED THE SAME DAY — see the
+   addendum below. It was never a conflict, and my premise about which
+   workout that ride ran was simply wrong.**
+
+### What remains, and it is small
+
+**Id 87 is already named "Last Lap Time"** from the device's own label,
+so 331 is a sibling of it, not the same field. Three candidates remain:
+last-lap *elapsed* vs last-lap *timer* time (indistinguishable today —
+nothing was paused on a trainer, so every lap had `elapsed == timer`);
+last **step** time rather than last **lap** time (identical inside a
+workout, divergent the moment you press Lap outside one); or a
+same-valued field meant for another device family, which would fit 331
+sitting in the unlabelled 840-only group beside SOG and Battery-hours.
+
+Two three-minute tests settle it, both runnable in one trainer session:
+**put 87 beside 331** and see whether they ever diverge, and **press
+Lap with no workout loaded** — a value means lap-based, 00:00 means
+step-based.
+
+### Method lesson, which is the transferable part
+
+Nine data points over several weeks eliminated nine candidates and
+could not have identified anything, because **every one was an
+end-of-ride reading and a latched value is invisible to end-of-ride
+sampling.** No amount of that sampling distinguishes a latch from an
+accumulator. One ride sampled at transitions did it. Sample at the
+transitions, not at the end — and when a quantity's *shape* is unknown,
+establish the shape before predicting values. My three predictions for
+this ride were 12:30, 14:00 and 28:00; all three assumed an
+accumulator, so all three were wrong in the same way.
+
+### ADDENDUM, same day — the 2026-11-24 file settles TWO things
+
+Doug sent the 2026-11-24 activity file rather than re-riding it, which
+was the right call: the file answers from the record what neither of us
+could answer from memory.
+
+**It was not the workout rev 227 says it was.** The file reports
+workout `90W`, step name `Base`, **one single step of 3,180,000 ms =
+53:00**, producing **two laps**: the 53:00 step and a 29 s free-ride
+lap after it. Not `2x14x0:10@290W` — that was the 11-17 *outdoor* ride,
+and I had conflated them. Rev 227 is corrected in place (it was
+uncommitted). No power field appears in any of its 3,210 record
+messages, so the power-free condition is confirmed from the file rather
+than from recollection.
+
+**(a) The 00:00 is fully explained, and there is no conflict.** A
+single-step workout closes exactly one lap, at the very end. So 331
+*correctly* read 00:00 for all 53 minutes — there was no completed lap
+to report. The only window in which it could ever have shown anything
+was the 29 seconds after the workout signalled complete, while Doug was
+stopping. Nothing about power was ever involved.
+
+**(b) It independently kills the rival reading of today's data.** The
+alternative to a latch was a *running* current-lap timer, i.e. plain
+"Lap Time" counting up and caught just before each reset. That reading
+was attractive — it explains the systematic 1-to-4-second shortfalls in
+today's table, it explains the outdoor 14:20 and 13:41 as mid-cool-down
+glances, and **no plain "Lap Time" or "Timer" appears anywhere in the
+213 named ids**, which is conspicuous for a field every Edge has. But a
+running lap timer would have climbed visibly from 00:00 to 53:00 across
+yesterday's single 53-minute lap, and Doug watched it sit at 00:00. So
+331 is **latched, not running.** Two readings, one file, one survives.
+
+That leaves exactly one unexplained item: the outdoor 14:20 and 13:41,
+where both rides' final closed lap was 900 s. Both are single glances
+recorded afterwards, so they are logged as a residual rather than
+treated as counter-evidence — but they are not explained.
+
+*Doc rev 227 — 2026-11-24.* **Ninth data point for field 331, and the
+first NEGATIVE one: a power-target workout with no power meter left it
+at 00:00. Suggestive, but CONFOUNDED — and I overstated it before
+noticing why.**
+
+### The observation
+
+Indoor trainer ride, **ROAD profile** (confirmed — Doug started the
+workout from the training widget while ROAD was active, so the field
+was on screen 12 and visible). The indoor bike has no power meter
+pedals, so the device had nothing to compare against the workout's
+targets. **331 never left 00:00.**
+
+> ⚠ *Amended 2026-11-25 from the activity file, while this rev was
+> still uncommitted: this rev originally said the ride ran
+> `2x14x0:10@290W`. **It did not.** The file says the workout was
+> `90W`, step name `Base`, and it was a **SINGLE STEP of 53:00** — one
+> lap, closing once at the very end. That changes what this rev means
+> entirely; rev 228 has the consequence. The ride WAS confirmed
+> power-free from the same file: no power field in any of 3,210 record
+> messages.*
+
+### Why it looked decisive
+
+If 331 were in the time-based family — time in the workout, time in
+the interval block, time in the sprint steps — it would have
+accumulated regardless of whether power was present, because those
+quantities need only a clock. It did not. That appeared to separate
+the time-based family from the target-dependent one, which is where
+Time in Target lives, and would have been the first evidence doing
+anything other than eliminating a single candidate.
+
+### ⚠ Why it is not decisive — but the gap is NARROWER than first written
+
+*Amended 2026-11-24 after Doug corrected me: **the indoor bike has
+speed and cadence sensors**, so wheel speed and cadence ARE available
+on the trainer. My first draft of this rev said indoor removes "no GPS
+and no GPS-derived speed, as well as no power", which was wrong about
+speed.*
+
+What an indoor ride on that bike actually lacks, against the outdoor
+runs:
+
+| | outdoor | indoor |
+|---|---|---|
+| power | yes | **no** (in this test) |
+| GPS / position | yes | **no** |
+| elevation change | yes | **effectively zero** |
+| **speed** | yes | **YES** — wheel sensor |
+| **cadence** | yes | **YES** — sensor |
+| heart rate | yes | yes |
+
+So the confound is **power, GPS and elevation** — three things, not
+"everything" — and crucially **not speed or cadence.**
+
+### ✅ Which independently eliminates speed- and cadence-derived readings
+
+331 stayed at 00:00 while speed and cadence were both being measured
+normally. So nothing computed from those is a candidate: not pace, not
+average speed, not a cadence timer.
+
+**Pace was already eliminated on magnitude** — the actual riding pace
+was off from the displayed values of 14:20 and 13:41 by roughly a
+factor of three. This is a second, independent reason, arrived at from a
+completely different direction. Two unrelated lines of evidence
+agreeing is worth more than either alone, and it is the first time
+anything in this investigation has been double-eliminated.
+
+### Doug's next test resolves it, and it is the cleanest yet
+
+Move the power meter pedals onto the indoor bike and repeat. That
+holds the indoor environment constant and **varies only power**:
+
+| | power | GPS | elevation | speed/cadence | result |
+|---|---|---|---|---|---|
+| done | no | no | zero | yes | 00:00 |
+| next | **yes** | no | zero | yes | ? |
+
+Only power changes between those two rows. Accumulates →
+**target-dependence established**, with GPS and elevation excluded as
+necessary conditions, and Time in Target becomes the leading candidate
+rather than one survivor among several. Stays at 00:00 → power is not
+sufficient either, and whatever the outdoor rides had that the trainer
+lacks is GPS or elevation, or 331 is not target-related at all.
+
+Cold weather keeps the outdoor variable out of reach for now, which is
+inconvenient for riding and convenient for testing: consecutive indoor
+runs hold far more constant than any two outdoor rides did.
+
+Two conditions for it to count: the **same workout** as one of the
+outdoor runs, and the workout must be **run to completion** — in both
+outdoor cases the value appeared only when the device signalled the
+workout finished, so an abandoned workout would produce a 00:00 that
+means nothing.
+
+*(Doug does not put the carbon outdoor bike on the trainer, which
+clamps at the rear wheel — a reasonable concern about lateral load
+into the chainstay, and the reason the indoor bike is a different bike
+with different instrumentation in the first place.)*
 
 *Doc rev 226 — 2026-11-20.* **MAINTENANCE MODE. An audit before
 agreeing to it: no features or to-do items remain, no TODO/FIXME

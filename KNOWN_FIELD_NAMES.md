@@ -34,9 +34,25 @@ unidentified, it is confirmed to have **no label anywhere**:
 | Edge 530 | **unsupported** — renders as Speed, the fallback for an unknown plain field id |
 
 So 331 needs no further label-hunting on the 840 or in Connect. Both
-have been checked and neither has a string for it. See `PROJECT_NOTES.md`
-Doc revs 220–225 for the seven behavioural candidates eliminated and
-the one remaining lead.
+have been checked and neither has a string for it.
+
+**Its BEHAVIOUR is now identified, even though its label is not:** 331
+displays the **duration of the most recently completed lap** — the
+workout step, inside a structured workout. Established 2026-11-25 from
+seventeen readings taken at each change during a `7x2:00@185W` indoor
+workout, 15 of 16 landing within 4 seconds of the lap that had just
+closed (`TEST_331_RESULT_2026-11-25.md`, Doc rev 228).
+
+It is therefore **not** given a name in the table below, for a reason
+worth stating: **id 87 is already "Last Lap Time"**, from the device's
+own label, so 331 is a sibling of that field and naming it the same
+thing would assert an identity that has not been shown. The remaining
+question is which variant — last-lap elapsed vs timer time, or last
+*step* time rather than last *lap* time. Two three-minute tests settle
+it; rev 228 has them.
+
+Doc revs 220–227 hold the candidates eliminated along the way; note
+that rev 227's power-dependence reading is superseded by rev 228.
 
 | Name | id |
 | %FTP | 42 |
