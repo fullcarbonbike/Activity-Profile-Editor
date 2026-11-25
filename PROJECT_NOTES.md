@@ -194,7 +194,7 @@ firmware 29.22.
 | device | firmware every finding here was measured on |
 |---|---|
 | Edge 840 | **31.33** |
-| Edge 530 | **9.81** — a public BETA that was never promoted to live; the 530's general release is 9.75. See rev 229. |
+| Edge 530 | **9.81** — a public BETA that was never promoted to live; the 530's general release is 9.75. See rev 229. **Still 981 after a factory reset** (rev 230), so a reset does not revert firmware on this model. |
 
 **Read it out of any file, with the toolkit's own walker:** `file_creator`
 (**mesg 49**), field **0** `software_version`, an integer scaled by 100
@@ -373,6 +373,82 @@ Conventions that are load-bearing rather than stylistic:
    → v0.20.1, v0.27.0 → #164, and the LAYOUT_GRIDS drift.
 
 ---
+
+*Doc rev 230 — 2026-11-25.* **A factory-reset 530 produced three
+results in one dump, and the best of them was not the one being looked
+for: ✅ id 111 is CONFIRMED as Garmin factory residue, from a pristine
+device.**
+
+Source: `fit_dump screens -v` and `fit_dump dump` on
+`CyclingRoadROAD.fit`, read off a 530 that had just been factory reset
+— profiles and activities erased, so this is **Garmin's own default
+ROAD profile**, untouched by this toolkit or any user edit. That makes
+it the cleanest reference state the project has ever had, and it
+arrived by accident at the very end.
+
+### ✅ 1. id 111 is factory residue — the strongest form of the proof
+
+Rev 222 closed #111 by arguing 111 was `f7` tail residue rather than a
+real field. That argument rested on edited profiles. This dump settles
+it from a pristine one:
+
+```
+14[1].7 = [48, 6, 13, 3, 5, 77, 56, 48, 6, 111]   f3 = 2
+14[6].7 = [272, 266, 13, 3, 5, 77, 56, 48, 6, 111] f3 = 2
+```
+
+**Two slots in Garmin's factory default profile carry 111 in the `f7`
+tail**, past a declared count of 2. Nothing here was ever written by
+this toolkit. So 111 ships from the factory, sits on every 530 in the
+world, and is read as a field only by a parser that walks all ten `f7`
+entries instead of stopping at `f3`.
+
+That is the complete answer to the `fitfileviewer` author's question,
+and it is a better answer than the one already sent: not "your parser
+over-reads and the extra ids are probably residue" but "**the id you
+asked about is in the factory default profile of a device nobody has
+touched, two slots of it, and your own screenshot showed `nr fields 2`
+right beside it.**" Worth passing on.
+
+### ✅ 2. A factory reset does NOT revert firmware — now measured
+
+```
+file_creator_mesgs[0].software_version = 981
+file_id_mesgs[0].garmin_product = 'edge_530'
+```
+
+Rev 229 inferred this from the absence of any mention in Garmin's reset
+documentation and flagged it as an inference. The post-reset device
+still reads **981 → 9.81**, the never-promoted beta. Inference
+promoted to measured fact, on this model, from the device's own file.
+The firmware survived; the user data did not.
+
+### 3. Context for 331, unlooked-for
+
+The conditional screen at slot 10 (`f10 = 32`, the Reserved/exempt
+state) ships from the factory holding **`[87 Last Lap Time, 84 Last Lap
+Dist]`**. So the device itself pairs id 87 with 84 on its lap-triggered
+screen. Not decisive for 331 — but it establishes that 87 is the id
+Garmin uses natively for last-lap time on a 530, which is the baseline
+TEST A compares against.
+
+Its tail is also a nice specimen of the same residue phenomenon:
+`[87, 84, None, None, 4, 0, 49620, 24754, 7, 0]` — two declared
+fields, then nulls, then values far outside any field-id range.
+
+### ⚠ 4. `fit_dump dump` prints the device serial number
+
+`file_id_mesgs[0].serial_number` is in the output, in the clear. Two
+places that matters:
+
+- **The video.** A `dump` on camera puts the serial on screen. It goes
+  on the redaction checklist for #175 alongside the serial-keyed backup
+  folder names.
+- **Forum posts.** Anyone pasting a `dump` to help diagnose something
+  publishes their device serial without noticing. The toolkit has no
+  `--redact` option, and a one-line mask on that field would fix it for
+  every user, not just this one. Recorded as a candidate, not built —
+  the project is in maintenance mode and the call is Doug's.
 
 *Doc rev 229 — 2026-11-25.* **✅ THE FIRMWARE VERSION WAS IN EVERY FILE
 ALL ALONG — `file_creator` (mesg 49) field 0, scaled by 100. Doug was
