@@ -36,23 +36,27 @@ unidentified, it is confirmed to have **no label anywhere**:
 So 331 needs no further label-hunting on the 840 or in Connect. Both
 have been checked and neither has a string for it.
 
-**Its BEHAVIOUR is now identified, even though its label is not:** 331
-displays the **duration of the most recently completed lap** — the
-workout step, inside a structured workout. Established 2026-11-25 from
-seventeen readings taken at each change during a `7x2:00@185W` indoor
-workout, 15 of 16 landing within 4 seconds of the lap that had just
-closed (`TEST_331_RESULT_2026-11-25.md`, Doc rev 228).
+**✅ IDENTIFIED 2026-11-28: 331 is an UNLABELLED LAST LAP TIME.** It
+carries the same value as **id 87 "Last Lap Time"**, and differs only
+in rendering: 87 shows hundredths of a second as a small superscript,
+331 has no subscript field and shows whole seconds only.
 
-It is therefore **not** given a name in the table below, for a reason
-worth stating: **id 87 is already "Last Lap Time"**, from the device's
-own label, so 331 is a sibling of that field and naming it the same
-thing would assert an identity that has not been shown. The remaining
-question is which variant — last-lap elapsed vs timer time, or last
-*step* time rather than last *lap* time. Two three-minute tests settle
-it; rev 228 has them.
+Proven by putting both fields on one screen and comparing them live:
+they matched exactly at every power transition of a Sprint workout, and
+again on a manually pressed **Lap button** during a Base workout — the
+manual lap also proving 331 is lap-based rather than workout-step-based.
+Photographed. See `TEST_331_RESULT_2026-11-25.md` and Doc revs 228–231.
 
-Doc revs 220–227 hold the candidates eliminated along the way; note
-that rev 227's power-dependence reading is superseded by rev 228.
+It is **still not given a name in the table below**, deliberately. The
+device has no string for it on any surface, so any name here would be
+this project's invention rather than Garmin's label, and the table's
+value is that every entry in it came off a device. Its behaviour is
+documented here instead, which is the honest form.
+
+Doc revs 220–227 hold the nine candidates eliminated along the way;
+note that rev 227's power-dependence reading is superseded by rev 228.
+One thing in the file was never explained: two outdoor readings of
+14:20 and 13:41 where the closing lap was 900 s.
 
 | Name | id |
 | %FTP | 42 |

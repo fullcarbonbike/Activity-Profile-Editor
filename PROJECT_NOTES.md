@@ -374,6 +374,79 @@ Conventions that are load-bearing rather than stylistic:
 
 ---
 
+*Doc rev 231 — 2026-11-28.* **✅✅ FIELD 331 IS CLOSED. It is an
+UNLABELLED LAST LAP TIME — the same value as id 87, rendered without
+87's hundredths-of-a-second subscript. Doug's side-by-side settled it,
+and because he used the LAP BUTTON it settled the second open question
+at the same time.**
+
+### The test, and the photograph
+
+331 and 87 placed on the same screen. Two sessions: a Sprint workout
+checked at every power transition, and a Base workout with the **Lap
+button pressed manually**. The two fields **matched exactly, every
+time.** Photographed: 331 reading `5:19` directly above `LAST LAP TIME
+5:19`&nbsp;with a superscript `28`.
+
+### Which row of the decision table
+
+`TEST_331_RESULT_2026-11-25.md` listed five outcomes in advance. The
+result is row 2 — **both frozen, always equal → a duplicate of Last Lap
+Time, investigation closed** — with one refinement nobody predicted:
+**331 omits the hundredths.** 87 renders `5:19` plus a small `28`; 331
+renders `5:19` and has no subscript field at all. Same quantity,
+coarser presentation. Whether it truncates or rounds is undetermined —
+one sample, and `.28` goes the same way either way.
+
+### ✅ And it killed the step-vs-lap question for free
+
+The last live alternative was that 331 was **workout-step**-based
+rather than **lap**-based — row 5 of the table, "331 stays 00:00 while
+87 shows a value". That was TEST B, and it was supposed to need its own
+ride.
+
+Doug pressed the **Lap button** during a Base workout. A manual lap is
+not a workout step. **331 responded.** So 331 is lap-based, and a
+separate TEST B is unnecessary — the result was already in hand. Worth
+noticing *why*: the test was designed to answer one question and
+answered two, because pressing Lap put the two hypotheses in opposition
+without either of us planning it.
+
+### What this makes of rev 228
+
+Rev 228's identification — "duration of the most recently completed
+lap" — is **confirmed in full**, by direct comparison against a labelled
+field rather than by inference from a lap table. Rev 230's incidental
+note turns out to have been the relevant one: the factory conditional
+screen ships with 87 on it, so 87 was the device's own reference all
+along.
+
+### The last loose end, and it stays open
+
+The outdoor finals of 14:20 and 13:41, against a 900 s closing lap on
+both rides. The hundredths finding does not explain them — truncation
+costs at most one second, not forty or seventy-nine. Two single glances
+recorded from memory against a 17-point series, a 53-minute null and
+now a photographed side-by-side. **Logged as unexplained, not
+resolved.** It is the only thing in #163 that was never accounted for.
+
+### A pattern across the whole unlabelled group
+
+The photograph shows all four of the unlabelled 840-only ids on one
+screen, and they have something in common:
+
+| id | renders as |
+|---|---|
+| 331 | last lap time, **whole seconds**, no hundredths |
+| 358 | elevation **plus** ascent and descent counts in one tile |
+| 395 | battery as **hours remaining**, not a percentage |
+
+Each is a **more compact or more composite presentation** than its
+labelled equivalent. That is consistent with the group belonging to a
+different product family's field set — which was Doug's own guess back
+when the only evidence was that Connect's phone app had no description
+for any of them. Recorded as a pattern, not a conclusion.
+
 *Doc rev 230 — 2026-11-25.* **A factory-reset 530 produced three
 results in one dump, and the best of them was not the one being looked
 for: ✅ id 111 is CONFIRMED as Garmin factory residue, from a pristine
